@@ -6,20 +6,25 @@ use rand::{
 };
 use serde_derive::{Deserialize, Serialize};
 use serde_json;
-use std::{collections::HashMap, io, isize, u8, usize};
+use std::{collections::HashMap, io, isize, rc::Rc, u8, usize};
+
+// TODO: ACTUALLY IMPORTANT STUFF
+// Split this file into 3 parts: 1 for the setup, 1 for the engine, and 1 for the all the commonly
+// used stuff (enums for roles, alignment, etc)
+// Maybe even split up the engine into two parts, one part for the setup of the engine and the
+// other parts for game logic
+// Definitely need more modularity, maybe sketch out all the modules that need to be in your system
+// and how they will interact: what data they should be passing to each other and what not
+// Refactor the engine (currently there seems to be a lot of issues in how the gameplay loop is
+// implemented)
 
 fn main() {
     // -- Setup --
     // First need to have the story teller upload a script with a list of roles
     //      Should make sure these roles are implemented before starting the game
 
-    // TODO: Make this json parsing not shit
-
     let script = get_script();
 
-    // TODO: Implement the rest of main to understand the API
-    // TODO: Allow player to input player seating order (this maybe should happen earlier)
-    // Can be used to get the number of players instead (instead of counting)?
     let player_names = get_player_names();
     // let num_players = get_player_count();
 
@@ -58,11 +63,12 @@ fn main() {
     loop {
         game.resolve_day();
         if game.game_over() {
-            // TODO: Game over
             break;
         }
         game.resolve_night();
     }
+
+    println!("Game Over!");
 }
 
 fn get_script() -> Script {
@@ -141,9 +147,6 @@ fn get_player_count() -> usize {
 
 fn choose_roles(num_players: usize, mut script: Script) -> Vec<Role> {
     // TODO: Implement a method to check if a role alters the setup
-    // TODO: Add option to stop adding roles when a certain number of characters is reached
-    // TODO: Add option to remove roles
-    // TODO: Validate proper character counts after done
     let mut roles: Vec<Role> = vec![];
     let player_counts = PlayerCounts::new(num_players).unwrap();
     let mut temp_counts = PlayerCounts::new_empty();
@@ -365,8 +368,11 @@ impl PlayerCounts {
 // -- Game Structures --
 
 struct Game {
-    players: Vec<Player>, // TODO: Maybe should be a map instead
+    players: Vec<Player>, // NOTE: Maybe should be a map instead
+    // Want to have pointers to players
     win_cond_i: Option<usize>,
+    // WARNING: Deprecated for now - active_roles: HashMap<Role, usize>, // Should hold a role and the corresponding player's index
+    // TODO: Implement a log here of all the events that have happened during the game
 }
 
 impl Game {
@@ -395,9 +401,18 @@ impl Game {
 
         let win_cond_i = players.iter().position(|p| p.role.is_win_condition());
 
+        // WARNING: Deprecated for now, might need to remove later
+        // let mut active_roles: HashMap<Role, usize> = HashMap::new();
+        //
+        // let index = 0;
+        // for player in players.iter() {
+        //     active_roles.insert(player.role.clone(), index);
+        // }
+
         return Ok(Self {
             players,
             win_cond_i,
+            // active_roles,
         });
     }
 
@@ -418,6 +433,13 @@ impl Game {
             return false;
         }
 
+        // Resolve the player's death
+        // TODO: Need to figure out a clean way to handle this
+        // Usually when a player dies, their ability is deactivated. However there are a few
+        // exceptions: Recluse, Spy, Ravenkeeper, Zombuul
+        // Ideas: Maybe make a match where the default case is deactivate the ability upon death
+        // but for other cases you actually want to activate the ability
+        // Feels like I need to refactor something here
         player.dead = true;
         return true;
     }
@@ -433,11 +455,14 @@ impl Game {
         self.win_cond_i = Some(self.get_player_index(player));
     }
 
-    // NOTE: Very inefficient and need to find a better way to do this
-    fn get_role_list(&self) -> Vec<Role> {
-        let mut result: Vec<Role> = vec![];
-        for player in self.players.iter() {
-            result.push(player.role.clone());
+    fn get_active_roles(&self) -> Vec<usize> {
+        let mut result: Vec<usize> = vec![];
+        for i in 0..self.players.len() {
+            let player = &self.players[i];
+            if !player.ability_active {
+                continue;
+            }
+            result.push(i);
         }
 
         return result;
@@ -458,10 +483,9 @@ impl Game {
     }
 
     fn resolve_night_1(&self) {
-        // TODO: Implement this method
         // Order the roles in this game to get the order they should be woken up in (should be
         // unique to night 1)
-        let ordered_roles = Role::get_night_1_order(self.get_role_list());
+        let ordered_player_indices = self.get_night_1_order(self.get_active_roles());
         // Wake each role up in order and show them the information they need to know, or the
         // choices that they get
         // For each choice:
@@ -470,16 +494,126 @@ impl Game {
         //      Should be calling a generic method on the role class to get info on the role's
         //      ability
         // Once you have gone through all the roles, nothing to do: wake everyone up
-        for role in ordered_roles.iter() {
-            self.resolve_night_1_ability(*role);
+        for i in ordered_player_indices.iter() {
+            self.resolve_night_1_ability(*i);
         }
-        todo!();
     }
 
-    fn resolve_night_1_ability(&self, role: Role) {
+    fn get_night_1_order(&self, player_indices: Vec<usize>) -> Vec<usize> {
+        // Go through all roles and assign each of them a number
+        // Maps night_order to player index
+        let mut order_map: HashMap<usize, usize> = HashMap::new();
+        for index in player_indices {
+            let role = self.players[index].role;
+            let order: usize = match role {
+                // Role::DUSK => 0,
+                // Role::Lordoftyphon => 1,
+                // Role::Kazali => 2,
+                // Role::Apprentice => 3,
+                // Role::Barista => 4,
+                // Role::Bureaucrat => 5,
+                // Role::Thief => 6,
+                // Role::Boffin => 7,
+                // Role::Philosopher => 8,
+                // Role::Alchemist => 9,
+                // Role::Poppygrower => 10,
+                // Role::Yaggababble => 11,
+                // Role::Magician => 12,
+                // Role::MINION => 13, TODO: Need to implement this shit
+                // Role::Snitch => 14,
+                // Role::Lunatic => 15,
+                // Role::Summoner => 16,
+                // Role::DEMON => 17, TODO: Need to implement this shit
+                // Role::King => 18,
+                // Role::Sailor => 19,
+                // Role::Marionette => 20,
+                // Role::Engineer => 21,
+                // Role::Preacher => 22,
+                // Role::Lilmonsta => 23,
+                // Role::Lleech => 24,
+                // Role::Xaan => 25,
+                // Role::Poisoner => 26,
+                // Role::Widow => 27,
+                // Role::Courtier => 28,
+                // Role::Wizard => 29,
+                // Role::Snakecharmer => 30,
+                // Role::Godfather => 31,
+                // Role::Organgrinder => 32,
+                // Role::Devilsadvocate => 33,
+                // Role::Eviltwin => 34,
+                // Role::Witch => 35,
+                // Role::Cerenovus => 36,
+                // Role::Fearmonger => 37,
+                // Role::Harpy => 38,
+                // Role::Mezepheles => 39,
+                // Role::Pukka => 40,
+                // Role::Pixie => 41,
+                // Role::Huntsman => 42,
+                // Role::Damsel => 43,
+                // Role::Amnesiac => 44,
+                Role::Washerwoman => 45,
+                Role::Librarian => 46,
+                Role::Investigator => 47,
+                Role::Chef => 48,
+                Role::Empath => 49,
+                Role::Fortuneteller => 50,
+                Role::Butler => 51,
+                // Role::Grandmother => 52,
+                // Role::Clockmaker => 53,
+                // Role::Dreamer => 54,
+                // Role::Seamstress => 55,
+                // Role::Steward => 56,
+                // Role::Knight => 57,
+                // Role::Noble => 58,
+                // Role::Balloonist => 59,
+                // Role::Shugenja => 60,
+                // Role::Villageidiot => 61,
+                // Role::Bountyhunter => 62,
+                // Role::Nightwatchman => 63,
+                // Role::Cultleader => 64,
+                Role::Spy => 65,
+                // Role::Ogre => 66,
+                // Role::Highpriestess => 67,
+                // Role::General => 68,
+                // Role::Chambermaid => 69,
+                // Role::Mathematician => 70,
+                // Role::DAWN => 71, TODO: Figure out wtf this means
+                // Role::Leviathan => 72,
+                // Role::Vizier => 73
+                _ => 0,
+            };
+            if order != 0 {
+                order_map.insert(order, index);
+            }
+        }
+
+        let mut final_order: Vec<usize> = vec![];
+        // Pull out the minimum number role and put it into vector until all roles are ordered
+        while order_map.keys().len() != 0 {
+            let min_key = *order_map
+                .keys()
+                .min()
+                .expect("There should be an minimum in the map");
+            let next_role = order_map.remove(&min_key).unwrap();
+            final_order.push(next_role);
+        }
+
+        // Return the new vector
+        return final_order;
+    }
+
+    fn resolve_night_1_ability(&self, player_index: usize) {
+        // Check if the role is active before resolving their ability, skip if the role is
+        // inactive, but also warn
+        // eprintln!("An inactive role tried to act during the night");
         // TODO: Implement abilities for every role
+        let player = &self.players[player_index];
+        let role = player.role;
         match role {
-            Role::Investigator => todo!(),
+            Role::Investigator => {
+                // WARNING: Can't actually resolve this, this should be decided during setup
+                todo!()
+            }
             Role::Empath => todo!(),
             Role::Gossip => todo!(),
             Role::Innkeeper => todo!(),
@@ -488,12 +622,15 @@ impl Game {
             Role::Chef => todo!(),
             Role::Fortuneteller => todo!(),
             Role::Undertaker => todo!(),
-            Role::Virgin => todo!(),
+            Role::Virgin => {
+                // Add a status effect that if someone nominates you, they die
+                // Maybe instead add this to the nominate method
+                todo!()
+            }
             Role::Soldier => todo!(),
             Role::Slayer => todo!(),
             Role::Mayor => todo!(),
             Role::Monk => todo!(),
-            Role::Ravenkeeper => todo!(),
             Role::Drunk => todo!(),
             Role::Saint => todo!(),
             Role::Butler => todo!(),
@@ -503,14 +640,37 @@ impl Game {
             Role::Scarletwoman => todo!(),
             Role::Poisoner => todo!(),
             Role::Imp => todo!(),
+            Role::Ravenkeeper => todo!(),
         }
+
+        // TODO: The event should be logged at some point
     }
 
     fn resolve_day(&self) {
+        // Only a few roles act during the day, and the storyteller only really needs to mark
+        // whether someone claimed something
+        // Some roles like savant come to the story teller during the day, the story teller should
+        // have options for all such roles in the game. These options should be shown all at once,
+        // (Like "these roles may come up to you today/ act during the day")
+        // and the storyteller should be able to quickly log that these events happened
+        //
+        // FIX: For now, this method will just do nothing. The functionality for it can be
+        // implemented later
         todo!();
     }
 
     fn resolve_night(&self) {
+        // TODO: Implement this method
+        // Order the roles in this game to get the order they should be woken up in (should be
+        // different from night 1)
+        // Wake each role up in order and show them the information they need to know, or the
+        // choices that they get
+        // For each choice:
+        //      If that choice impacts the game state, change the game state accordingly
+        //      If that choice tells the player info, give them that info
+        //      Should be calling a generic method on the role class to get info on the role's
+        //      ability
+        // Once you have gone through all the roles, nothing to do: wake everyone up
         todo!();
     }
 }
@@ -598,108 +758,13 @@ impl Role {
             _ => false,
         }
     }
-
-    fn get_night_1_order(roles: Vec<Role>) -> Vec<Role> {
-        // TODO:
-        // Go through all roles and assign each of them a number (maybe use a map for this)
-        let mut order_map: HashMap<usize, Role> = HashMap::new();
-        for role in roles {
-            let order: usize = match role {
-                // Role::DUSK => 0,
-                // Role::Lordoftyphon => 1,
-                // Role::Kazali => 2,
-                // Role::Apprentice => 3,
-                // Role::Barista => 4,
-                // Role::Bureaucrat => 5,
-                // Role::Thief => 6,
-                // Role::Boffin => 7,
-                // Role::Philosopher => 8,
-                // Role::Alchemist => 9,
-                // Role::Poppygrower => 10,
-                // Role::Yaggababble => 11,
-                // Role::Magician => 12,
-                // Role::MINION => 13, TODO: Need to implement this shit
-                // Role::Snitch => 14,
-                // Role::Lunatic => 15,
-                // Role::Summoner => 16,
-                // Role::DEMON => 17, TODO: Need to implement this shit
-                // Role::King => 18,
-                // Role::Sailor => 19,
-                // Role::Marionette => 20,
-                // Role::Engineer => 21,
-                // Role::Preacher => 22,
-                // Role::Lilmonsta => 23,
-                // Role::Lleech => 24,
-                // Role::Xaan => 25,
-                // Role::Poisoner => 26,
-                // Role::Widow => 27,
-                // Role::Courtier => 28,
-                // Role::Wizard => 29,
-                // Role::Snakecharmer => 30,
-                // Role::Godfather => 31,
-                // Role::Organgrinder => 32,
-                // Role::Devilsadvocate => 33,
-                // Role::Eviltwin => 34,
-                // Role::Witch => 35,
-                // Role::Cerenovus => 36,
-                // Role::Fearmonger => 37,
-                // Role::Harpy => 38,
-                // Role::Mezepheles => 39,
-                // Role::Pukka => 40,
-                // Role::Pixie => 41,
-                // Role::Huntsman => 42,
-                // Role::Damsel => 43,
-                // Role::Amnesiac => 44,
-                Role::Washerwoman => 45,
-                Role::Librarian => 46,
-                Role::Investigator => 47,
-                Role::Chef => 48,
-                Role::Empath => 49,
-                Role::Fortuneteller => 50,
-                Role::Butler => 51,
-                // Role::Grandmother => 52,
-                // Role::Clockmaker => 53,
-                // Role::Dreamer => 54,
-                // Role::Seamstress => 55,
-                // Role::Steward => 56,
-                // Role::Knight => 57,
-                // Role::Noble => 58,
-                // Role::Balloonist => 59,
-                // Role::Shugenja => 60,
-                // Role::Villageidiot => 61,
-                // Role::Bountyhunter => 62,
-                // Role::Nightwatchman => 63,
-                // Role::Cultleader => 64,
-                Role::Spy => 65,
-                // Role::Ogre => 66,
-                // Role::Highpriestess => 67,
-                // Role::General => 68,
-                // Role::Chambermaid => 69,
-                // Role::Mathematician => 70,
-                // Role::DAWN => 71, TODO: Figure out wtf this means
-                // Role::Leviathan => 72,
-                // Role::Vizier => 73
-                _ => 0,
-            };
-            order_map.insert(order, role);
-        }
-
-        let mut final_order: Vec<Role> = vec![];
-        // Pull out the minimum number role and put it into vector until all roles are ordered
-        while order_map.keys().len() != 0 {
-            let min_key = *order_map
-                .keys()
-                .min()
-                .expect("There should be an minimum in the map");
-            let next_role = order_map.remove(&min_key).unwrap();
-            final_order.push(next_role);
-        }
-
-        // Return the new vector
-        return final_order;
-    }
 }
 
+struct StatusEffect {
+    status_type: StatusEffects,
+    inflicting_role: Role,
+    inflicting_player_index: usize,
+}
 #[derive(Clone, Copy, Hash, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum StatusEffects {
     Drunk,
@@ -714,6 +779,8 @@ struct Player {
     role: Role,
     // Order should be implemented through external array
     dead: bool,
+    ability_active: bool, // WARNING: Not too happy about this implementation, might want to make
+    // it cleaner
     ghost_vote: bool,
     alignment: Alignment,
     statuses: Vec<StatusEffects>,
@@ -725,6 +792,7 @@ impl Player {
             name,
             role,
             ghost_vote: true,
+            ability_active: true,
             statuses: vec![],
             dead: false,
             alignment: role.get_default_alignment(),
