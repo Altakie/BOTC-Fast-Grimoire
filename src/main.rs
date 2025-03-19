@@ -13,6 +13,14 @@ use std::{collections::HashMap, io};
 // and how they will interact: what data they should be passing to each other and what not
 // Refactor the engine (currently there seems to be a lot of issues in how the gameplay loop is
 // implemented)
+//
+// TODO: Seems to be a lot of prompting the storyteller to do something, but that isn't actually
+// implemented
+// Need to figure out types of prompts for the storyteller:
+// Choose a number of players
+// Choose a role/roles
+//
+// TODO: Also I need to implement logging like real bad. It would help test a lot of my methods
 
 fn main() {
     // -- Setup --
@@ -56,9 +64,6 @@ fn main() {
     // step as resolved
 
     game.resolve_night_1();
-    // TODO: Keep a list of alive roles that are active
-    // Whenever someone dies, remove that role from the list
-    // Order that list by night order (should be different for night one and other nights)
     loop {
         game.resolve_day();
         if game.game_over() {
@@ -145,7 +150,6 @@ fn get_player_count() -> usize {
 }
 
 fn choose_roles(num_players: usize, mut script: Script) -> Vec<Role> {
-    // TODO: Implement a method to check if a role alters the setup
     let mut roles: Vec<Role> = vec![];
     let player_counts = PlayerCounts::new(num_players).unwrap();
     let mut temp_counts = PlayerCounts::new_empty();
@@ -379,8 +383,10 @@ struct Game {
     players: Vec<Player>, // NOTE: Maybe should be a map instead
     // Want to have pointers to players
     win_cond_i: Option<PlayerIndex>,
-    status_effects: Vec<StatusEffect>, // WARNING: Deprecated for now - active_roles: HashMap<Role, usize>, // Should hold a role and the corresponding player's index
-                                       // TODO: Implement a log here of all the events that have happened during the game
+    status_effects: Vec<StatusEffect>,
+    day_phase: DayPhase,
+    day_num: usize,
+    // TODO: Implement a log here of all the events that have happened during the game
 }
 
 impl Game {
@@ -410,22 +416,53 @@ impl Game {
         let win_cond_i = players.iter().position(|p| p.role.is_win_condition());
         let status_effects: Vec<StatusEffect> = vec![];
 
-        // WARNING: Deprecated for now, might need to remove later
-        // let mut active_roles: HashMap<Role, usize> = HashMap::new();
-        //
-        // let index = 0;
-        // for player in players.iter() {
-        //     active_roles.insert(player.role.clone(), index);
-        // }
-
         return Ok(Self {
             players,
             win_cond_i,
             status_effects, // active_roles,
+            day_phase: DayPhase::Night,
+            day_num: 0,
         });
     }
 
     fn setup(&mut self) {
+        // TODO: Thoughts
+        // Honestly should be a part of creating the new game state but want it to be more modular
+        // Basically, want to collect a list of roles that are in the game
+        // Then check if any of these roles alter the setup (match statement will do fine here,
+        // should exclude roles that just alter character type counts)
+        // Then for each role, resolve the specifc effect it has on setup
+        for player_index in 0..self.players.len() {
+            let role = &self.players[player_index].role;
+
+            match role {
+                Role::Washerwoman => {
+                    // TODO: Prompt storyteller to select two players
+                    // Check that at least one of those players is a townsfolk
+                    todo!()
+                }
+                Role::Librarian => {
+                    // TODO: Prompt storyteller to select two players
+                    // Check that at least one of those players is a townsfolk
+                    todo!()
+                }
+                Role::Investigator => {
+                    // TODO: Prompt storyteller to select two players
+                    // Check that at least one of those players is a townsfolk
+                    todo!()
+                }
+                Role::Drunk => {
+                    // TODO: Choose a townsfolk role for the storyteller to replace the drunk with
+                    // Swap the chosen role with drunk, but give them a status effect that they
+                    // are actually the drunk
+                    // Essentially, the drunk should never actually be in play, the actual role
+                    // should be swapped out but a note is added that this player is indeed the
+                    // drunk
+                    todo!()
+                }
+                _ => (),
+            }
+        }
         todo!();
     }
 
@@ -485,12 +522,26 @@ impl Game {
     }
 
     // Should return true if the player was successfully killed, false if the player failed to die
-    fn kill_player(&mut self, player_index: PlayerIndex) -> bool {
+    fn kill_player(
+        &mut self,
+        attacking_player_index: PlayerIndex,
+        target_player_index: PlayerIndex,
+    ) -> bool {
         // Find the target player in the array and set their status to dead
         if self
-            .get_afflicted_statuses(player_index)
+            .get_afflicted_statuses(target_player_index)
             .iter()
-            .any(|s| s.status_type == StatusEffects::Protected)
+            .any(|s| match s.status_type {
+                StatusEffects::DeathProtected => true,
+                StatusEffects::NightProtected if self.day_phase == DayPhase::Night => true,
+                StatusEffects::DemonProtected
+                    if self.players[attacking_player_index].role.get_type()
+                        == CharacterType::Demon =>
+                {
+                    true
+                }
+                _ => false,
+            })
         {
             return false;
         }
@@ -502,9 +553,27 @@ impl Game {
         // Ideas: Maybe make a match where the default case is deactivate the ability upon death
         // but for other cases you actually want to activate the ability
         // Feels like I need to refactor something here
-        let player = self.players.get_mut(player_index).unwrap();
+        let player = self.players.get_mut(target_player_index).unwrap();
         player.dead = true;
         return true;
+    }
+
+    fn nominate_player(
+        &mut self,
+        source_player_index: PlayerIndex,
+        target_player_index: PlayerIndex,
+    ) -> bool {
+        todo!()
+        // Should execute the target player if the nomination succeeds
+        // For now just check for virgin and whether enough votes to pass
+        // Storyteller should input vote count
+    }
+
+    fn execute_player(&mut self, target_player_index: PlayerIndex) {
+        // Execute a player
+        // Check if there is something that stops the player's death
+        // End the day
+        todo!()
     }
 
     fn left_player(&self, player_index: PlayerIndex) -> PlayerIndex {
@@ -558,6 +627,7 @@ impl Game {
     }
 
     fn resolve_night_1(&mut self) {
+        self.day_phase = DayPhase::Night;
         // Order the roles in this game to get the order they should be woken up in (should be
         // unique to night 1)
         let ordered_player_indices = self.get_night_1_order(self.get_active_roles());
@@ -706,10 +776,10 @@ impl Game {
                 // For now, just print output
                 println!("Empath count: {}", count);
             }
-            Role::Gossip => todo!(),
-            Role::Innkeeper => todo!(),
-            Role::Washerwoman => todo!(),
-            Role::Librarian => todo!(),
+            Role::Gossip => todo!(),      // Should wait till v2
+            Role::Innkeeper => todo!(),   // Should wait till v2
+            Role::Washerwoman => todo!(), // Setup
+            Role::Librarian => todo!(),   // Setup
             Role::Chef => {
                 // Count pairs of evil players
                 // For each evil, player, check if the right player is evil, if yes, increment the
@@ -743,21 +813,41 @@ impl Game {
             }
             Role::Soldier => {
                 // Just add protected status effect and only remove upon death
-                self.add_status(StatusEffects::Protected, player_index, player_index);
+                self.add_status(StatusEffects::DemonProtected, player_index, player_index);
             }
             Role::Slayer => todo!(), // No night one ability
-            Role::Mayor => todo!(),  // No night one ability
-            Role::Monk => todo!(),   // No night one ability
-            Role::Drunk => todo!(),  // Should be handled during setup
+            Role::Mayor => {
+                // No night one ability, but add effect to yourself
+                self.add_status(StatusEffects::MayorBounceKill, player_index, player_index);
+            }
+            Role::Monk => todo!(), // No night one ability
+            Role::Drunk => {
+                // WARNING: This one is a little difficult
+                // Maybe just add the role but make them drunk?
+                // Maybe during setup swap the drunk with another role if they are selected but
+                // give them a status effect as well?
+                todo!()
+            } // Should be handled during setup, also gets mimiced
+            // role's ability
             Role::Saint => todo!(),  // No night one ability
-            Role::Butler => todo!(),
-            Role::Recluse => todo!(),      // Status effect?
-            Role::Spy => todo!(),          // Status effect and look at grimoire?
+            Role::Butler => todo!(), // Status effect?, also same as normal ability
+            Role::Recluse => {
+                // Status effect
+                self.add_status(StatusEffects::AppearsEvil, player_index, player_index);
+            }
+            Role::Spy => {
+                // Status effect and look at grimoire?
+                self.add_status(StatusEffects::AppearsEvil, player_index, player_index);
+                // Just tell the storyteller to let the spy look at the grimoire
+                todo!()
+            }
             Role::Baron => todo!(),        // Should affect setup
             Role::Scarletwoman => todo!(), // Basically shouldn't happen night one
-            Role::Poisoner => todo!(),     // Add poison to someone until next night
-            Role::Imp => todo!(),          // Nothing to do night one
-            Role::Ravenkeeper => todo!(),
+            Role::Poisoner => todo!(),     // Add poison to someone until next night, same as
+            // normal ability
+            Role::Imp => todo!(), // Nothing to do night one
+            Role::Ravenkeeper => todo!(), // No night ability unless they die, same as normal
+                                   // ability
         }
 
         // TODO: Method should wait until storyteller explicitly advances to the next phase
@@ -765,7 +855,7 @@ impl Game {
         // TODO: The event should be logged at some point
     }
 
-    fn resolve_day(&self) {
+    fn resolve_day(&mut self) {
         // Only a few roles act during the day, and the storyteller only really needs to mark
         // whether someone claimed something
         // Some roles like savant come to the story teller during the day, the story teller should
@@ -775,6 +865,7 @@ impl Game {
         //
         // FIX: For now, this method will just do nothing. The functionality for it can be
         // implemented later
+        self.day_phase = DayPhase::Day;
         todo!();
     }
 
@@ -792,6 +883,61 @@ impl Game {
         // Once you have gone through all the roles, nothing to do: wake everyone up
         todo!();
     }
+}
+
+// -- Logging --
+// TODO: Implement all events
+enum EventType {
+    // Game Time Events
+    DayStart,
+    DayEnd,
+    NightStart,
+    NightEnd,
+    // Player Events
+    Nomination,
+    Execution,
+    AttemptedKill,
+    Protected,
+    Death,
+    // Ability Specific Events
+}
+
+trait Event {
+    fn get_description(&self) -> String;
+
+    fn get_type(&self) -> EventType;
+
+    fn get_reason(&self) -> Option<String> {
+        return None;
+    }
+
+    fn get_affected_player(&self) -> Option<PlayerIndex> {
+        return None;
+    }
+
+    fn get_cause_player(&self) -> Option<PlayerIndex> {
+        return None;
+    }
+}
+
+#[derive(PartialEq)]
+enum DayPhase {
+    Day,
+    Night,
+}
+
+struct DayPhaseLog {
+    day_phase: DayPhase,
+    log: Vec<Box<dyn Event>>,
+}
+
+struct Nychthemeron {
+    day_num: usize,
+    log: DayPhaseLog,
+}
+struct Log {
+    // TODO: Make this a tree eventually
+    nychthemrons: Vec<Nychthemeron>,
 }
 
 #[derive(Clone, Copy, Hash, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -838,12 +984,9 @@ enum Role {
 }
 
 impl Role {
-    // Also need to define an order on these roles as to their first night order and night order
     fn get_default_alignment(&self) -> Alignment {
-        match *self {
-            Role::Spy | Role::Baron | Role::Scarletwoman | Role::Poisoner | Role::Imp => {
-                Alignment::Evil
-            }
+        match self.get_type() {
+            CharacterType::Minion | CharacterType::Demon => Alignment::Evil,
             _ => Alignment::Good,
         }
     }
@@ -872,20 +1015,13 @@ impl Role {
     }
 
     fn is_win_condition(&self) -> bool {
-        match *self {
-            Role::Imp => true,
+        match self.get_type() {
+            CharacterType::Demon => true,
             _ => false,
         }
     }
 }
 
-// FIX: I no likey this. Each player has a list of status effects and it's just really weird to go
-// through each list and check which status effects are active
-// Makes removing status effects really weird without
-// Maybe have a shared list of status effects, and those status effects have a player index that
-// they are affecting.
-// That way I can use iters to get the values I need from the list
-// In theory, shouldn't be too ineffcient as checking the list might actually be shorter
 #[derive(Debug, PartialEq)]
 struct StatusEffect {
     status_type: StatusEffects,
@@ -911,13 +1047,21 @@ impl StatusEffect {
 }
 #[derive(Clone, Copy, Hash, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum StatusEffects {
+    // General
     Drunk,
     Mad,
     Poisoned,
-    Protected,
+    DemonProtected,
+    NightProtected,
+    DeathProtected,
+    // Role specific
+    ButlerMaster,
+    AppearsGood,
+    AppearsEvil,
+    MayorBounceKill,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 struct Player {
     name: String,
     role: Role,
@@ -940,22 +1084,6 @@ impl Player {
             alignment: role.get_default_alignment(),
         }
     }
-
-    // WARNING: This method is now deprecated and should be removed
-    // fn add_status(&mut self, status: StatusEffect) {
-    //     self.statuses.push(status);
-    // }
-
-    // WARNING: This method is now deprecated and should be removed
-    // fn remove_status(&mut self, status: StatusEffect) {
-    //     match self.statuses.iter().position(|s| *s == status) {
-    //         Some(pos) => {
-    //             self.statuses.remove(pos);
-    //             return;
-    //         }
-    //         None => return,
-    //     }
-    // }
 }
 
 impl ToString for Player {
@@ -971,21 +1099,6 @@ impl ToString for Player {
         return player_string;
     }
 }
-
-impl PartialEq for Player {
-    fn eq(&self, other: &Self) -> bool {
-        if self.name != other.name {
-            return false;
-        }
-
-        if self.role != other.role {
-            return false;
-        }
-
-        return true;
-    }
-}
-impl Eq for Player {}
 
 #[cfg(test)]
 mod tests {
@@ -1077,32 +1190,80 @@ mod tests {
 
         let mut game = Game::new(roles, player_names).unwrap();
 
-        game.kill_player(0);
+        game.kill_player(0, 0);
         assert_eq!(game.players[0].dead, true);
-        game.kill_player(1);
+        game.kill_player(1, 1);
         assert_eq!(game.players[1].dead, true);
-        game.kill_player(2);
+        game.kill_player(2, 2);
         assert_eq!(game.players[2].dead, true);
     }
 
     #[test]
-    fn kill_protected_player() {
+    fn kill_death_protected_player() {
         let roles = vec![Role::Investigator, Role::Innkeeper, Role::Imp];
         let player_names = vec![String::from("P1"), String::from("P2"), String::from("P3")];
 
         let mut game = Game::new(roles, player_names).unwrap();
 
-        game.add_status(StatusEffects::Protected, 0, 1);
+        game.add_status(StatusEffects::DeathProtected, 1, 1);
 
-        game.kill_player(0);
+        game.kill_player(0, 0);
         assert_eq!(game.players[0].dead, true);
-        game.kill_player(1);
+        game.kill_player(1, 1);
         assert_eq!(game.players[1].dead, false);
-        game.kill_player(2);
+        game.kill_player(2, 2);
         assert_eq!(game.players[2].dead, true);
 
-        game.remove_status(StatusEffects::Protected, 0, 1);
-        game.kill_player(1);
+        game.remove_status(StatusEffects::DeathProtected, 1, 1);
+        game.kill_player(1, 1);
+        assert_eq!(game.players[1].dead, true);
+    }
+
+    #[test]
+    fn kill_night_protected_player() {
+        let roles = vec![Role::Investigator, Role::Innkeeper, Role::Imp];
+        let player_names = vec![String::from("P1"), String::from("P2"), String::from("P3")];
+
+        let mut game = Game::new(roles, player_names).unwrap();
+
+        game.day_phase = DayPhase::Night;
+        game.add_status(StatusEffects::NightProtected, 1, 1);
+
+        game.kill_player(0, 0);
+        assert_eq!(game.players[0].dead, true);
+        game.kill_player(1, 1);
+        assert_eq!(game.players[1].dead, false);
+        game.kill_player(2, 2);
+        assert_eq!(game.players[2].dead, true);
+
+        game.day_phase = DayPhase::Day;
+        game.kill_player(1, 1);
+        assert_eq!(game.players[1].dead, true);
+    }
+
+    #[test]
+    fn kill_demon_protected_player() {
+        let roles = vec![Role::Investigator, Role::Innkeeper, Role::Imp];
+        let player_names = vec![String::from("P1"), String::from("P2"), String::from("P3")];
+
+        let mut game = Game::new(roles, player_names).unwrap();
+
+        game.add_status(StatusEffects::DemonProtected, 1, 1);
+
+        let demon_index = game.win_cond_i.unwrap();
+
+        game.kill_player(demon_index, 0);
+        assert_eq!(game.players[0].dead, true);
+        game.kill_player(demon_index, 1);
+        assert_eq!(game.players[1].dead, false);
+        game.kill_player(demon_index, 2);
+        assert_eq!(game.players[2].dead, true);
+
+        game.kill_player(demon_index, 1);
+        assert_eq!(game.players[1].dead, false);
+
+        game.remove_status(StatusEffects::DemonProtected, 1, 1);
+        game.kill_player(demon_index, 1);
         assert_eq!(game.players[1].dead, true);
     }
 
@@ -1116,7 +1277,7 @@ mod tests {
         assert_eq!(game.players[game.left_player(1)], game.players[0]);
 
         // Kill set the left player to dead and see that the left player is updated accordingly
-        game.kill_player(0);
+        game.kill_player(0, 0);
         assert_eq!(game.players[game.left_player(1)], game.players[2]);
     }
 
@@ -1130,7 +1291,7 @@ mod tests {
         assert_eq!(game.players[game.right_player(1)], game.players[2]);
 
         // Kill the right player and make sure the right player is updated accordingly
-        game.kill_player(2);
+        game.kill_player(0, 2);
         assert_eq!(game.players[game.right_player(1)], game.players[0]);
     }
 
