@@ -19,6 +19,7 @@ use std::{collections::HashMap, io};
 // Need to figure out types of prompts for the storyteller:
 // Choose a number of players
 // Choose a role/roles
+// Also need a generic method to show something to the storyteller
 //
 // TODO: Also I need to implement logging like real bad. It would help test a lot of my methods
 
@@ -460,6 +461,11 @@ impl Game {
                     // drunk
                     todo!()
                 }
+                Role::Fortuneteller => {
+                    // TODO: Add a red-herring through status effects
+                    // Get storyteller input on who red-herring is
+                    todo!()
+                }
                 _ => (),
             }
         }
@@ -798,7 +804,8 @@ impl Game {
                 }
                 println!("Chef Pair Count: {}", pair_count);
             }
-            Role::Fortuneteller => todo!(), // Should be the same as ability from other nights
+            Role::Fortuneteller => todo!(), // Should be the same as ability from other nights, but
+            // also need setup
             Role::Undertaker => {
                 // TODO: Should scan the log for the entire day yesterday
                 // If there was a execution event yesterday that resulted in death, grab the player
