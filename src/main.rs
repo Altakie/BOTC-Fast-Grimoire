@@ -1,12 +1,8 @@
-#![allow(dead_code, unused_variables)]
+#![allow(dead_code, unused_variables, clippy::needless_return)]
 
-use rand::{
-    self,
-    seq::{IndexedRandom, SliceRandom},
-};
+use rand::{self, seq::SliceRandom};
 use serde_derive::{Deserialize, Serialize};
-use serde_json;
-use std::{collections::HashMap, io, isize, rc::Rc, u8, usize};
+use std::{collections::HashMap, io};
 
 // TODO: ACTUALLY IMPORTANT STUFF
 // Split this file into 3 parts: 1 for the setup, 1 for the engine, and 1 for the all the commonly
@@ -44,7 +40,10 @@ fn main() {
 
     // Use the roles and player names to create a new seating chart
 
-    let game = Game::new(roles, player_names).unwrap();
+    let mut game = Game::new(roles, player_names).unwrap();
+
+    // Set up the game depending on certain roles
+    game.setup();
 
     // -- Night 1 --
     // Storyteller should give out all roles to players (game not needed here)
@@ -363,16 +362,25 @@ impl PlayerCounts {
             demons: self.demons - other.demons,
         }
     }
+
+    fn on_choose(&mut self, role: Role) {
+        match role {
+            Role::Baron => self.outsiders += 2,
+            _ => (),
+        }
+    }
 }
 
 // -- Game Structures --
 
+type PlayerIndex = usize;
+
 struct Game {
     players: Vec<Player>, // NOTE: Maybe should be a map instead
     // Want to have pointers to players
-    win_cond_i: Option<usize>,
-    // WARNING: Deprecated for now - active_roles: HashMap<Role, usize>, // Should hold a role and the corresponding player's index
-    // TODO: Implement a log here of all the events that have happened during the game
+    win_cond_i: Option<PlayerIndex>,
+    status_effects: Vec<StatusEffect>, // WARNING: Deprecated for now - active_roles: HashMap<Role, usize>, // Should hold a role and the corresponding player's index
+                                       // TODO: Implement a log here of all the events that have happened during the game
 }
 
 impl Game {
@@ -400,6 +408,7 @@ impl Game {
         );
 
         let win_cond_i = players.iter().position(|p| p.role.is_win_condition());
+        let status_effects: Vec<StatusEffect> = vec![];
 
         // WARNING: Deprecated for now, might need to remove later
         // let mut active_roles: HashMap<Role, usize> = HashMap::new();
@@ -412,23 +421,76 @@ impl Game {
         return Ok(Self {
             players,
             win_cond_i,
-            // active_roles,
+            status_effects, // active_roles,
         });
     }
 
-    fn get_player_index(&self, player: &Player) -> usize {
+    fn setup(&mut self) {
         todo!();
     }
 
-    // Should return true if the player was successfully killed, false if the player failed to die
-    fn kill_player(&mut self, player_index: usize) -> bool {
-        // Find the target player in the array and set their status to dead
-        let player = self.players.get_mut(player_index).unwrap();
-        if player
-            .statuses
+    // WARNING: Unused for now
+    fn get_player_index(&self, player: &Player) -> PlayerIndex {
+        self.players
             .iter()
-            .find(|s| **s == StatusEffects::Protected)
-            != None
+            .position(|p| p == player)
+            .expect("Player should be in player array")
+    }
+
+    fn add_status(
+        &mut self,
+        effect_type: StatusEffects,
+        source_player_index: PlayerIndex,
+        affected_player_index: PlayerIndex,
+    ) {
+        let new_status = StatusEffect::new(
+            effect_type,
+            source_player_index,
+            self.players[source_player_index].role,
+            affected_player_index,
+        );
+        self.status_effects.push(new_status);
+    }
+
+    fn remove_status(
+        &mut self,
+        effect_type: StatusEffects,
+        source_player_index: PlayerIndex,
+        affected_player_index: PlayerIndex,
+    ) {
+        let index = self
+            .status_effects
+            .iter()
+            .position(|s| {
+                s.status_type == effect_type
+                    && s.source_player_index == source_player_index
+                    && s.affected_player_index == affected_player_index
+            })
+            .expect("Tried to remove status effect not in game");
+        self.status_effects.remove(index);
+    }
+
+    fn get_inflicted_statuses(&self, source_player_index: PlayerIndex) -> Vec<&StatusEffect> {
+        self.status_effects
+            .iter()
+            .filter(|s| s.source_player_index == source_player_index)
+            .collect()
+    }
+
+    fn get_afflicted_statuses(&self, affected_player_index: PlayerIndex) -> Vec<&StatusEffect> {
+        self.status_effects
+            .iter()
+            .filter(|s| s.affected_player_index == affected_player_index)
+            .collect()
+    }
+
+    // Should return true if the player was successfully killed, false if the player failed to die
+    fn kill_player(&mut self, player_index: PlayerIndex) -> bool {
+        // Find the target player in the array and set their status to dead
+        if self
+            .get_afflicted_statuses(player_index)
+            .iter()
+            .any(|s| s.status_type == StatusEffects::Protected)
         {
             return false;
         }
@@ -440,23 +502,36 @@ impl Game {
         // Ideas: Maybe make a match where the default case is deactivate the ability upon death
         // but for other cases you actually want to activate the ability
         // Feels like I need to refactor something here
+        let player = self.players.get_mut(player_index).unwrap();
         player.dead = true;
         return true;
     }
 
-    fn left_player(&self, player: &Player) -> &Player {
-        todo!();
+    fn left_player(&self, player_index: PlayerIndex) -> PlayerIndex {
+        let mut index: PlayerIndex = (player_index + self.players.len() - 1) % self.players.len();
+        // eprintln!("{}", index);
+        while self.players[index].dead {
+            // eprintln!("{}", index);
+            index = (index + self.players.len() - 1) % self.players.len();
+        }
+
+        return index;
     }
-    fn right_player(&self, player: &Player) -> &Player {
-        todo!();
+    fn right_player(&self, player_index: PlayerIndex) -> PlayerIndex {
+        let mut index: PlayerIndex = (player_index + self.players.len() + 1) % self.players.len();
+        while self.players[index].dead {
+            index = (index + self.players.len() + 1) % self.players.len();
+        }
+
+        return index;
     }
 
     fn set_win_condition(&mut self, player: &Player) {
         self.win_cond_i = Some(self.get_player_index(player));
     }
 
-    fn get_active_roles(&self) -> Vec<usize> {
-        let mut result: Vec<usize> = vec![];
+    fn get_active_roles(&self) -> Vec<PlayerIndex> {
+        let mut result: Vec<PlayerIndex> = vec![];
         for i in 0..self.players.len() {
             let player = &self.players[i];
             if !player.ability_active {
@@ -482,7 +557,7 @@ impl Game {
         self.players[index].dead
     }
 
-    fn resolve_night_1(&self) {
+    fn resolve_night_1(&mut self) {
         // Order the roles in this game to get the order they should be woken up in (should be
         // unique to night 1)
         let ordered_player_indices = self.get_night_1_order(self.get_active_roles());
@@ -499,10 +574,10 @@ impl Game {
         }
     }
 
-    fn get_night_1_order(&self, player_indices: Vec<usize>) -> Vec<usize> {
+    fn get_night_1_order(&self, player_indices: Vec<PlayerIndex>) -> Vec<PlayerIndex> {
         // Go through all roles and assign each of them a number
         // Maps night_order to player index
-        let mut order_map: HashMap<usize, usize> = HashMap::new();
+        let mut order_map: HashMap<usize, PlayerIndex> = HashMap::new();
         for index in player_indices {
             let role = self.players[index].role;
             let order: usize = match role {
@@ -532,7 +607,7 @@ impl Game {
                 // Role::Lilmonsta => 23,
                 // Role::Lleech => 24,
                 // Role::Xaan => 25,
-                // Role::Poisoner => 26,
+                Role::Poisoner => 26,
                 // Role::Widow => 27,
                 // Role::Courtier => 28,
                 // Role::Wizard => 29,
@@ -587,7 +662,7 @@ impl Game {
             }
         }
 
-        let mut final_order: Vec<usize> = vec![];
+        let mut final_order: Vec<PlayerIndex> = vec![];
         // Pull out the minimum number role and put it into vector until all roles are ordered
         while order_map.keys().len() != 0 {
             let min_key = *order_map
@@ -602,46 +677,90 @@ impl Game {
         return final_order;
     }
 
-    fn resolve_night_1_ability(&self, player_index: usize) {
+    fn resolve_night_1_ability(&mut self, player_index: PlayerIndex) {
         // Check if the role is active before resolving their ability, skip if the role is
         // inactive, but also warn
         // eprintln!("An inactive role tried to act during the night");
+        // NOTE: I think that for info roles, the storyteller should still receive the correct
+        // info, but there will be a warning that the player is poisoned on the screen somewhere,
+        // letting the storyteller decide what number they should give
         // TODO: Implement abilities for every role
-        let player = &self.players[player_index];
+        let player = &mut self.players[player_index];
         let role = player.role;
         match role {
             Role::Investigator => {
                 // WARNING: Can't actually resolve this, this should be decided during setup
                 todo!()
             }
-            Role::Empath => todo!(),
+            Role::Empath => {
+                // Check how many players next to the empath are evil
+                let mut count = 0;
+                let left_player = &self.players[self.left_player(player_index)];
+                let right_player = &self.players[self.right_player(player_index)];
+                if left_player.alignment == Alignment::Evil {
+                    count += 1;
+                }
+                if right_player.alignment == Alignment::Evil {
+                    count += 1;
+                }
+                // For now, just print output
+                println!("Empath count: {}", count);
+            }
             Role::Gossip => todo!(),
             Role::Innkeeper => todo!(),
             Role::Washerwoman => todo!(),
             Role::Librarian => todo!(),
-            Role::Chef => todo!(),
-            Role::Fortuneteller => todo!(),
-            Role::Undertaker => todo!(),
+            Role::Chef => {
+                // Count pairs of evil players
+                // For each evil, player, check if the right player is evil, if yes, increment the
+                // pair count
+                let mut pair_count = 0;
+
+                for player_index in 0..self.players.len() {
+                    let player = &self.players[player_index];
+                    if player.alignment != Alignment::Evil {
+                        continue;
+                    }
+                    let right_player = &self.players[self.right_player(player_index)];
+                    if right_player.alignment == Alignment::Evil {
+                        pair_count += 1;
+                    }
+                }
+                println!("Chef Pair Count: {}", pair_count);
+            }
+            Role::Fortuneteller => todo!(), // Should be the same as ability from other nights
+            Role::Undertaker => {
+                // TODO: Should scan the log for the entire day yesterday
+                // If there was a execution event yesterday that resulted in death, grab the player
+                // from that event
+                // Grab that player's role and give it to the undertaker
+                todo!();
+            }
             Role::Virgin => {
                 // Add a status effect that if someone nominates you, they die
                 // Maybe instead add this to the nominate method
                 todo!()
             }
-            Role::Soldier => todo!(),
-            Role::Slayer => todo!(),
-            Role::Mayor => todo!(),
-            Role::Monk => todo!(),
-            Role::Drunk => todo!(),
-            Role::Saint => todo!(),
+            Role::Soldier => {
+                // Just add protected status effect and only remove upon death
+                self.add_status(StatusEffects::Protected, player_index, player_index);
+            }
+            Role::Slayer => todo!(), // No night one ability
+            Role::Mayor => todo!(),  // No night one ability
+            Role::Monk => todo!(),   // No night one ability
+            Role::Drunk => todo!(),  // Should be handled during setup
+            Role::Saint => todo!(),  // No night one ability
             Role::Butler => todo!(),
-            Role::Recluse => todo!(),
-            Role::Spy => todo!(),
-            Role::Baron => todo!(),
-            Role::Scarletwoman => todo!(),
-            Role::Poisoner => todo!(),
-            Role::Imp => todo!(),
+            Role::Recluse => todo!(),      // Status effect?
+            Role::Spy => todo!(),          // Status effect and look at grimoire?
+            Role::Baron => todo!(),        // Should affect setup
+            Role::Scarletwoman => todo!(), // Basically shouldn't happen night one
+            Role::Poisoner => todo!(),     // Add poison to someone until next night
+            Role::Imp => todo!(),          // Nothing to do night one
             Role::Ravenkeeper => todo!(),
         }
+
+        // TODO: Method should wait until storyteller explicitly advances to the next phase
 
         // TODO: The event should be logged at some point
     }
@@ -760,10 +879,35 @@ impl Role {
     }
 }
 
+// FIX: I no likey this. Each player has a list of status effects and it's just really weird to go
+// through each list and check which status effects are active
+// Makes removing status effects really weird without
+// Maybe have a shared list of status effects, and those status effects have a player index that
+// they are affecting.
+// That way I can use iters to get the values I need from the list
+// In theory, shouldn't be too ineffcient as checking the list might actually be shorter
+#[derive(Debug, PartialEq)]
 struct StatusEffect {
     status_type: StatusEffects,
-    inflicting_role: Role,
-    inflicting_player_index: usize,
+    source_role: Role,
+    source_player_index: PlayerIndex,
+    affected_player_index: PlayerIndex,
+}
+
+impl StatusEffect {
+    fn new(
+        status_type: StatusEffects,
+        source_player_index: PlayerIndex,
+        source_role: Role,
+        affected_player_index: PlayerIndex,
+    ) -> Self {
+        Self {
+            status_type,
+            source_player_index,
+            source_role,
+            affected_player_index,
+        }
+    }
 }
 #[derive(Clone, Copy, Hash, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum StatusEffects {
@@ -783,7 +927,6 @@ struct Player {
     // it cleaner
     ghost_vote: bool,
     alignment: Alignment,
-    statuses: Vec<StatusEffects>,
 }
 
 impl Player {
@@ -793,25 +936,26 @@ impl Player {
             role,
             ghost_vote: true,
             ability_active: true,
-            statuses: vec![],
             dead: false,
             alignment: role.get_default_alignment(),
         }
     }
 
-    fn add_status(&mut self, status: StatusEffects) {
-        self.statuses.push(status);
-    }
+    // WARNING: This method is now deprecated and should be removed
+    // fn add_status(&mut self, status: StatusEffect) {
+    //     self.statuses.push(status);
+    // }
 
-    fn remove_status(&mut self, status: StatusEffects) {
-        match self.statuses.iter().position(|s| *s == status) {
-            Some(pos) => {
-                self.statuses.remove(pos);
-                return;
-            }
-            None => return,
-        }
-    }
+    // WARNING: This method is now deprecated and should be removed
+    // fn remove_status(&mut self, status: StatusEffect) {
+    //     match self.statuses.iter().position(|s| *s == status) {
+    //         Some(pos) => {
+    //             self.statuses.remove(pos);
+    //             return;
+    //         }
+    //         None => return,
+    //     }
+    // }
 }
 
 impl ToString for Player {
@@ -888,14 +1032,18 @@ mod tests {
     }
 
     #[test]
-    fn test_setup() {
+    fn test_new_game() {
         let roles = vec![Role::Investigator, Role::Innkeeper, Role::Imp];
         let player_names = vec![String::from("P1"), String::from("P2"), String::from("P3")];
 
         let game = Game::new(roles.clone(), player_names).unwrap();
 
         assert_eq!(game.players.len(), 3);
+        assert_eq!(game.players[0].name, "P1");
         assert_eq!(game.players[1].name, "P2");
+        assert_eq!(game.players[2].name, "P3");
+
+        assert_eq!(game.status_effects.len(), 0);
 
         {
             let mut roles = roles.clone();
@@ -913,6 +1061,13 @@ mod tests {
 
             assert_eq!(roles.len(), 0);
         }
+    }
+
+    #[test]
+    fn game_setup() {
+        // TODO: Do this after implementing setup method
+        // Only way to really test this right now is through baron and drunk
+        todo!()
     }
 
     #[test]
@@ -937,7 +1092,7 @@ mod tests {
 
         let mut game = Game::new(roles, player_names).unwrap();
 
-        game.players[1].add_status(StatusEffects::Protected);
+        game.add_status(StatusEffects::Protected, 0, 1);
 
         game.kill_player(0);
         assert_eq!(game.players[0].dead, true);
@@ -946,7 +1101,7 @@ mod tests {
         game.kill_player(2);
         assert_eq!(game.players[2].dead, true);
 
-        game.players[1].remove_status(StatusEffects::Protected);
+        game.remove_status(StatusEffects::Protected, 0, 1);
         game.kill_player(1);
         assert_eq!(game.players[1].dead, true);
     }
@@ -956,15 +1111,13 @@ mod tests {
         let roles = vec![Role::Investigator, Role::Innkeeper, Role::Imp];
         let player_names = vec![String::from("P1"), String::from("P2"), String::from("P3")];
 
-        let game = Game::new(roles.clone(), player_names).unwrap();
+        let mut game = Game::new(roles.clone(), player_names).unwrap();
 
-        assert_eq!(
-            game.left_player(&game.players[2]).name,
-            game.players[1].name
-        );
+        assert_eq!(game.players[game.left_player(1)], game.players[0]);
 
         // Kill set the left player to dead and see that the left player is updated accordingly
-        todo!();
+        game.kill_player(0);
+        assert_eq!(game.players[game.left_player(1)], game.players[2]);
     }
 
     #[test]
@@ -972,14 +1125,39 @@ mod tests {
         let roles = vec![Role::Investigator, Role::Innkeeper, Role::Imp];
         let player_names = vec![String::from("P1"), String::from("P2"), String::from("P3")];
 
-        let game = Game::new(roles, player_names).unwrap();
+        let mut game = Game::new(roles, player_names).unwrap();
 
-        assert_eq!(
-            game.left_player(&game.players[2]).name,
-            game.players[1].name
-        );
+        assert_eq!(game.players[game.right_player(1)], game.players[2]);
 
         // Kill the right player and make sure the right player is updated accordingly
-        todo!();
+        game.kill_player(2);
+        assert_eq!(game.players[game.right_player(1)], game.players[0]);
+    }
+
+    #[test]
+    fn test_get_night_1_order() {
+        let roles = vec![
+            Role::Investigator,
+            Role::Innkeeper,
+            Role::Imp,
+            Role::Chef,
+            Role::Poisoner,
+        ];
+        let player_names = vec![
+            String::from("P1"),
+            String::from("P2"),
+            String::from("P3"),
+            String::from("P4"),
+            String::from("P5"),
+        ];
+
+        let game = Game::new(roles, player_names).unwrap();
+
+        let player_indices = vec![0, 1, 2, 3, 4];
+        let order = game.get_night_1_order(player_indices);
+        assert_eq!(game.players[order[0]].role, Role::Poisoner);
+        assert_eq!(game.players[order[1]].role, Role::Investigator);
+        assert_eq!(game.players[order[2]].role, Role::Chef);
+        assert_eq!(order.len(), 3);
     }
 }
