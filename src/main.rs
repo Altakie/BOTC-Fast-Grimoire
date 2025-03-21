@@ -1183,6 +1183,7 @@ enum EventType {
     // Ability Specific Events
 }
 
+// TODO: Make this just a type
 trait Event {
     fn get_description(&self) -> String;
 
@@ -1223,7 +1224,9 @@ struct Log {
 
 impl Log {
     fn new() -> Self {
-        todo!()
+        Self {
+            nychthemrons: vec![],
+        }
     }
 }
 
@@ -1393,6 +1396,10 @@ impl ToString for Player {
 mod tests {
     // Setup Tests
 
+    use std::collections::binary_heap::Iter;
+
+    use rand::seq::IndexedRandom;
+
     use super::*;
     #[test]
     fn test_player_constructor() {
@@ -1463,6 +1470,8 @@ mod tests {
 
             assert_eq!(roles.len(), 0);
         }
+
+        // TODO: Maybe add a check here that all the assigment events were logged
     }
 
     #[test]
@@ -1585,6 +1594,11 @@ mod tests {
     }
 
     #[test]
+    fn test_game_over() {
+        todo!();
+    }
+
+    #[test]
     fn test_get_night_1_order() {
         let roles = vec![
             Role::Investigator,
@@ -1609,5 +1623,331 @@ mod tests {
         assert_eq!(game.players[order[1]].role, Role::Investigator);
         assert_eq!(game.players[order[2]].role, Role::Chef);
         assert_eq!(order.len(), 3);
+    }
+
+    fn test_resolve_night_1() {
+        todo!();
+    }
+
+    // TODO: Test that all night one abilities work as expected
+
+    fn test_night_order() {
+        let roles = vec![
+            Role::Investigator,
+            Role::Innkeeper,
+            Role::Imp,
+            Role::Chef,
+            Role::Poisoner,
+        ];
+        let player_names = vec![
+            String::from("P1"),
+            String::from("P2"),
+            String::from("P3"),
+            String::from("P4"),
+            String::from("P5"),
+        ];
+
+        let game = Game::new(roles, player_names).unwrap();
+
+        let player_indices = vec![0, 1, 2, 3, 4];
+        let order = game.get_night_order(player_indices);
+        assert_eq!(game.players[order[0]].role, Role::Poisoner);
+        assert_eq!(game.players[order[1]].role, Role::Innkeeper);
+        assert_eq!(order.len(), 2);
+    }
+
+    // TODO: Test that all night abilities work as expected
+    fn test_resolve_night() {
+        todo!();
+    }
+
+    #[test]
+    fn add_status_effect() {
+        let roles = vec![
+            Role::Investigator,
+            Role::Innkeeper,
+            Role::Imp,
+            Role::Chef,
+            Role::Poisoner,
+        ];
+        let player_names = vec![
+            String::from("P1"),
+            String::from("P2"),
+            String::from("P3"),
+            String::from("P4"),
+            String::from("P5"),
+        ];
+
+        let mut game = Game::new(roles, player_names).unwrap();
+
+        game.add_status(StatusEffects::Poisoned, 2, 0);
+
+        assert_eq!(game.status_effects[0].status_type, StatusEffects::Poisoned);
+        assert_eq!(game.status_effects[0].source_player_index, 2);
+        assert_eq!(game.status_effects[0].affected_player_index, 0);
+    }
+
+    #[test]
+    fn add_multiple_status_effects() {
+        let roles = vec![
+            Role::Investigator,
+            Role::Innkeeper,
+            Role::Imp,
+            Role::Chef,
+            Role::Poisoner,
+        ];
+        let player_names = vec![
+            String::from("P1"),
+            String::from("P2"),
+            String::from("P3"),
+            String::from("P4"),
+            String::from("P5"),
+        ];
+
+        let mut game = Game::new(roles, player_names).unwrap();
+
+        game.add_status(StatusEffects::Poisoned, 2, 0);
+        game.add_status(StatusEffects::MayorBounceKill, 1, 3);
+        game.add_status(StatusEffects::Drunk, 4, 2);
+
+        assert_eq!(
+            game.status_effects
+                .iter()
+                .filter(|s| {
+                    s.status_type == StatusEffects::Poisoned
+                        && s.source_player_index == 2
+                        && s.source_role == game.players[2].role
+                        && s.affected_player_index == 0
+                })
+                .count(),
+            1
+        );
+
+        assert_eq!(
+            game.status_effects
+                .iter()
+                .filter(|s| {
+                    s.status_type == StatusEffects::MayorBounceKill
+                        && s.source_player_index == 1
+                        && s.source_role == game.players[1].role
+                        && s.affected_player_index == 3
+                })
+                .count(),
+            1
+        );
+
+        assert_eq!(
+            game.status_effects
+                .iter()
+                .filter(|s| {
+                    s.status_type == StatusEffects::Drunk
+                        && s.source_player_index == 4
+                        && s.source_role == game.players[4].role
+                        && s.affected_player_index == 2
+                })
+                .count(),
+            1
+        );
+
+        // Checks that same player can have multiple status effects applied to them
+        // Checks that the same player can have multiple of the same status effect from differnet
+        // sources applied to them
+        //
+        game.add_status(StatusEffects::Drunk, 3, 2);
+        game.add_status(StatusEffects::Drunk, 1, 2);
+        game.add_status(StatusEffects::Poisoned, 4, 2);
+        game.add_status(StatusEffects::Drunk, 1, 0);
+
+        assert_eq!(
+            game.status_effects
+                .iter()
+                .filter(|s| { s.status_type == StatusEffects::Drunk })
+                .count(),
+            4
+        );
+
+        assert_eq!(
+            game.status_effects
+                .iter()
+                .filter(|s| {
+                    s.status_type == StatusEffects::Drunk && s.affected_player_index == 2
+                })
+                .count(),
+            3
+        );
+
+        assert_eq!(
+            game.status_effects
+                .iter()
+                .filter(|s| {
+                    s.status_type == StatusEffects::Drunk
+                        && s.source_player_index == 4
+                        && s.source_role == game.players[4].role
+                        && s.affected_player_index == 2
+                })
+                .count(),
+            1
+        );
+
+        assert_eq!(
+            game.status_effects
+                .iter()
+                .filter(|s| {
+                    s.status_type == StatusEffects::Poisoned && s.affected_player_index == 2
+                })
+                .count(),
+            1
+        );
+
+        assert_eq!(
+            game.status_effects
+                .iter()
+                .filter(|s| {
+                    s.source_player_index == 4
+                        && s.source_role == game.players[4].role
+                        && s.affected_player_index == 2
+                })
+                .count(),
+            2
+        );
+
+        assert_eq!(
+            game.status_effects
+                .iter()
+                .filter(|s| { s.affected_player_index == 2 })
+                .count(),
+            4
+        );
+    }
+
+    #[test]
+    fn find_status_effects_inflicted_by_player() {
+        let roles = vec![
+            Role::Investigator,
+            Role::Innkeeper,
+            Role::Imp,
+            Role::Chef,
+            Role::Poisoner,
+        ];
+        let player_names = vec![
+            String::from("P1"),
+            String::from("P2"),
+            String::from("P3"),
+            String::from("P4"),
+            String::from("P5"),
+        ];
+
+        let mut game = Game::new(roles, player_names).unwrap();
+
+        game.add_status(StatusEffects::Poisoned, 2, 0);
+        game.add_status(StatusEffects::MayorBounceKill, 1, 3);
+        game.add_status(StatusEffects::Drunk, 4, 2);
+
+        game.add_status(StatusEffects::Drunk, 2, 2);
+        game.add_status(StatusEffects::Drunk, 2, 1);
+        game.add_status(StatusEffects::Drunk, 2, 0);
+
+        let statuses = game.get_inflicted_statuses(2);
+        assert_eq!(statuses.len(), 4);
+        assert_eq!(
+            statuses
+                .iter()
+                .filter(|s| s.status_type == StatusEffects::Drunk)
+                .count(),
+            3
+        );
+        assert_eq!(
+            statuses
+                .iter()
+                .filter(|s| s.status_type == StatusEffects::Poisoned)
+                .count(),
+            1
+        );
+        assert!(statuses.iter().all(|s| s.source_player_index == 2));
+        assert!(
+            statuses
+                .iter()
+                .all(|s| s.source_role == game.players[2].role)
+        );
+
+        let no_statuses = game.get_inflicted_statuses(0);
+        assert_eq!(no_statuses.len(), 0);
+    }
+
+    #[test]
+    fn find_status_effects_inlicted_by_player() {
+        let roles = vec![
+            Role::Investigator,
+            Role::Innkeeper,
+            Role::Imp,
+            Role::Chef,
+            Role::Poisoner,
+        ];
+        let player_names = vec![
+            String::from("P1"),
+            String::from("P2"),
+            String::from("P3"),
+            String::from("P4"),
+            String::from("P5"),
+        ];
+
+        let mut game = Game::new(roles, player_names).unwrap();
+
+        game.add_status(StatusEffects::Poisoned, 2, 0);
+        game.add_status(StatusEffects::MayorBounceKill, 1, 3);
+        game.add_status(StatusEffects::Poisoned, 4, 2);
+
+        game.add_status(StatusEffects::Drunk, 3, 2);
+        game.add_status(StatusEffects::Drunk, 1, 2);
+        game.add_status(StatusEffects::Drunk, 0, 2);
+
+        let statuses = game.get_afflicted_statuses(2);
+        assert_eq!(statuses.len(), 4);
+        assert_eq!(
+            statuses
+                .iter()
+                .filter(|s| s.status_type == StatusEffects::Drunk)
+                .count(),
+            3
+        );
+        assert_eq!(
+            statuses
+                .iter()
+                .filter(|s| s.status_type == StatusEffects::Poisoned)
+                .count(),
+            1
+        );
+        assert!(statuses.iter().all(|s| s.affected_player_index == 2));
+
+        let no_statuses = game.get_afflicted_statuses(4);
+        assert_eq!(no_statuses.len(), 0);
+    }
+
+    #[test]
+    fn remove_status_effect() {
+        todo!();
+    }
+
+    #[test]
+    fn remove_multiple_status_effects() {
+        todo!();
+    }
+
+    // -- Other Tests --
+    #[test]
+    fn new_script_from_json() {
+        // Pass in valid script
+        todo!()
+    }
+
+    #[should_panic]
+    #[test]
+    fn invalid_script_from_json() {
+        todo!()
+    }
+
+    #[test]
+    fn counts_updated_on_choose() {
+        todo!()
     }
 }
