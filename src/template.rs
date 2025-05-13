@@ -1,3 +1,4 @@
+#![allow(unlinked-file)]
 trait Character {
     fn night_action(&mut self) -> ();
 }
