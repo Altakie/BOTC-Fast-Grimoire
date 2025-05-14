@@ -1,6 +1,7 @@
+use leptos::IntoView;
 use rand::{self, seq::SliceRandom};
 use serde_derive::{Deserialize, Serialize};
-use std::{collections::HashMap, usize};
+use std::{collections::HashMap, fmt::Display, usize};
 
 use crate::setup::Script;
 
@@ -978,6 +979,36 @@ pub(crate) enum Role {
     Imp,
 }
 
+impl Display for Role {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Role::Investigator => write!(f, "Investigator"),
+            Role::Empath => write!(f, "Empath"),
+            Role::Gossip => write!(f, "Gossip"),
+            Role::Innkeeper => write!(f, "Innkeeper"),
+            Role::Washerwoman => write!(f, "Washerwoman"),
+            Role::Librarian => write!(f, "Librarian"),
+            Role::Chef => write!(f, "Chef"),
+            Role::Fortuneteller => write!(f, "Fortuneteller"),
+            Role::Undertaker => write!(f, "Undertaker"),
+            Role::Virgin => write!(f, "Virgin"),
+            Role::Soldier => write!(f, "Soldier"),
+            Role::Slayer => write!(f, "Slayer"),
+            Role::Mayor => write!(f, "Mayor"),
+            Role::Monk => write!(f, "Monk"),
+            Role::Ravenkeeper => write!(f, "Ravenkeeper"),
+            Role::Drunk => write!(f, "Drunk"),
+            Role::Saint => write!(f, "Saint"),
+            Role::Butler => write!(f, "Butler"),
+            Role::Recluse => write!(f, "Recluse"),
+            Role::Spy => write!(f, "Spy"),
+            Role::Baron => write!(f, "Baron"),
+            Role::Scarletwoman => write!(f, "Scarletwoman"),
+            Role::Poisoner => write!(f, "Poisoner"),
+            Role::Imp => write!(f, "Imp"),
+        }
+    }
+}
 impl Role {
     pub(crate) fn get_default_alignment(&self) -> Alignment {
         match self.get_type() {

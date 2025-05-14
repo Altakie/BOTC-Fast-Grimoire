@@ -1,4 +1,6 @@
-use crate::game::Role;
+use std::{fmt::Display, isize};
+
+use crate::game::{CharacterType, Role};
 
 use serde_derive::{Deserialize, Serialize};
 
@@ -40,15 +42,15 @@ impl Script {
 }
 
 // -- Setup Structures --
-#[derive(Debug, PartialEq, Eq)]
-pub(crate) struct PlayerCounts {
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct CharacterTypeCounts {
     pub(crate) townsfolk: isize,
     pub(crate) outsiders: isize,
     pub(crate) minions: isize,
     pub(crate) demons: isize,
 }
 
-impl PlayerCounts {
+impl CharacterTypeCounts {
     pub(crate) fn new(num_players: usize) -> Result<Self, ()> {
         match num_players {
             0..=4 => Err(()),
@@ -144,10 +146,40 @@ impl PlayerCounts {
         }
     }
 
-    fn on_choose(&mut self, role: Role) {
+    pub(crate) fn on_choose(&mut self, role: Role) {
+        self.role_effects(role, 1);
+    }
+
+    pub(crate) fn on_remove(&mut self, role: Role) {
+        self.role_effects(role, -1);
+    }
+
+    fn role_effects(&mut self, role: Role, multiplier: isize) {
         match role {
-            Role::Baron => self.outsiders += 2,
+            Role::Baron => {
+                let num = 2 * multiplier;
+                self.outsiders += num;
+                self.townsfolk -= num;
+            }
             _ => (),
+        }
+    }
+
+    pub(crate) fn set_count(&mut self, character_type: CharacterType, count: isize) {
+        match character_type {
+            CharacterType::Townsfolk => self.townsfolk = count,
+            CharacterType::Outsider => self.outsiders = count,
+            CharacterType::Minion => self.minions = count,
+            CharacterType::Demon => self.demons = count,
+        }
+    }
+
+    pub(crate) fn get_count(&self, character_type: CharacterType) -> isize {
+        match character_type {
+            CharacterType::Townsfolk => self.townsfolk,
+            CharacterType::Outsider => self.outsiders,
+            CharacterType::Minion => self.minions,
+            CharacterType::Demon => self.demons,
         }
     }
 }
@@ -160,7 +192,7 @@ mod tests {
         // NOTE: Should have a test for all roles that modify character_types
 
         // Baron
-        let character_counts = PlayerCounts::new(5).unwrap();
+        let character_counts = CharacterTypeCounts::new(5).unwrap();
         todo!()
     }
 }

@@ -41,55 +41,55 @@ mod setup;
 
 fn main() {
     // -- Setup --
-   //  First need to have the story teller upload a script with a list of roles
-          Should make sure these roles are implemented before starting the game
+    //  First need to have the story teller upload a script with a list of roles
+    // Should make sure these roles are implemented before starting the game
 
-     let script = get_script();
-    
-     let player_names = get_player_names();
-     // let num_players = get_player_count();
-    
-     // Assign default character numbers
-    
-     // Prompt the story teller to pick the appropriate number of roles from this list
-     //      This includes the appropriate number of types of roles (travellers, outsiders, minions,
-     //      demons)
-     //      While picking roles, if the storyteller picks a role that modifies the setup in any way,
-     //      those changes should be applied to the setup numbers, but should not be validated until
-     //      the storyteller locks in a list of roles for the game
-    
-     let roles = choose_roles(player_names.len(), script.clone());
-     // Prompt the storyteller to put in the names of all the players in the game in the order they
-     // are sitting (might help to have an anchor point here somewhere)
-     //      This should assemble a vector of names
-    
-     // Use the roles and player names to create a new seating chart
-    
-     let mut game = game::Game::new(roles, player_names).unwrap();
-    
-     // Set up the game depending on certain roles
-     game.setup();
-    
-     // -- Night 1 --
-     // Storyteller should give out all roles to players (game not needed here)
-     // Can make a checklist of all players so storyteller can keep track of who has gotten their
-     // roles
-     // Game should tell storyteller to introduce demons and minions to each other (might want to
-     // include this event in the night order)
-     // Game should provide a night 1 specific order based on the roles that are in play (function
-     // call)
-     // Game should go through this night 1 specific order, providing the appropriate information,
-     // or waiting for the appropraite input from the storyteller (through the player), waiting for the storyteller to mark each
-     // step as resolved
+    let script = get_script();
 
-     game.resolve_night_1();
-     loop {
-         game.resolve_day();
-         if game.game_over() {
-             break;
-         }
-         game.resolve_night();
-     }
+    let player_names = get_player_names();
+    // let num_players = get_player_count();
+
+    // Assign default character numbers
+
+    // Prompt the story teller to pick the appropriate number of roles from this list
+    //      This includes the appropriate number of types of roles (travellers, outsiders, minions,
+    //      demons)
+    //      While picking roles, if the storyteller picks a role that modifies the setup in any way,
+    //      those changes should be applied to the setup numbers, but should not be validated until
+    //      the storyteller locks in a list of roles for the game
+
+    let roles = choose_roles(player_names.len(), script.clone());
+    // Prompt the storyteller to put in the names of all the players in the game in the order they
+    // are sitting (might help to have an anchor point here somewhere)
+    //      This should assemble a vector of names
+
+    // Use the roles and player names to create a new seating chart
+
+    let mut game = game::Game::new(roles, player_names).unwrap();
+
+    // Set up the game depending on certain roles
+    game.setup();
+
+    // -- Night 1 --
+    // Storyteller should give out all roles to players (game not needed here)
+    // Can make a checklist of all players so storyteller can keep track of who has gotten their
+    // roles
+    // Game should tell storyteller to introduce demons and minions to each other (might want to
+    // include this event in the night order)
+    // Game should provide a night 1 specific order based on the roles that are in play (function
+    // call)
+    // Game should go through this night 1 specific order, providing the appropriate information,
+    // or waiting for the appropraite input from the storyteller (through the player), waiting for the storyteller to mark each
+    // step as resolved
+
+    game.resolve_night_1();
+    loop {
+        game.resolve_day();
+        if game.game_over() {
+            break;
+        }
+        game.resolve_night();
+    }
 
     println!("Game Over!");
 }
