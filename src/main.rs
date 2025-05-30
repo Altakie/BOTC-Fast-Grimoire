@@ -5,7 +5,7 @@ mod setup;
 use setup::{CharacterTypeCounts, Script, ScriptJson};
 
 mod game;
-use game::{Game, Player, Role};
+use game::{Game, Player, Role, StoryTellerInterface};
 // use leptos_router::components::*;
 // use leptos_router::path;
 
@@ -122,7 +122,6 @@ fn PlayerInputer(
 
     view! {
         <PlayerSetupList player_names=players />
-        // <form>
         <p>"Input Player Name Below"</p>
         <input id="PlayerInput" type="text" bind:value=name />
         <div>
@@ -132,9 +131,17 @@ fn PlayerInputer(
             }>"Add Player"</button>
             // TODO: Implement this button
             // TODO: Make sure you can't click this button unless you have at least 5 players
-            <button on:click=move |_| {
-                setup_stage.set(next_setup_stage);
-            }>"Finish"</button>
+            // Because this is not handled, this button will throw an error
+            <button
+                on:click=move |_| {
+                    if players.get().len() >= 5 {
+                        setup_stage.set(next_setup_stage);
+                    }
+                }
+                disabled=move || { players.get().len() < 5 }
+            >
+                "Finish"
+            </button>
         </div>
     }
 }
@@ -189,36 +196,60 @@ fn PlayerSetupList(player_names: RwSignal<Vec<String>>) -> impl IntoView {
                         view! {
                             <li>
                                 {player} "  "
-                                <button on:click=move |_| {
-                                    player_names
-                                        .update(|pv| {
-                                            let player_index = pv
-                                                .iter()
-                                                .position(|p| *p == player.get())
-                                                .unwrap();
-                                            if player_index <= 0 {
-                                                return;
-                                            }
-                                            let temp = pv[player_index].clone();
-                                            pv[player_index] = pv[player_index - 1].clone();
-                                            pv[player_index - 1] = temp;
-                                        })
-                                }>"Move Up"</button>
-                                <button on:click=move |_| {
-                                    player_names
-                                        .update(|pv| {
-                                            let player_index = pv
-                                                .iter()
-                                                .position(|p| *p == player.get())
-                                                .unwrap();
-                                            if (player_index + 1) >= pv.len() {
-                                                return;
-                                            }
-                                            let temp = pv[player_index].clone();
-                                            pv[player_index] = pv[player_index + 1].clone();
-                                            pv[player_index + 1] = temp;
-                                        });
-                                }>"Move Down"</button>
+                                <button
+                                    on:click=move |_| {
+                                        player_names
+                                            .update(|pv| {
+                                                let player_index = pv
+                                                    .iter()
+                                                    .position(|p| *p == player.get())
+                                                    .unwrap();
+                                                if player_index == 0 {
+                                                    return;
+                                                }
+                                                let temp = pv[player_index].clone();
+                                                pv[player_index] = pv[player_index - 1].clone();
+                                                pv[player_index - 1] = temp;
+                                            })
+                                    }
+                                    disabled=move || {
+                                        let pv = player_names.get();
+                                        let player_index = pv
+                                            .iter()
+                                            .position(|p| *p == player.get())
+                                            .unwrap();
+                                        player_index == 0
+                                    }
+                                >
+                                    "Move Up"
+                                </button>
+                                <button
+                                    on:click=move |_| {
+                                        player_names
+                                            .update(|pv| {
+                                                let player_index = pv
+                                                    .iter()
+                                                    .position(|p| *p == player.get())
+                                                    .unwrap();
+                                                if (player_index + 1) >= pv.len() {
+                                                    return;
+                                                }
+                                                let temp = pv[player_index].clone();
+                                                pv[player_index] = pv[player_index + 1].clone();
+                                                pv[player_index + 1] = temp;
+                                            });
+                                    }
+                                    disabled=move || {
+                                        let pv = player_names.get();
+                                        let player_index = pv
+                                            .iter()
+                                            .position(|p| *p == player.get())
+                                            .unwrap();
+                                        (player_index + 1) >= pv.len()
+                                    }
+                                >
+                                    "Move Down"
+                                </button>
                                 <button on:click=move |_| {
                                     player_names
                                         .update(|pv| {
@@ -247,12 +278,19 @@ fn ScriptInputter(
         // TODO: Might want to add an error boundary here
         <p>"Input Script Json Below"</p>
         <input type="text" bind:value=raw_json />
-        <button on:click=move |_| {
-            let script_json = serde_json::from_str::<ScriptJson>(&raw_json.get()).unwrap();
-            script.set(Script::new_from_json(script_json));
-            raw_json.set(String::from(""));
-            setup_stage.set(next_setup_stage);
-        }>"Submit"</button>
+        <ErrorBoundary fallback=|_errors| view! {}>
+            <button
+                on:click=move |_| {
+                    let script_json = serde_json::from_str::<ScriptJson>(&raw_json.get()).unwrap();
+                    script.set(Script::new_from_json(script_json));
+                    raw_json.set(String::from(""));
+                    setup_stage.set(next_setup_stage);
+                }
+                disabled=move || raw_json.get().is_empty()
+            >
+                "Submit"
+            </button>
+        </ErrorBoundary>
     }
 }
 
@@ -304,14 +342,13 @@ fn RoleChooser(
                         <button
                             on:click=move |_| {
                                 let role_type = role.get_type();
-                                    let desired_count = desired_character_type_counts
-                                        .get()
-                                        .get_count(role_type);
-                                    let curr_count = curr_character_type_counts
-                                        .get()
-                                        .get_count(role_type);
+                                let desired_count = desired_character_type_counts
+                                    .get()
+                                    .get_count(role_type);
+                                let curr_count = curr_character_type_counts
+                                    .get()
+                                    .get_count(role_type);
                                 if !selected.get() {
-                                    // Adding Roles
                                     let valid_choice = desired_count > curr_count;
                                     if !valid_choice {
                                         return;
@@ -321,7 +358,6 @@ fn RoleChooser(
                                         .update(|cct| cct.set_count(role_type, curr_count + 1));
                                     desired_character_type_counts.update(|dct| dct.on_choose(role));
                                 } else {
-                                    // Removing Roles
                                     let element_index = roles.get().iter().position(|r| *r == role);
                                     let role_i = match element_index {
                                         Some(i) => i,
@@ -331,9 +367,9 @@ fn RoleChooser(
                                         .update(|v| {
                                             v.swap_remove(role_i);
                                         });
-                                curr_character_type_counts
-                                    .update(|cct| cct.set_count(role_type, curr_count - 1));
-                                desired_character_type_counts.update(|dct| dct.on_remove(role));
+                                    curr_character_type_counts
+                                        .update(|cct| cct.set_count(role_type, curr_count - 1));
+                                    desired_character_type_counts.update(|dct| dct.on_remove(role));
                                 }
                                 selected.set(!selected.get());
                             }
@@ -346,27 +382,72 @@ fn RoleChooser(
                 }
             />
         </div>
-        <button on:click=move |_| setup_stage.set(next_setup_stage)>"Finish"</button>
+        <button
+            on:click=move |_| {
+                if roles.get().len() == num_players {
+                    setup_stage.set(next_setup_stage);
+                }
+            }
+            disabled=move || { roles.get().len() != num_players }
+        >
+            "Finish"
+        </button>
     }
 }
 
 #[component]
 fn GameInterface(roles: Vec<Role>, player_names: Vec<String>, script: Script) -> impl IntoView {
     // TODO: Create a new game using the data we have just collected from the user
+    let game =
+        RwSignal::new(Game::new(roles, player_names, script, WebStoryTellerInterface {}).unwrap());
+
+    let player_view = move |player: Player| {
+        view! {
+            <div style:border="solid">
+                <p>{player.name.to_string()}</p>
+                <p>{player.role.to_string()}</p>
+            </div>
+        }
+    };
     view! {
         <p>"Not yet implemented"</p>
-        <p>"Players: "</p>
-        <ul>
-            {move || {
-                player_names.iter().map(|name| view! { <li>{name.to_string()}</li> }).collect_view()
-            }}
-        </ul>
-        <p>"Roles: "</p>
-        <ul>
-            {move || {
-                roles.iter().map(|role| view! { <li>{role.to_string()}</li> }).collect_view()
-            }}
-        </ul>
+        <div>
+            <For
+                each=move || game.get().get_players()
+                key=|p| p.name.clone()
+                children=player_view
+            />
+        </div>
+    }
+}
+
+#[derive(Clone)]
+struct WebStoryTellerInterface {}
+
+impl StoryTellerInterface for WebStoryTellerInterface {
+    // Change a value that renders a certain view, grab the values from that view
+    fn choose_players(&self, num: usize, max_index: usize) -> Vec<game::PlayerIndex> {
+        todo!()
+    }
+
+    fn choose_roles(&self, num: usize, valid_roles: Vec<Role>) -> Vec<Role> {
+        todo!()
+    }
+
+    fn input_number(&self) -> usize {
+        todo!()
+    }
+
+    fn display_number(&self) {
+        todo!()
+    }
+
+    fn display_players(&self) {
+        todo!()
+    }
+
+    fn display_role(&self) {
+        todo!()
     }
 }
 

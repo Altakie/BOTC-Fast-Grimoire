@@ -1,5 +1,26 @@
 # BOTC Logic Requirements
 
+## Game Modes
+
+- Mostly automated
+  - Logic is mostly handled by the engine
+  - Some things will be done automatically
+- Manual
+  - Game doesn't automatically execute logic
+  - Game will still display night order
+  - Events will still be logged
+- Should be able to switch between modes at will 
+  - If something goes wrong, want to be able to undo and go back to manual mode
+  - Sometimes there are bits of logic that are unable to be captured, and manual mode is good for that
+
+## Undoing Actions
+
+- There should be a way to rollback events using the log
+  - Might want to research how this is done
+  - Each action should have an opposite action
+
+# Old Requirements
+
 ## General
 
 - Day / Night Phases
@@ -8,6 +29,7 @@
 - GUI
   - A visual way to see all the information that is stored by the game engine
 - Misc story teller notes
+
 
 ## Setup
 

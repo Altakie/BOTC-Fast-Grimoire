@@ -1,23 +1,16 @@
-use leptos::IntoView;
+mod interface;
+mod log;
+use log::*;
+mod status_effects;
+use status_effects::*;
+
 use rand::{self, seq::SliceRandom};
 use serde_derive::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Display, usize};
 
+use reactive_stores::*;
+
 use crate::setup::Script;
-
-pub trait StoryTellerInterface {
-    // These methods should prompt a user for some input that corresponds to the return type, wait
-    // for them to input it, and return the corresponding values
-    fn choose_players(&self, num: usize, max_index: usize) -> Vec<PlayerIndex>;
-    fn choose_roles(&self, num: usize, valid_roles: Vec<Role>) -> Vec<Role>;
-    fn input_number(&self) -> usize;
-
-    // These methods should just display some data for the storyteller/player and wait for them to
-    // confirm they are done viewing it
-    fn display_number(&self);
-    fn display_players(&self);
-    fn display_role(&self);
-}
 
 pub(crate) enum RoleSelectionType {
     InPlay,
@@ -25,11 +18,26 @@ pub(crate) enum RoleSelectionType {
     Script,
 }
 
+#[derive(Clone)]
+pub(crate) enum InterfacePhase {
+    Default,
+    Done,
+    ChoosingRoles,
+    ChoosingPlayers,
+    InputtingNumber,
+    DisplayingNumber,
+    DisplayingPlayers,
+    DisplayingRoles,
+}
+
+pub(crate) struct InterfaceInfo {}
+
 // -- Game pub(crate) structures --
 
 pub(crate) type PlayerIndex = usize;
 
-pub(crate) struct Game<T: StoryTellerInterface> {
+#[derive(Clone, Store)]
+pub(crate) struct Game {
     players: Vec<Player>, // NOTE: Maybe should be a map instead
     // Want to have pointers to players
     win_cond_i: Option<PlayerIndex>,
@@ -37,16 +45,16 @@ pub(crate) struct Game<T: StoryTellerInterface> {
     day_phase: DayPhase,
     day_num: usize,
     log: Log,
-    storyteller_interface: T,
     script: Script,
+    // ADD A PHASE THING HERE, method should change game phase accordingly and also wait for change
+    interface_phase: InterfacePhase,
 }
 
-impl<T: StoryTellerInterface> Game<T> {
+impl Game {
     pub(crate) fn new(
         mut roles: Vec<Role>,
         player_names: Vec<String>,
         script: Script,
-        storyteller_interface: T,
     ) -> Result<Self, ()> {
         // Make this method conpub(crate) struct a new seating chart
         let mut players: Vec<Player> = vec![];
@@ -81,14 +89,16 @@ impl<T: StoryTellerInterface> Game<T> {
             day_phase: DayPhase::Night,
             day_num: 0,
             log,
-            storyteller_interface,
             script,
         });
     }
 
+    pub(crate) fn get_players(&self) -> Vec<Player> {
+        self.players.clone()
+    }
+
     pub(crate) fn choose_players(&self, num: usize) -> Vec<usize> {
-        self.storyteller_interface
-            .choose_players(num, self.players.len())
+        todo!()
     }
 
     pub(crate) fn choose_roles(&self, num: usize, selector: RoleSelectionType) -> Vec<Role> {
@@ -98,7 +108,8 @@ impl<T: StoryTellerInterface> Game<T> {
             RoleSelectionType::Script => self.script.roles.clone(),
         };
 
-        self.storyteller_interface.choose_roles(num, roles_in_scope)
+        // self.storyteller_interface.choose_roles(num, roles_in_scope)
+        todo!()
     }
 
     pub(crate) fn setup(&mut self) {
@@ -183,59 +194,6 @@ impl<T: StoryTellerInterface> Game<T> {
             .iter()
             .position(|p| p == player)
             .expect("Player should be in player array")
-    }
-
-    pub(crate) fn add_status(
-        &mut self,
-        effect_type: StatusEffects,
-        source_player_index: PlayerIndex,
-        affected_player_index: PlayerIndex,
-    ) {
-        let new_status = StatusEffect::new(
-            effect_type,
-            source_player_index,
-            self.players[source_player_index].role,
-            affected_player_index,
-        );
-        self.status_effects.push(new_status);
-    }
-
-    pub(crate) fn remove_status(
-        &mut self,
-        effect_type: StatusEffects,
-        source_player_index: PlayerIndex,
-        affected_player_index: PlayerIndex,
-    ) {
-        let index = self
-            .status_effects
-            .iter()
-            .position(|s| {
-                s.status_type == effect_type
-                    && s.source_player_index == source_player_index
-                    && s.affected_player_index == affected_player_index
-            })
-            .expect("Tried to remove status effect not in game");
-        self.status_effects.remove(index);
-    }
-
-    pub(crate) fn get_inflicted_statuses(
-        &self,
-        source_player_index: PlayerIndex,
-    ) -> Vec<&StatusEffect> {
-        self.status_effects
-            .iter()
-            .filter(|s| s.source_player_index == source_player_index)
-            .collect()
-    }
-
-    pub(crate) fn get_afflicted_statuses(
-        &self,
-        affected_player_index: PlayerIndex,
-    ) -> Vec<&StatusEffect> {
-        self.status_effects
-            .iter()
-            .filter(|s| s.affected_player_index == affected_player_index)
-            .collect()
     }
 
     // Should return true if the player was successfully killed, false if the player failed to die
@@ -854,88 +812,6 @@ impl<T: StoryTellerInterface> Game<T> {
     }
 }
 
-// -- Logging --
-// TODO: Implement all events
-#[derive(Debug)]
-pub(crate) enum EventType {
-    // Game Time Events
-    DayStart,
-    DayEnd,
-    NightStart,
-    NightEnd,
-    // Player Events
-    Nomination,
-    Execution,
-    AttemptedKill,
-    Protected,
-    Death,
-    // Ability Specific Events
-}
-
-pub(crate) struct Event {
-    pub(crate) event_type: EventType,
-    pub(crate) source_player: Option<PlayerIndex>,
-    pub(crate) target_player: Option<PlayerIndex>,
-}
-
-impl Event {
-    pub(crate) fn new(
-        event_type: EventType,
-        source_player: Option<PlayerIndex>,
-        target_player: Option<PlayerIndex>,
-    ) -> Self {
-        Self {
-            event_type,
-            source_player,
-            target_player,
-        }
-    }
-
-    pub(crate) fn new_game_event(event_type: EventType) -> Self {
-        Self {
-            event_type,
-            source_player: None,
-            target_player: None,
-        }
-    }
-    pub(crate) fn get_description(&self) -> String {
-        todo!();
-    }
-
-    pub(crate) fn get_reason(&self) -> Option<String> {
-        todo!();
-    }
-}
-
-#[derive(PartialEq)]
-pub(crate) enum DayPhase {
-    Day,
-    Night,
-}
-
-pub(crate) struct DayPhaseLog {
-    day_phase: DayPhase,
-    log: Vec<Event>,
-}
-
-pub(crate) struct Nychthemeron {
-    day_num: usize,
-    day: DayPhaseLog,
-    night: DayPhaseLog,
-}
-pub(crate) struct Log {
-    // TODO: Make this a tree eventually
-    nychthemrons: Vec<Nychthemeron>,
-}
-
-impl Log {
-    pub(crate) fn new() -> Self {
-        Self {
-            nychthemrons: vec![],
-        }
-    }
-}
-
 #[derive(Clone, Copy, Hash, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Alignment {
     Good,
@@ -1048,47 +924,6 @@ impl Role {
     }
 }
 
-#[derive(Debug, PartialEq)]
-pub(crate) struct StatusEffect {
-    status_type: StatusEffects,
-    source_role: Role,
-    source_player_index: PlayerIndex,
-    affected_player_index: PlayerIndex,
-}
-
-impl StatusEffect {
-    pub(crate) fn new(
-        status_type: StatusEffects,
-        source_player_index: PlayerIndex,
-        source_role: Role,
-        affected_player_index: PlayerIndex,
-    ) -> Self {
-        Self {
-            status_type,
-            source_player_index,
-            source_role,
-            affected_player_index,
-        }
-    }
-}
-#[derive(Clone, Copy, Hash, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) enum StatusEffects {
-    // General
-    Drunk,
-    Mad,
-    Poisoned,
-    DemonProtected,
-    NightProtected,
-    DeathProtected,
-    // Role specific
-    ButlerMaster,
-    AppearsGood,
-    AppearsEvil,
-    MayorBounceKill,
-    TheDrunk,
-    FortuneTellerRedHerring,
-}
-
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub(crate) struct Player {
     pub(crate) name: String,
@@ -1134,52 +969,6 @@ mod tests {
     use super::*;
 
     // NOTE: Testing Utils
-
-    struct TestInput {}
-
-    impl StoryTellerInterface for TestInput {
-        fn choose_players(&self, num: usize, max_index: usize) -> Vec<PlayerIndex> {
-            let mut rng = rand::rng();
-            let mut values: Vec<usize> = (0..max_index).collect();
-            values.shuffle(&mut rng);
-            let mut result: Vec<PlayerIndex> = vec![];
-            for i in 0..num {
-                result.push(values.pop().unwrap());
-            }
-
-            return result;
-        }
-
-        fn choose_roles(&self, num: usize, mut valid_roles: Vec<Role>) -> Vec<Role> {
-            let mut rng = rand::rng();
-            valid_roles.shuffle(&mut rng);
-            let mut result: Vec<Role> = vec![];
-            for i in 0..num {
-                result.push(valid_roles.pop().unwrap());
-            }
-
-            return result;
-        }
-
-        // These don't need to be implemented for testing
-        fn input_number(&self) -> usize {
-            todo!()
-        }
-
-        fn display_number(&self) {
-            todo!()
-        }
-
-        fn display_players(&self) {
-            todo!()
-        }
-
-        fn display_role(&self) {
-            todo!()
-        }
-    }
-
-    const TEST_INPUT: TestInput = TestInput {};
 
     const EMPTY_SCRIPT: Script = Script { roles: vec![] };
 
@@ -1228,7 +1017,7 @@ mod tests {
         let roles = vec![Role::Investigator, Role::Innkeeper, Role::Imp];
         let player_names = vec![String::from("P1"), String::from("P2"), String::from("P3")];
 
-        let game = Game::new(roles.clone(), player_names, EMPTY_SCRIPT, TEST_INPUT).unwrap();
+        let game = Game::new(roles.clone(), player_names, EMPTY_SCRIPT).unwrap();
 
         assert_eq!(game.players.len(), 3);
         assert_eq!(game.players[0].name, "P1");
@@ -1269,7 +1058,7 @@ mod tests {
         let roles = vec![Role::Investigator, Role::Innkeeper, Role::Imp];
         let player_names = vec![String::from("P1"), String::from("P2"), String::from("P3")];
 
-        let mut game = Game::new(roles, player_names, EMPTY_SCRIPT, TEST_INPUT).unwrap();
+        let mut game = Game::new(roles, player_names, EMPTY_SCRIPT).unwrap();
 
         game.kill_player(0, 0);
         assert_eq!(game.players[0].dead, true);
@@ -1284,7 +1073,7 @@ mod tests {
         let roles = vec![Role::Investigator, Role::Innkeeper, Role::Imp];
         let player_names = vec![String::from("P1"), String::from("P2"), String::from("P3")];
 
-        let mut game = Game::new(roles, player_names, EMPTY_SCRIPT, TEST_INPUT).unwrap();
+        let mut game = Game::new(roles, player_names, EMPTY_SCRIPT).unwrap();
 
         game.add_status(StatusEffects::DeathProtected, 1, 1);
 
@@ -1305,7 +1094,7 @@ mod tests {
         let roles = vec![Role::Investigator, Role::Innkeeper, Role::Imp];
         let player_names = vec![String::from("P1"), String::from("P2"), String::from("P3")];
 
-        let mut game = Game::new(roles, player_names, EMPTY_SCRIPT, TEST_INPUT).unwrap();
+        let mut game = Game::new(roles, player_names, EMPTY_SCRIPT).unwrap();
 
         game.day_phase = DayPhase::Night;
         game.add_status(StatusEffects::NightProtected, 1, 1);
@@ -1327,7 +1116,7 @@ mod tests {
         let roles = vec![Role::Investigator, Role::Innkeeper, Role::Imp];
         let player_names = vec![String::from("P1"), String::from("P2"), String::from("P3")];
 
-        let mut game = Game::new(roles, player_names, EMPTY_SCRIPT, TEST_INPUT).unwrap();
+        let mut game = Game::new(roles, player_names, EMPTY_SCRIPT).unwrap();
 
         game.add_status(StatusEffects::DemonProtected, 1, 1);
 
@@ -1353,7 +1142,7 @@ mod tests {
         let roles = vec![Role::Investigator, Role::Innkeeper, Role::Imp];
         let player_names = vec![String::from("P1"), String::from("P2"), String::from("P3")];
 
-        let mut game = Game::new(roles.clone(), player_names, EMPTY_SCRIPT, TEST_INPUT).unwrap();
+        let mut game = Game::new(roles.clone(), player_names, EMPTY_SCRIPT).unwrap();
 
         assert_eq!(game.players[game.left_player(1)], game.players[0]);
 
@@ -1367,7 +1156,7 @@ mod tests {
         let roles = vec![Role::Investigator, Role::Innkeeper, Role::Imp];
         let player_names = vec![String::from("P1"), String::from("P2"), String::from("P3")];
 
-        let mut game = Game::new(roles, player_names, EMPTY_SCRIPT, TEST_INPUT).unwrap();
+        let mut game = Game::new(roles, player_names, EMPTY_SCRIPT).unwrap();
 
         assert_eq!(game.players[game.right_player(1)], game.players[2]);
 
@@ -1398,7 +1187,7 @@ mod tests {
             String::from("P5"),
         ];
 
-        let game = Game::new(roles, player_names, EMPTY_SCRIPT, TEST_INPUT).unwrap();
+        let game = Game::new(roles, player_names, EMPTY_SCRIPT).unwrap();
 
         let player_indices = vec![0, 1, 2, 3, 4];
         let order = game.get_night_1_order(player_indices);
@@ -1430,7 +1219,7 @@ mod tests {
             String::from("P5"),
         ];
 
-        let game = Game::new(roles, player_names, EMPTY_SCRIPT, TEST_INPUT).unwrap();
+        let game = Game::new(roles, player_names, EMPTY_SCRIPT).unwrap();
 
         let player_indices = vec![0, 1, 2, 3, 4];
         let order = game.get_night_order(player_indices);
@@ -1461,7 +1250,7 @@ mod tests {
             String::from("P5"),
         ];
 
-        let mut game = Game::new(roles, player_names, EMPTY_SCRIPT, TEST_INPUT).unwrap();
+        let mut game = Game::new(roles, player_names, EMPTY_SCRIPT).unwrap();
 
         game.add_status(StatusEffects::Poisoned, 2, 0);
 
@@ -1487,7 +1276,7 @@ mod tests {
             String::from("P5"),
         ];
 
-        let mut game = Game::new(roles, player_names, EMPTY_SCRIPT, TEST_INPUT).unwrap();
+        let mut game = Game::new(roles, player_names, EMPTY_SCRIPT).unwrap();
 
         game.add_status(StatusEffects::Poisoned, 2, 0);
         game.add_status(StatusEffects::MayorBounceKill, 1, 3);
@@ -1620,7 +1409,7 @@ mod tests {
             String::from("P5"),
         ];
 
-        let mut game = Game::new(roles, player_names, EMPTY_SCRIPT, TEST_INPUT).unwrap();
+        let mut game = Game::new(roles, player_names, EMPTY_SCRIPT).unwrap();
 
         game.add_status(StatusEffects::Poisoned, 2, 0);
         game.add_status(StatusEffects::MayorBounceKill, 1, 3);
@@ -1674,7 +1463,7 @@ mod tests {
             String::from("P5"),
         ];
 
-        let mut game = Game::new(roles, player_names, EMPTY_SCRIPT, TEST_INPUT).unwrap();
+        let mut game = Game::new(roles, player_names, EMPTY_SCRIPT).unwrap();
 
         game.add_status(StatusEffects::Poisoned, 2, 0);
         game.add_status(StatusEffects::MayorBounceKill, 1, 3);
