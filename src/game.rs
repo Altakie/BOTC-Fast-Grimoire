@@ -1,4 +1,5 @@
 mod interface;
+use interface::*;
 mod log;
 use log::*;
 mod status_effects;
@@ -11,26 +12,6 @@ use std::{collections::HashMap, fmt::Display, usize};
 use reactive_stores::*;
 
 use crate::setup::Script;
-
-pub(crate) enum RoleSelectionType {
-    InPlay,
-    NotInPlay,
-    Script,
-}
-
-#[derive(Clone)]
-pub(crate) enum InterfacePhase {
-    Default,
-    Done,
-    ChoosingRoles,
-    ChoosingPlayers,
-    InputtingNumber,
-    DisplayingNumber,
-    DisplayingPlayers,
-    DisplayingRoles,
-}
-
-pub(crate) struct InterfaceInfo {}
 
 // -- Game pub(crate) structures --
 
@@ -95,21 +76,6 @@ impl Game {
 
     pub(crate) fn get_players(&self) -> Vec<Player> {
         self.players.clone()
-    }
-
-    pub(crate) fn choose_players(&self, num: usize) -> Vec<usize> {
-        todo!()
-    }
-
-    pub(crate) fn choose_roles(&self, num: usize, selector: RoleSelectionType) -> Vec<Role> {
-        let roles_in_scope: Vec<Role> = match selector {
-            RoleSelectionType::InPlay => self.players.iter().clone().map(|p| p.role).collect(),
-            RoleSelectionType::NotInPlay => todo!(),
-            RoleSelectionType::Script => self.script.roles.clone(),
-        };
-
-        // self.storyteller_interface.choose_roles(num, roles_in_scope)
-        todo!()
     }
 
     pub(crate) fn setup(&mut self) {
