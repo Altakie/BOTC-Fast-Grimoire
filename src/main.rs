@@ -2,11 +2,11 @@ use leptos::mount::mount_to_body;
 use leptos::prelude::*;
 use reactive_stores::Store;
 
-mod setup;
-use setup::{CharacterTypeCounts, Script, ScriptJson};
+mod initialization;
+use initialization::{CharacterTypeCounts, Script, ScriptJson};
 
-mod game;
-use game::{Game, Player, Role};
+mod engine;
+use engine::{Game, Player, Role};
 // use leptos_router::components::*;
 // use leptos_router::path;
 
@@ -18,7 +18,7 @@ fn main() {
 }
 
 #[derive(Clone, Copy)]
-enum SetUpStage {
+enum InitializationStage {
     Start,
     InputScript,
     InputPlayers,
@@ -28,7 +28,7 @@ enum SetUpStage {
 
 #[component]
 fn App() -> impl IntoView {
-    let setup_stage = RwSignal::new(SetUpStage::Start);
+    let setup_stage = RwSignal::new(InitializationStage::Start);
     let player_names = RwSignal::new(Vec::<String>::new());
     let roles = RwSignal::new(Vec::<Role>::new());
     let script = RwSignal::new(Script { roles: vec![] });
@@ -50,36 +50,36 @@ fn App() -> impl IntoView {
         <div>
             {move || {
                 match setup_stage.get() {
-                    SetUpStage::Start => {
+                    InitializationStage::Start => {
                         view! {
                             <Starter
                                 setup_stage=setup_stage.write_only()
-                                next_setup_stage=SetUpStage::InputScript
+                                next_setup_stage=InitializationStage::InputScript
                             />
                         }
                             .into_any()
                     }
-                    SetUpStage::InputScript => {
+                    InitializationStage::InputScript => {
                         view! {
                             <ScriptInputter
                                 script=script
                                 setup_stage=setup_stage.write_only()
-                                next_setup_stage=SetUpStage::InputPlayers
+                                next_setup_stage=InitializationStage::InputPlayers
                             />
                         }
                             .into_any()
                     }
-                    SetUpStage::InputPlayers => {
+                    InitializationStage::InputPlayers => {
                         view! {
                             <PlayerInputer
                                 players=player_names
                                 setup_stage=setup_stage.write_only()
-                                next_setup_stage=SetUpStage::ChooseRoles
+                                next_setup_stage=InitializationStage::ChooseRoles
                             />
                         }
                             .into_any()
                     }
-                    SetUpStage::ChooseRoles => {
+                    InitializationStage::ChooseRoles => {
                         let num_players = player_names.get().len();
                         view! {
                             <RoleChooser
@@ -87,12 +87,12 @@ fn App() -> impl IntoView {
                                 script=script.read_only()
                                 roles=roles
                                 setup_stage=setup_stage.write_only()
-                                next_setup_stage=SetUpStage::GameStart
+                                next_setup_stage=InitializationStage::GameStart
                             />
                         }
                             .into_any()
                     }
-                    SetUpStage::GameStart => {
+                    InitializationStage::GameStart => {
                         view! {
                             <GameInterface
                                 roles=roles.get()
@@ -109,15 +109,18 @@ fn App() -> impl IntoView {
 }
 
 #[component]
-fn Starter(setup_stage: WriteSignal<SetUpStage>, next_setup_stage: SetUpStage) -> impl IntoView {
+fn Starter(
+    setup_stage: WriteSignal<InitializationStage>,
+    next_setup_stage: InitializationStage,
+) -> impl IntoView {
     view! { <button on:click=move |_| { setup_stage.set(next_setup_stage) }>"Start Game"</button> }
 }
 
 #[component]
 fn PlayerInputer(
     players: RwSignal<Vec<String>>,
-    setup_stage: WriteSignal<SetUpStage>,
-    next_setup_stage: SetUpStage,
+    setup_stage: WriteSignal<InitializationStage>,
+    next_setup_stage: InitializationStage,
 ) -> impl IntoView {
     let name = RwSignal::new(String::new());
 
@@ -271,8 +274,8 @@ fn PlayerSetupList(player_names: RwSignal<Vec<String>>) -> impl IntoView {
 #[component]
 fn ScriptInputter(
     script: RwSignal<Script>,
-    setup_stage: WriteSignal<SetUpStage>,
-    next_setup_stage: SetUpStage,
+    setup_stage: WriteSignal<InitializationStage>,
+    next_setup_stage: InitializationStage,
 ) -> impl IntoView {
     let raw_json = RwSignal::new(String::new());
     view! {
@@ -297,11 +300,11 @@ fn ScriptInputter(
 
 #[component]
 fn RoleChooser(
-    setup_stage: WriteSignal<SetUpStage>,
+    setup_stage: WriteSignal<InitializationStage>,
     num_players: usize,
     script: ReadSignal<Script>,
     roles: RwSignal<Vec<Role>>,
-    next_setup_stage: SetUpStage,
+    next_setup_stage: InitializationStage,
 ) -> impl IntoView {
     // Iterate through roles in script
     // For each role, make it clickable?

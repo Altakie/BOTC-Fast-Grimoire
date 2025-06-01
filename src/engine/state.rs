@@ -1,43 +1,38 @@
-mod interface;
-use interface::RoleSelectionType;
+#![allow(dead_code, clippy::needless_return)]
 mod log;
 use log::{DayPhase, Log};
+mod state_machine;
 mod status_effects;
 use status_effects::{StatusEffect, StatusEffects};
 
 use rand::{self, seq::SliceRandom};
-use serde_derive::{Deserialize, Serialize};
-use std::{collections::HashMap, fmt::Display, usize};
-
 use reactive_stores::*;
+use std::collections::HashMap;
 
-use crate::setup::Script;
-
-// -- Game pub(crate) structures --
+use crate::{
+    engine::player::{Alignment, CharacterType, Player, Role},
+    initialization::Script,
+};
 
 pub(crate) type PlayerIndex = usize;
 
 #[derive(Clone, Store)]
-pub(crate) struct Game {
-    pub(crate) players: Vec<Player>, // NOTE: Maybe should be a map instead
-    // Want to have pointers to players
+pub(crate) struct State {
+    pub(crate) players: Vec<Player>,
     win_cond_i: Option<PlayerIndex>,
     status_effects: Vec<StatusEffect>,
     day_phase: DayPhase,
     day_num: usize,
     pub(crate) log: Log,
     script: Script,
-    // ADD A PHASE THING HERE, method should change game phase accordingly and also wait for change
-    pub(crate) interface_info: interface::Info,
 }
 
-impl Game {
+impl State {
     pub(crate) fn new(
         mut roles: Vec<Role>,
         player_names: Vec<String>,
         script: Script,
     ) -> Result<Self, ()> {
-        // Make this method conpub(crate) struct a new seating chart
         let mut players: Vec<Player> = vec![];
 
         let mut rng = rand::rng();
@@ -45,7 +40,7 @@ impl Game {
 
         if roles.len() != player_names.len() {
             eprintln!("Number of players does not match number of roles");
-            // Figure out to do errors here
+            // TODO: Figure out to do errors here
             return Err(());
         }
 
@@ -63,7 +58,6 @@ impl Game {
         let status_effects: Vec<StatusEffect> = vec![];
 
         let log = Log::new();
-        let interface_info = interface::Info::new();
 
         return Ok(Self {
             players,
@@ -73,84 +67,7 @@ impl Game {
             day_num: 0,
             log,
             script,
-            interface_info,
         });
-    }
-
-    pub(crate) fn setup(&mut self) {
-        for player_index in 0..self.players.len() {
-            let role = &self.players[player_index].role;
-
-            match role {
-                Role::Washerwoman => loop {
-                    let target_player_indices: Vec<PlayerIndex> = self.choose_players(2);
-                    for target_player_index in target_player_indices {
-                        let player = &self.players[target_player_index];
-                        if player.role.get_type() == CharacterType::Townsfolk
-                            || player.role == Role::Spy
-                        {
-                            break;
-                        }
-                    }
-                    eprintln!("Storyteller should have selected a townsfolk");
-                },
-                Role::Librarian => {
-                    // TODO: Prompt storyteller to select two players
-                    // Check that at least one of those players is a outsider
-                    loop {
-                        let target_player_indices: Vec<PlayerIndex> = self.choose_players(2);
-                        for target_player_index in target_player_indices {
-                            let player = self.players[target_player_index].clone();
-                            if player.role.get_type() == CharacterType::Outsider
-                                || player.role == Role::Spy
-                            {
-                                break;
-                            }
-                        }
-                        eprintln!("Storyteller should have selected a outsider");
-                    }
-                }
-                Role::Investigator => {
-                    // TODO: Prompt storyteller to select two players
-                    // Check that at least one of those players is a minion
-                    loop {
-                        let target_player_indices: Vec<PlayerIndex> = self.choose_players(2);
-                        for target_player_index in target_player_indices {
-                            let player = self.players[target_player_index].clone();
-                            if player.role.get_type() == CharacterType::Minion
-                                || player.role == Role::Recluse
-                            {
-                                break;
-                            }
-                        }
-                        eprintln!("Storyteller should have selected a minion");
-                    }
-                }
-                Role::Drunk => {
-                    // TODO: Choose a townsfolk role for the storyteller to replace the drunk with
-                    // Swap the chosen role with drunk, but give them a status effect that they
-                    // are actually the drunk
-                    // Essentially, the drunk should never actually be in play, the actual role
-                    // should be swapped out but a note is added that this player is indeed the
-                    // drunk
-                    let drunk_role = self.choose_roles(1, RoleSelectionType::Script)[0];
-                    self.players[player_index].role = drunk_role;
-                    self.add_status(StatusEffects::TheDrunk, player_index, player_index);
-                }
-                Role::Fortuneteller => {
-                    // TODO: Add a red-herring through status effects
-                    // Get storyteller input on who red-herring is
-                    let target_player_index = self.choose_players(1)[0];
-                    self.add_status(
-                        StatusEffects::FortuneTellerRedHerring,
-                        player_index,
-                        target_player_index,
-                    );
-                }
-                _ => (),
-            }
-            // TODO: Log events that happen in the setup
-        }
     }
 
     // WARNING: Unused for now
@@ -206,9 +123,9 @@ impl Game {
         // Should execute the target player if the vote succeeds
         // On nomination effects
         let source_player = &mut self.players[source_player_index];
-        match source_player.role {
-            _ => (),
-        }
+        // match source_player.role {
+        //     _ => (),
+        // }
 
         // For now just check for virgin and whether enough votes to pass
         let target_player = &mut self.players[source_player_index];
@@ -230,7 +147,7 @@ impl Game {
     }
 
     pub(crate) fn living_player_count(&self) -> usize {
-        self.players.iter().filter(|s| s.dead == false).count()
+        self.players.iter().filter(|s| !s.dead).count()
     }
 
     pub(crate) fn execute_player(&mut self, target_player_index: PlayerIndex) -> bool {
@@ -240,10 +157,7 @@ impl Game {
         if self
             .get_afflicted_statuses(target_player_index)
             .iter()
-            .any(|s| match s.status_type {
-                StatusEffects::DeathProtected => true,
-                _ => false,
-            })
+            .any(|s| matches!(s.status_type, StatusEffects::DeathProtected))
         {
             return true;
         }
@@ -777,187 +691,32 @@ impl Game {
     }
 }
 
-#[derive(Clone, Copy, Hash, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) enum Alignment {
-    Good,
-    Evil,
-}
-
-#[derive(Clone, Copy, Hash, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) enum CharacterType {
-    Townsfolk,
-    Outsider,
-    Minion,
-    Demon,
-}
-
-#[derive(Clone, Copy, Hash, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub(crate) enum Role {
-    Investigator,
-    Empath,
-    Gossip,
-    Innkeeper,
-    Washerwoman,
-    Librarian,
-    Chef,
-    Fortuneteller,
-    Undertaker,
-    Virgin,
-    Soldier,
-    Slayer,
-    Mayor,
-    Monk,
-    Ravenkeeper,
-    Drunk,
-    Saint,
-    Butler,
-    Recluse,
-    Spy,
-    Baron,
-    Scarletwoman,
-    Poisoner,
-    Imp,
-}
-
-impl Display for Role {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Role::Investigator => write!(f, "Investigator"),
-            Role::Empath => write!(f, "Empath"),
-            Role::Gossip => write!(f, "Gossip"),
-            Role::Innkeeper => write!(f, "Innkeeper"),
-            Role::Washerwoman => write!(f, "Washerwoman"),
-            Role::Librarian => write!(f, "Librarian"),
-            Role::Chef => write!(f, "Chef"),
-            Role::Fortuneteller => write!(f, "Fortuneteller"),
-            Role::Undertaker => write!(f, "Undertaker"),
-            Role::Virgin => write!(f, "Virgin"),
-            Role::Soldier => write!(f, "Soldier"),
-            Role::Slayer => write!(f, "Slayer"),
-            Role::Mayor => write!(f, "Mayor"),
-            Role::Monk => write!(f, "Monk"),
-            Role::Ravenkeeper => write!(f, "Ravenkeeper"),
-            Role::Drunk => write!(f, "Drunk"),
-            Role::Saint => write!(f, "Saint"),
-            Role::Butler => write!(f, "Butler"),
-            Role::Recluse => write!(f, "Recluse"),
-            Role::Spy => write!(f, "Spy"),
-            Role::Baron => write!(f, "Baron"),
-            Role::Scarletwoman => write!(f, "Scarletwoman"),
-            Role::Poisoner => write!(f, "Poisoner"),
-            Role::Imp => write!(f, "Imp"),
-        }
-    }
-}
-impl Role {
-    pub(crate) fn get_default_alignment(&self) -> Alignment {
-        match self.get_type() {
-            CharacterType::Minion | CharacterType::Demon => Alignment::Evil,
-            _ => Alignment::Good,
-        }
-    }
-
-    pub(crate) fn get_type(&self) -> CharacterType {
-        match *self {
-            Role::Investigator
-            | Role::Empath
-            | Role::Gossip
-            | Role::Innkeeper
-            | Role::Washerwoman
-            | Role::Librarian
-            | Role::Chef
-            | Role::Fortuneteller
-            | Role::Undertaker
-            | Role::Virgin
-            | Role::Soldier
-            | Role::Slayer
-            | Role::Mayor
-            | Role::Monk
-            | Role::Ravenkeeper => CharacterType::Townsfolk,
-            Role::Drunk | Role::Saint | Role::Butler | Role::Recluse => CharacterType::Outsider,
-            Role::Spy | Role::Baron | Role::Scarletwoman | Role::Poisoner => CharacterType::Minion,
-            Role::Imp => CharacterType::Demon,
-        }
-    }
-
-    pub(crate) fn is_win_condition(&self) -> bool {
-        match self.get_type() {
-            CharacterType::Demon => true,
-            _ => false,
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub(crate) struct Player {
-    pub(crate) name: String,
-    pub(crate) role: Role,
-    // Order should be implemented through external array
-    pub(crate) dead: bool,
-    pub(crate) ability_active: bool, // WARNING: Not too happy about this implementation, might want to make
-    // it cleaner
-    pub(crate) ghost_vote: bool,
-    // it cleaner
-    pub(crate) alignment: Alignment,
-}
-
-impl Player {
-    pub(crate) fn new(name: String, role: Role) -> Self {
-        Self {
-            name,
-            role,
-            ghost_vote: true,
-            ability_active: true,
-            dead: false,
-            alignment: role.get_default_alignment(),
-        }
-    }
-}
-
-impl ToString for Player {
-    fn to_string(&self) -> String {
-        let player_string = format!(
-            "Player {}\n\tRole: {:?}\n
-                \tDead?: Not Yet Implemented\n
-                \t Statuses: Not yet implemented \n
-                \tHas Ghost Vote?: {}\n",
-            self.name, self.dead, self.ghost_vote
-        );
-
-        return player_string;
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     // NOTE: Testing Utils
 
-    #[macro_export]
-    macro_rules! setup_test_game {
-        () => {{
-            let roles = vec![
-                Role::Investigator,
-                Role::Innkeeper,
-                Role::Imp,
-                Role::Chef,
-                Role::Poisoner,
-            ];
-            let player_names = vec![
-                String::from("P1"),
-                String::from("P2"),
-                String::from("P3"),
-                String::from("P4"),
-                String::from("P5"),
-            ];
+    pub(crate) fn setup_test_game() -> (State, Vec<Role>) {
+        let roles = vec![
+            Role::Investigator,
+            Role::Innkeeper,
+            Role::Imp,
+            Role::Chef,
+            Role::Poisoner,
+        ];
+        let player_names = vec![
+            String::from("P1"),
+            String::from("P2"),
+            String::from("P3"),
+            String::from("P4"),
+            String::from("P5"),
+        ];
 
-            (
-                Game::new(roles.clone(), player_names, EMPTY_SCRIPT).unwrap(),
-                roles,
-            )
-        }};
+        return (
+            State::new(roles.clone(), player_names, EMPTY_SCRIPT).unwrap(),
+            roles,
+        );
     }
     pub(crate) const EMPTY_SCRIPT: Script = Script { roles: vec![] };
 
@@ -980,8 +739,8 @@ mod tests {
             // effects on them, has the right role, and is good
             assert_eq!(player.name, String::from("Good"));
             assert_eq!(player.role, role);
-            assert_eq!(player.dead, false);
-            assert_eq!(player.ghost_vote, true);
+            assert!(!player.dead);
+            assert!(player.ghost_vote);
             assert_eq!(player.alignment, Alignment::Good);
         }
 
@@ -995,15 +754,15 @@ mod tests {
             // effects on them, has the right role, and is good
             assert_eq!(player.name, String::from("Evil"));
             assert_eq!(player.role, role);
-            assert_eq!(player.dead, false);
-            assert_eq!(player.ghost_vote, true);
+            assert!(!player.dead);
+            assert!(player.ghost_vote);
             assert_eq!(player.alignment, Alignment::Evil);
         }
     }
 
     #[test]
     fn test_new_game() {
-        let (mut game, roles) = setup_test_game!();
+        let (game, roles) = setup_test_game();
 
         assert_eq!(game.players.len(), 3);
         assert_eq!(game.players[0].name, "P1");
@@ -1041,79 +800,79 @@ mod tests {
 
     #[test]
     fn kill_player() {
-        let mut game = setup_test_game!().0;
+        let mut game = setup_test_game().0;
 
         game.kill_player(0, 0);
-        assert_eq!(game.players[0].dead, true);
+        assert!(game.players[0].dead);
         game.kill_player(1, 1);
-        assert_eq!(game.players[1].dead, true);
+        assert!(game.players[1].dead);
         game.kill_player(2, 2);
-        assert_eq!(game.players[2].dead, true);
+        assert!(game.players[2].dead);
     }
 
     #[test]
     fn kill_death_protected_player() {
-        let mut game = setup_test_game!().0;
+        let mut game = setup_test_game().0;
 
         game.add_status(StatusEffects::DeathProtected, 1, 1);
 
         game.kill_player(0, 0);
-        assert_eq!(game.players[0].dead, true);
+        assert!(game.players[0].dead);
         game.kill_player(1, 1);
-        assert_eq!(game.players[1].dead, false);
+        assert!(!game.players[1].dead);
         game.kill_player(2, 2);
-        assert_eq!(game.players[2].dead, true);
+        assert!(game.players[2].dead);
 
         game.remove_status(StatusEffects::DeathProtected, 1, 1);
         game.kill_player(1, 1);
-        assert_eq!(game.players[1].dead, true);
+        assert!(game.players[1].dead);
     }
 
     #[test]
     fn kill_night_protected_player() {
-        let mut game = setup_test_game!().0;
+        let mut game = setup_test_game().0;
 
         game.day_phase = DayPhase::Night;
         game.add_status(StatusEffects::NightProtected, 1, 1);
 
         game.kill_player(0, 0);
-        assert_eq!(game.players[0].dead, true);
+        assert!(game.players[0].dead);
         game.kill_player(1, 1);
-        assert_eq!(game.players[1].dead, false);
+        assert!(!game.players[1].dead);
         game.kill_player(2, 2);
-        assert_eq!(game.players[2].dead, true);
+        assert!(game.players[2].dead);
 
         game.day_phase = DayPhase::Day;
         game.kill_player(1, 1);
-        assert_eq!(game.players[1].dead, true);
+        assert!(game.players[1].dead);
     }
 
     #[test]
     fn kill_demon_protected_player() {
-        let mut game = setup_test_game!().0;
+        let mut game = setup_test_game().0;
 
         game.add_status(StatusEffects::DemonProtected, 1, 1);
 
         let demon_index = game.win_cond_i.unwrap();
 
         game.kill_player(demon_index, 0);
-        assert_eq!(game.players[0].dead, true);
+        assert!(game.players[0].dead);
         game.kill_player(demon_index, 1);
-        assert_eq!(game.players[1].dead, false);
+        assert!(!game.players[1].dead);
         game.kill_player(demon_index, 2);
-        assert_eq!(game.players[2].dead, true);
+        assert!(game.players[2].dead);
 
         game.kill_player(demon_index, 1);
-        assert_eq!(game.players[1].dead, false);
+        assert!(!game.players[1].dead);
 
         game.remove_status(StatusEffects::DemonProtected, 1, 1);
         game.kill_player(demon_index, 1);
-        assert_eq!(game.players[1].dead, true);
+        assert!(game.players[1].dead);
     }
 
     #[test]
     fn test_left() {
-        let mut game = setup_test_game!().0;
+        let mut game = setup_test_game().0;
 
         assert_eq!(game.players[game.left_player(1)], game.players[0]);
 
@@ -1124,7 +883,7 @@ mod tests {
 
     #[test]
     fn test_right() {
-        let mut game = setup_test_game!().0;
+        let mut game = setup_test_game().0;
 
         assert_eq!(game.players[game.right_player(1)], game.players[2]);
 
@@ -1140,7 +899,7 @@ mod tests {
 
     #[test]
     fn test_get_night_1_order() {
-        let game = setup_test_game!().0;
+        let game = setup_test_game().0;
 
         let player_indices = vec![0, 1, 2, 3, 4];
         let order = game.get_night_1_order(player_indices);
@@ -1157,7 +916,7 @@ mod tests {
     // TODO: Test that all night one abilities work as expected
 
     fn test_night_order() {
-        let game = setup_test_game!().0;
+        let game = setup_test_game().0;
 
         let player_indices = vec![0, 1, 2, 3, 4];
         let order = game.get_night_order(player_indices);
@@ -1173,7 +932,7 @@ mod tests {
 
     #[test]
     fn add_status_effect() {
-        let mut game = setup_test_game!().0;
+        let mut game = setup_test_game().0;
 
         game.add_status(StatusEffects::Poisoned, 2, 0);
 
@@ -1184,7 +943,7 @@ mod tests {
 
     #[test]
     fn add_multiple_status_effects() {
-        let mut game = setup_test_game!().0;
+        let mut game = setup_test_game().0;
 
         game.add_status(StatusEffects::Poisoned, 2, 0);
         game.add_status(StatusEffects::MayorBounceKill, 1, 3);
@@ -1302,7 +1061,7 @@ mod tests {
 
     #[test]
     fn find_status_effects_inflicted_by_player() {
-        let mut game = setup_test_game!().0;
+        let mut game = setup_test_game().0;
 
         game.add_status(StatusEffects::Poisoned, 2, 0);
         game.add_status(StatusEffects::MayorBounceKill, 1, 3);
@@ -1341,7 +1100,7 @@ mod tests {
 
     #[test]
     fn find_status_effects_inlicted_by_player() {
-        let mut game = setup_test_game!().0;
+        let mut game = setup_test_game().0;
 
         game.add_status(StatusEffects::Poisoned, 2, 0);
         game.add_status(StatusEffects::MayorBounceKill, 1, 3);
