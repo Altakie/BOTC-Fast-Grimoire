@@ -1,9 +1,9 @@
 mod interface;
-use interface::*;
+use interface::RoleSelectionType;
 mod log;
-use log::*;
+use log::{DayPhase, Log};
 mod status_effects;
-use status_effects::*;
+use status_effects::{StatusEffect, StatusEffects};
 
 use rand::{self, seq::SliceRandom};
 use serde_derive::{Deserialize, Serialize};
@@ -19,16 +19,16 @@ pub(crate) type PlayerIndex = usize;
 
 #[derive(Clone, Store)]
 pub(crate) struct Game {
-    players: Vec<Player>, // NOTE: Maybe should be a map instead
+    pub(crate) players: Vec<Player>, // NOTE: Maybe should be a map instead
     // Want to have pointers to players
     win_cond_i: Option<PlayerIndex>,
     status_effects: Vec<StatusEffect>,
     day_phase: DayPhase,
     day_num: usize,
-    log: Log,
+    pub(crate) log: Log,
     script: Script,
     // ADD A PHASE THING HERE, method should change game phase accordingly and also wait for change
-    interface_phase: InterfacePhase,
+    pub(crate) interface_info: interface::Info,
 }
 
 impl Game {
@@ -63,6 +63,8 @@ impl Game {
         let status_effects: Vec<StatusEffect> = vec![];
 
         let log = Log::new();
+        let interface_info = interface::Info::new();
+
         return Ok(Self {
             players,
             win_cond_i,
@@ -71,11 +73,8 @@ impl Game {
             day_num: 0,
             log,
             script,
+            interface_info,
         });
-    }
-
-    pub(crate) fn get_players(&self) -> Vec<Player> {
-        self.players.clone()
     }
 
     pub(crate) fn setup(&mut self) {
@@ -936,7 +935,31 @@ mod tests {
 
     // NOTE: Testing Utils
 
-    const EMPTY_SCRIPT: Script = Script { roles: vec![] };
+    #[macro_export]
+    macro_rules! setup_test_game {
+        () => {{
+            let roles = vec![
+                Role::Investigator,
+                Role::Innkeeper,
+                Role::Imp,
+                Role::Chef,
+                Role::Poisoner,
+            ];
+            let player_names = vec![
+                String::from("P1"),
+                String::from("P2"),
+                String::from("P3"),
+                String::from("P4"),
+                String::from("P5"),
+            ];
+
+            (
+                Game::new(roles.clone(), player_names, EMPTY_SCRIPT).unwrap(),
+                roles,
+            )
+        }};
+    }
+    pub(crate) const EMPTY_SCRIPT: Script = Script { roles: vec![] };
 
     // NOTE: Tests
     #[test]
@@ -980,10 +1003,7 @@ mod tests {
 
     #[test]
     fn test_new_game() {
-        let roles = vec![Role::Investigator, Role::Innkeeper, Role::Imp];
-        let player_names = vec![String::from("P1"), String::from("P2"), String::from("P3")];
-
-        let game = Game::new(roles.clone(), player_names, EMPTY_SCRIPT).unwrap();
+        let (mut game, roles) = setup_test_game!();
 
         assert_eq!(game.players.len(), 3);
         assert_eq!(game.players[0].name, "P1");
@@ -1021,10 +1041,7 @@ mod tests {
 
     #[test]
     fn kill_player() {
-        let roles = vec![Role::Investigator, Role::Innkeeper, Role::Imp];
-        let player_names = vec![String::from("P1"), String::from("P2"), String::from("P3")];
-
-        let mut game = Game::new(roles, player_names, EMPTY_SCRIPT).unwrap();
+        let mut game = setup_test_game!().0;
 
         game.kill_player(0, 0);
         assert_eq!(game.players[0].dead, true);
@@ -1036,10 +1053,7 @@ mod tests {
 
     #[test]
     fn kill_death_protected_player() {
-        let roles = vec![Role::Investigator, Role::Innkeeper, Role::Imp];
-        let player_names = vec![String::from("P1"), String::from("P2"), String::from("P3")];
-
-        let mut game = Game::new(roles, player_names, EMPTY_SCRIPT).unwrap();
+        let mut game = setup_test_game!().0;
 
         game.add_status(StatusEffects::DeathProtected, 1, 1);
 
@@ -1057,10 +1071,7 @@ mod tests {
 
     #[test]
     fn kill_night_protected_player() {
-        let roles = vec![Role::Investigator, Role::Innkeeper, Role::Imp];
-        let player_names = vec![String::from("P1"), String::from("P2"), String::from("P3")];
-
-        let mut game = Game::new(roles, player_names, EMPTY_SCRIPT).unwrap();
+        let mut game = setup_test_game!().0;
 
         game.day_phase = DayPhase::Night;
         game.add_status(StatusEffects::NightProtected, 1, 1);
@@ -1079,10 +1090,7 @@ mod tests {
 
     #[test]
     fn kill_demon_protected_player() {
-        let roles = vec![Role::Investigator, Role::Innkeeper, Role::Imp];
-        let player_names = vec![String::from("P1"), String::from("P2"), String::from("P3")];
-
-        let mut game = Game::new(roles, player_names, EMPTY_SCRIPT).unwrap();
+        let mut game = setup_test_game!().0;
 
         game.add_status(StatusEffects::DemonProtected, 1, 1);
 
@@ -1105,10 +1113,7 @@ mod tests {
 
     #[test]
     fn test_left() {
-        let roles = vec![Role::Investigator, Role::Innkeeper, Role::Imp];
-        let player_names = vec![String::from("P1"), String::from("P2"), String::from("P3")];
-
-        let mut game = Game::new(roles.clone(), player_names, EMPTY_SCRIPT).unwrap();
+        let mut game = setup_test_game!().0;
 
         assert_eq!(game.players[game.left_player(1)], game.players[0]);
 
@@ -1119,10 +1124,7 @@ mod tests {
 
     #[test]
     fn test_right() {
-        let roles = vec![Role::Investigator, Role::Innkeeper, Role::Imp];
-        let player_names = vec![String::from("P1"), String::from("P2"), String::from("P3")];
-
-        let mut game = Game::new(roles, player_names, EMPTY_SCRIPT).unwrap();
+        let mut game = setup_test_game!().0;
 
         assert_eq!(game.players[game.right_player(1)], game.players[2]);
 
@@ -1138,22 +1140,7 @@ mod tests {
 
     #[test]
     fn test_get_night_1_order() {
-        let roles = vec![
-            Role::Investigator,
-            Role::Innkeeper,
-            Role::Imp,
-            Role::Chef,
-            Role::Poisoner,
-        ];
-        let player_names = vec![
-            String::from("P1"),
-            String::from("P2"),
-            String::from("P3"),
-            String::from("P4"),
-            String::from("P5"),
-        ];
-
-        let game = Game::new(roles, player_names, EMPTY_SCRIPT).unwrap();
+        let game = setup_test_game!().0;
 
         let player_indices = vec![0, 1, 2, 3, 4];
         let order = game.get_night_1_order(player_indices);
@@ -1170,22 +1157,7 @@ mod tests {
     // TODO: Test that all night one abilities work as expected
 
     fn test_night_order() {
-        let roles = vec![
-            Role::Investigator,
-            Role::Innkeeper,
-            Role::Imp,
-            Role::Chef,
-            Role::Poisoner,
-        ];
-        let player_names = vec![
-            String::from("P1"),
-            String::from("P2"),
-            String::from("P3"),
-            String::from("P4"),
-            String::from("P5"),
-        ];
-
-        let game = Game::new(roles, player_names, EMPTY_SCRIPT).unwrap();
+        let game = setup_test_game!().0;
 
         let player_indices = vec![0, 1, 2, 3, 4];
         let order = game.get_night_order(player_indices);
@@ -1201,22 +1173,7 @@ mod tests {
 
     #[test]
     fn add_status_effect() {
-        let roles = vec![
-            Role::Investigator,
-            Role::Innkeeper,
-            Role::Imp,
-            Role::Chef,
-            Role::Poisoner,
-        ];
-        let player_names = vec![
-            String::from("P1"),
-            String::from("P2"),
-            String::from("P3"),
-            String::from("P4"),
-            String::from("P5"),
-        ];
-
-        let mut game = Game::new(roles, player_names, EMPTY_SCRIPT).unwrap();
+        let mut game = setup_test_game!().0;
 
         game.add_status(StatusEffects::Poisoned, 2, 0);
 
@@ -1227,22 +1184,7 @@ mod tests {
 
     #[test]
     fn add_multiple_status_effects() {
-        let roles = vec![
-            Role::Investigator,
-            Role::Innkeeper,
-            Role::Imp,
-            Role::Chef,
-            Role::Poisoner,
-        ];
-        let player_names = vec![
-            String::from("P1"),
-            String::from("P2"),
-            String::from("P3"),
-            String::from("P4"),
-            String::from("P5"),
-        ];
-
-        let mut game = Game::new(roles, player_names, EMPTY_SCRIPT).unwrap();
+        let mut game = setup_test_game!().0;
 
         game.add_status(StatusEffects::Poisoned, 2, 0);
         game.add_status(StatusEffects::MayorBounceKill, 1, 3);
@@ -1360,22 +1302,7 @@ mod tests {
 
     #[test]
     fn find_status_effects_inflicted_by_player() {
-        let roles = vec![
-            Role::Investigator,
-            Role::Innkeeper,
-            Role::Imp,
-            Role::Chef,
-            Role::Poisoner,
-        ];
-        let player_names = vec![
-            String::from("P1"),
-            String::from("P2"),
-            String::from("P3"),
-            String::from("P4"),
-            String::from("P5"),
-        ];
-
-        let mut game = Game::new(roles, player_names, EMPTY_SCRIPT).unwrap();
+        let mut game = setup_test_game!().0;
 
         game.add_status(StatusEffects::Poisoned, 2, 0);
         game.add_status(StatusEffects::MayorBounceKill, 1, 3);
@@ -1414,22 +1341,7 @@ mod tests {
 
     #[test]
     fn find_status_effects_inlicted_by_player() {
-        let roles = vec![
-            Role::Investigator,
-            Role::Innkeeper,
-            Role::Imp,
-            Role::Chef,
-            Role::Poisoner,
-        ];
-        let player_names = vec![
-            String::from("P1"),
-            String::from("P2"),
-            String::from("P3"),
-            String::from("P4"),
-            String::from("P5"),
-        ];
-
-        let mut game = Game::new(roles, player_names, EMPTY_SCRIPT).unwrap();
+        let mut game = setup_test_game!().0;
 
         game.add_status(StatusEffects::Poisoned, 2, 0);
         game.add_status(StatusEffects::MayorBounceKill, 1, 3);

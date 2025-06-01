@@ -3,13 +3,13 @@
 
 <head>
 
-	<!-- <link rel="stylesheet" href="style.css"> -->
-<link rel="modulepreload" href="/botc-21f3c5776abf5f22.js" crossorigin="anonymous" integrity="sha384-ojSsvWDbe0cHZlBYBqJ3NYR++yeNEJ8z8EXA/zsOgPtQzKWk7PH0PccybnVZhl3d"><link rel="preload" href="/botc-21f3c5776abf5f22_bg.wasm" crossorigin="anonymous" integrity="sha384-rv7I8UT+K/v0MTgzuS7PWXKxQrdNDWhd3dHLhCQV8HQ8zFhqwLHchq9wP8k/GUoc" as="fetch" type="application/wasm"></head>
+	<!-- <link rel="stylesheet" href="styles.css"> -->
+<link rel="modulepreload" href="/botc-e5fe54d17e8f5a17.js" crossorigin="anonymous" integrity="sha384-wL7nZ/zoqlL1EJWhrLs9S7IViFJzD2sMxtqkmPM/9N4K7Y6X8pH+She1eCtFMrE3"><link rel="preload" href="/botc-e5fe54d17e8f5a17_bg.wasm" crossorigin="anonymous" integrity="sha384-YuNu+FdxS/YYuIWcsmpWnAIkgCcwyPdDI22CaGkkEAnC8k6bElReWfJo6U49FMP8" as="fetch" type="application/wasm"></head>
 
 <body>
 <script type="module">
-import init, * as bindings from '/botc-21f3c5776abf5f22.js';
-const wasm = await init({ module_or_path: '/botc-21f3c5776abf5f22_bg.wasm' });
+import init, * as bindings from '/botc-e5fe54d17e8f5a17.js';
+const wasm = await init({ module_or_path: '/botc-e5fe54d17e8f5a17_bg.wasm' });
 
 
 window.wasmBindings = bindings;
@@ -149,9 +149,3 @@ dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
 </script></body>
 
 </html>
-
-<style>
-	.red {
-		color: red
-	}
-</style>

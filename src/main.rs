@@ -1,11 +1,12 @@
 use leptos::mount::mount_to_body;
 use leptos::prelude::*;
+use reactive_stores::Store;
 
 mod setup;
 use setup::{CharacterTypeCounts, Script, ScriptJson};
 
 mod game;
-use game::{Game, Player, Role, StoryTellerInterface};
+use game::{Game, Player, Role};
 // use leptos_router::components::*;
 // use leptos_router::path;
 
@@ -398,8 +399,7 @@ fn RoleChooser(
 #[component]
 fn GameInterface(roles: Vec<Role>, player_names: Vec<String>, script: Script) -> impl IntoView {
     // TODO: Create a new game using the data we have just collected from the user
-    let game =
-        RwSignal::new(Game::new(roles, player_names, script, WebStoryTellerInterface {}).unwrap());
+    let game = Store::new(Game::new(roles, player_names, script).unwrap());
 
     let player_view = move |player: Player| {
         view! {
@@ -413,41 +413,11 @@ fn GameInterface(roles: Vec<Role>, player_names: Vec<String>, script: Script) ->
         <p>"Not yet implemented"</p>
         <div>
             <For
-                each=move || game.get().get_players()
+                each=move || game.get().players
                 key=|p| p.name.clone()
                 children=player_view
             />
         </div>
-    }
-}
-
-#[derive(Clone)]
-struct WebStoryTellerInterface {}
-
-impl StoryTellerInterface for WebStoryTellerInterface {
-    // Change a value that renders a certain view, grab the values from that view
-    fn choose_players(&self, num: usize, max_index: usize) -> Vec<game::PlayerIndex> {
-        todo!()
-    }
-
-    fn choose_roles(&self, num: usize, valid_roles: Vec<Role>) -> Vec<Role> {
-        todo!()
-    }
-
-    fn input_number(&self) -> usize {
-        todo!()
-    }
-
-    fn display_number(&self) {
-        todo!()
-    }
-
-    fn display_players(&self) {
-        todo!()
-    }
-
-    fn display_role(&self) {
-        todo!()
     }
 }
 
