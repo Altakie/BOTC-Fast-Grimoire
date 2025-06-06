@@ -1,12 +1,22 @@
+#![allow(clippy::needless_return)]
 use leptos::mount::mount_to_body;
 use leptos::prelude::*;
 use reactive_stores::Store;
 
-mod setup;
-use setup::{CharacterTypeCounts, Script, ScriptJson};
+mod initialization;
+use initialization::{CharacterTypeCounts, Script, ScriptJson};
 
-mod game;
-use game::{Game, Player, Role};
+mod engine;
+use engine::{
+    player::{CharacterType, Player, Role},
+    setup::{Args, ChangeRequest, ChangeType},
+    state::{PlayerIndex, State, StateStoreFields, Step},
+};
+
+mod scripts;
+use scripts::*;
+
+const DEBUG: bool = true;
 // use leptos_router::components::*;
 // use leptos_router::path;
 
@@ -18,7 +28,7 @@ fn main() {
 }
 
 #[derive(Clone, Copy)]
-enum SetUpStage {
+enum InitializationStage {
     Start,
     InputScript,
     InputPlayers,
@@ -28,13 +38,42 @@ enum SetUpStage {
 
 #[component]
 fn App() -> impl IntoView {
-    let setup_stage = RwSignal::new(SetUpStage::Start);
+    let initialization_stage = RwSignal::new(InitializationStage::Start);
     let player_names = RwSignal::new(Vec::<String>::new());
     let roles = RwSignal::new(Vec::<Role>::new());
     let script = RwSignal::new(Script { roles: vec![] });
+    provide_context(script);
 
-    // let game = RwSignal::new(Game::new());
-    // provide_context(game);
+    // NOTE: Debug only
+    if DEBUG {
+        roles.set(vec![
+            Role::Washerwoman,
+            Role::Investigator,
+            Role::Librarian,
+            Role::Fortuneteller,
+            Role::Monk,
+            Role::Drunk,
+            Role::Scarletwoman,
+            Role::Imp,
+        ]);
+
+        player_names.set(vec![
+            "Artem".to_string(),
+            "Naim".to_string(),
+            "Alec".to_string(),
+            "Nathaniel".to_string(),
+            "Messiah".to_string(),
+            "Isaac".to_string(),
+            "Ben".to_string(),
+            "Zhi".to_string(),
+        ]);
+        let script_json = serde_json::from_str("
+     [{\"id\":\"_meta\",\"author\":\"\",\"name\":\"Trouble Brewing\"},\"washerwoman\",\"librarian\",\"investigator\",\"chef\",\"empath\",\"fortuneteller\",\"undertaker\",\"virgin\",\"soldier\",\"slayer\",\"mayor\",\"monk\",\"ravenkeeper\",\"drunk\",\"saint\",\"butler\",\"recluse\",\"spy\",\"baron\",\"scarletwoman\",\"poisoner\",\"imp\"]
+     ");
+        script.set(Script::new_from_json(script_json.unwrap()));
+
+        initialization_stage.set(InitializationStage::GameStart);
+    }
 
     view! {
         // Could not get router to work
@@ -49,50 +88,50 @@ fn App() -> impl IntoView {
 
         <div>
             {move || {
-                match setup_stage.get() {
-                    SetUpStage::Start => {
+                match initialization_stage.get() {
+                    InitializationStage::Start => {
                         view! {
                             <Starter
-                                setup_stage=setup_stage.write_only()
-                                next_setup_stage=SetUpStage::InputScript
+                                setup_stage=initialization_stage.write_only()
+                                next_setup_stage=InitializationStage::InputScript
                             />
                         }
                             .into_any()
                     }
-                    SetUpStage::InputScript => {
+                    InitializationStage::InputScript => {
                         view! {
                             <ScriptInputter
                                 script=script
-                                setup_stage=setup_stage.write_only()
-                                next_setup_stage=SetUpStage::InputPlayers
+                                setup_stage=initialization_stage.write_only()
+                                next_setup_stage=InitializationStage::InputPlayers
                             />
                         }
                             .into_any()
                     }
-                    SetUpStage::InputPlayers => {
+                    InitializationStage::InputPlayers => {
                         view! {
                             <PlayerInputer
                                 players=player_names
-                                setup_stage=setup_stage.write_only()
-                                next_setup_stage=SetUpStage::ChooseRoles
+                                setup_stage=initialization_stage.write_only()
+                                next_setup_stage=InitializationStage::ChooseRoles
                             />
                         }
                             .into_any()
                     }
-                    SetUpStage::ChooseRoles => {
+                    InitializationStage::ChooseRoles => {
                         let num_players = player_names.get().len();
                         view! {
                             <RoleChooser
                                 num_players=num_players
                                 script=script.read_only()
                                 roles=roles
-                                setup_stage=setup_stage.write_only()
-                                next_setup_stage=SetUpStage::GameStart
+                                setup_stage=initialization_stage.write_only()
+                                next_setup_stage=InitializationStage::GameStart
                             />
                         }
                             .into_any()
                     }
-                    SetUpStage::GameStart => {
+                    InitializationStage::GameStart => {
                         view! {
                             <GameInterface
                                 roles=roles.get()
@@ -109,22 +148,35 @@ fn App() -> impl IntoView {
 }
 
 #[component]
-fn Starter(setup_stage: WriteSignal<SetUpStage>, next_setup_stage: SetUpStage) -> impl IntoView {
+fn Starter(
+    setup_stage: WriteSignal<InitializationStage>,
+    next_setup_stage: InitializationStage,
+) -> impl IntoView {
     view! { <button on:click=move |_| { setup_stage.set(next_setup_stage) }>"Start Game"</button> }
 }
 
 #[component]
 fn PlayerInputer(
     players: RwSignal<Vec<String>>,
-    setup_stage: WriteSignal<SetUpStage>,
-    next_setup_stage: SetUpStage,
+    setup_stage: WriteSignal<InitializationStage>,
+    next_setup_stage: InitializationStage,
 ) -> impl IntoView {
     let name = RwSignal::new(String::new());
 
     view! {
         <PlayerSetupList player_names=players />
         <p>"Input Player Name Below"</p>
-        <input id="PlayerInput" type="text" bind:value=name />
+        <input
+            id="PlayerInput"
+            type="text"
+            bind:value=name
+            on:keypress=move |ev| {
+                if ev.key() == "Enter" {
+                    players.update(|pv| pv.push(name.get()));
+                    name.set(String::from(""));
+                }
+            }
+        />
         <div>
             <button on:click=move |_| {
                 players.update(|pv| pv.push(name.get()));
@@ -153,117 +205,87 @@ fn PlayerSetupList(player_names: RwSignal<Vec<String>>) -> impl IntoView {
         <ol>
             // WARN: Should probably use this for loop for this and make it work, but for now other
             // option is fine
-            // <For each=move || player_names.get()
-            // key=|player_name| player_name.as_str()
-            // children = move |player_name| {
-            // let (player, _) = signal(player_name);
-            // view! {
-            // <li>
-            // {player} "  "
-            // <button on:click=move|_| {
-            // player_names.update(|pv| {
-            // let player_index = pv.iter().position(|p| *p == player.get()).unwrap();
-            // if player_index <= 0 {
-            // return
-            // }
-            // let temp = pv[player_index].clone();
-            // pv[player_index] = pv[player_index - 1].clone();
-            // pv[player_index - 1] = temp;
-            // })
-            // }>"Move Up"</button>
-            // <button on:click=move|_| {
-            // player_names.update(|pv| {
-            // let player_index = pv.iter().position(|p| *p == player.get()).unwrap();
-            // if (player_index + 1) >= pv.len() {
-            // return
-            // }
-            // let temp = pv[player_index].clone();
-            // pv[player_index] = pv[player_index + 1].clone();
-            // pv[player_index + 1] = temp;
-            // });
-            // }>"Move Down"</button>
-            // <button on:click=move|_| player_names.update(|pv| {
-            // pv.remove(pv.iter().position(|p| *p == player.get()).unwrap());})>"X"</button>
-            // </li>
-            // }}
-            // />
-
-            {move || {
-                player_names
-                    .get()
-                    .into_iter()
-                    .map(|player_name| {
-                        let (player, _) = signal(player_name);
-                        view! {
-                            <li>
-                                {player} "  "
-                                <button
-                                    on:click=move |_| {
-                                        player_names
-                                            .update(|pv| {
-                                                let player_index = pv
-                                                    .iter()
-                                                    .position(|p| *p == player.get())
-                                                    .unwrap();
-                                                if player_index == 0 {
-                                                    return;
-                                                }
-                                                let temp = pv[player_index].clone();
-                                                pv[player_index] = pv[player_index - 1].clone();
-                                                pv[player_index - 1] = temp;
-                                            })
-                                    }
-                                    disabled=move || {
-                                        let pv = player_names.get();
-                                        let player_index = pv
-                                            .iter()
-                                            .position(|p| *p == player.get())
-                                            .unwrap();
-                                        player_index == 0
-                                    }
-                                >
-                                    "Move Up"
-                                </button>
-                                <button
-                                    on:click=move |_| {
-                                        player_names
-                                            .update(|pv| {
-                                                let player_index = pv
-                                                    .iter()
-                                                    .position(|p| *p == player.get())
-                                                    .unwrap();
-                                                if (player_index + 1) >= pv.len() {
-                                                    return;
-                                                }
-                                                let temp = pv[player_index].clone();
-                                                pv[player_index] = pv[player_index + 1].clone();
-                                                pv[player_index + 1] = temp;
-                                            });
-                                    }
-                                    disabled=move || {
-                                        let pv = player_names.get();
-                                        let player_index = pv
-                                            .iter()
-                                            .position(|p| *p == player.get())
-                                            .unwrap();
-                                        (player_index + 1) >= pv.len()
-                                    }
-                                >
-                                    "Move Down"
-                                </button>
-                                <button on:click=move |_| {
+            <For
+                each=move || player_names.get()
+                key=|pn| pn.clone()
+                children=move |player_name| {
+                    let (player_name, _) = signal(player_name);
+                    view! {
+                        <li>
+                            {player_name} "  "
+                            <button
+                                on:click=move |_| {
+                                    let player_name = player_name.get();
+                                    let i = player_names
+                                        .read()
+                                        .iter()
+                                        .position(|p| *p == player_name)
+                                        .unwrap();
                                     player_names
                                         .update(|pv| {
-                                            pv.remove(
-                                                pv.iter().position(|p| *p == player.get()).unwrap(),
-                                            );
+                                            if i == 0 {
+                                                return;
+                                            }
+                                            let temp = pv[i].clone();
+                                            pv[i] = pv[i - 1].clone();
+                                            pv[i - 1] = temp;
                                         })
-                                }>"X"</button>
-                            </li>
-                        }
-                    })
-                    .collect_view()
-            }}
+                                }
+                                disabled=move || {
+                                    let i = player_names
+                                        .read()
+                                        .iter()
+                                        .position(|p| *p == *player_name.read())
+                                        .unwrap();
+                                    i == 0
+                                }
+                            >
+                                "Move Up"
+                            </button>
+                            <button
+                                on:click=move |_| {
+                                    let i = player_names
+                                        .read()
+                                        .iter()
+                                        .position(|p| *p == *player_name.read())
+                                        .unwrap();
+                                    player_names
+                                        .update(|pv| {
+                                            if (i + 1) >= pv.len() {
+                                                return;
+                                            }
+                                            let temp = pv[i].clone();
+                                            pv[i] = pv[i + 1].clone();
+                                            pv[i + 1] = temp;
+                                        });
+                                }
+                                disabled=move || {
+                                    let i = player_names
+                                        .read()
+                                        .iter()
+                                        .position(|p| *p == *player_name.read())
+                                        .unwrap();
+                                    let len = player_names.read().len();
+                                    (i + 1) >= len
+                                }
+                            >
+                                "Move Down"
+                            </button>
+                            <button on:click=move |_| {
+                                let i = player_names
+                                    .read()
+                                    .iter()
+                                    .position(|p| *p == *player_name.read())
+                                    .unwrap();
+                                player_names
+                                    .update(|pv| {
+                                        pv.remove(i);
+                                    })
+                            }>"X"</button>
+                        </li>
+                    }
+                }
+            />
         </ol>
     }
 }
@@ -271,20 +293,33 @@ fn PlayerSetupList(player_names: RwSignal<Vec<String>>) -> impl IntoView {
 #[component]
 fn ScriptInputter(
     script: RwSignal<Script>,
-    setup_stage: WriteSignal<SetUpStage>,
-    next_setup_stage: SetUpStage,
+    setup_stage: WriteSignal<InitializationStage>,
+    next_setup_stage: InitializationStage,
 ) -> impl IntoView {
     let raw_json = RwSignal::new(String::new());
     view! {
         // TODO: Might want to add an error boundary here
-        <p>"Input Script Json Below"</p>
+        <button
+            class="block"
+            on:click=move |_| {
+                script.set(trouble_brewing());
+                setup_stage.set(next_setup_stage);
+            }
+        >
+            "Trouble Brewing"
+        </button>
+        <p>"Input Custom Script Json Below"</p>
         <input type="text" bind:value=raw_json />
-        <ErrorBoundary fallback=|_errors| view! {}>
+        <ErrorBoundary fallback=|_errors| ()>
             <button
                 on:click=move |_| {
-                    let script_json = serde_json::from_str::<ScriptJson>(&raw_json.get()).unwrap();
-                    script.set(Script::new_from_json(script_json));
+                    let script_json = serde_json::from_str::<ScriptJson>(&raw_json.get());
                     raw_json.set(String::from(""));
+                    let script_json = match script_json {
+                        Ok(json) => json,
+                        Err(_) => return,
+                    };
+                    script.set(Script::new_from_json(script_json));
                     setup_stage.set(next_setup_stage);
                 }
                 disabled=move || raw_json.get().is_empty()
@@ -297,11 +332,11 @@ fn ScriptInputter(
 
 #[component]
 fn RoleChooser(
-    setup_stage: WriteSignal<SetUpStage>,
+    setup_stage: WriteSignal<InitializationStage>,
     num_players: usize,
     script: ReadSignal<Script>,
     roles: RwSignal<Vec<Role>>,
-    next_setup_stage: SetUpStage,
+    next_setup_stage: InitializationStage,
 ) -> impl IntoView {
     // Iterate through roles in script
     // For each role, make it clickable?
@@ -313,127 +348,549 @@ fn RoleChooser(
         RwSignal::new(CharacterTypeCounts::new(num_players).unwrap());
     let curr_character_type_counts = RwSignal::new(CharacterTypeCounts::new_empty());
 
+    let role_button = move |role: Role| {
+        let selected = RwSignal::new(false);
+        view! {
+            <button
+                on:click=move |_| {
+                    let role_type = role.get_type();
+                    let desired_count = desired_character_type_counts.get().get_count(role_type);
+                    let curr_count = curr_character_type_counts.get().get_count(role_type);
+                    if !selected.get() {
+                        let valid_choice = desired_count > curr_count;
+                        if !valid_choice {
+                            return;
+                        }
+                        roles.update(|v| v.push(role));
+                        curr_character_type_counts
+                            .update(|cct| cct.set_count(role_type, curr_count + 1));
+                        desired_character_type_counts.update(|dct| dct.on_choose(role));
+                    } else {
+                        let element_index = roles.get().iter().position(|r| *r == role);
+                        let role_i = match element_index {
+                            Some(i) => i,
+                            None => return,
+                        };
+                        roles
+                            .update(|v| {
+                                v.swap_remove(role_i);
+                            });
+                        curr_character_type_counts
+                            .update(|cct| cct.set_count(role_type, curr_count - 1));
+                        desired_character_type_counts.update(|dct| dct.on_remove(role));
+                    }
+                    selected.set(!selected.get());
+                }
+                style:color=move || if selected.get() { "red" } else { "black" }
+            >
+                {move || role.to_string()}
+            </button>
+            <br />
+        }
+    };
+
     view! {
-        <div>
-            <p>
-                "Townsfolk: " {move || curr_character_type_counts.get().townsfolk} "/"
-                {move || desired_character_type_counts.get().townsfolk}
-            </p>
-            <p>
-                "Outsiders: " {move || curr_character_type_counts.get().outsiders} "/"
-                {move || desired_character_type_counts.get().outsiders}
-            </p>
-            <p>
-                "Minions: " {move || curr_character_type_counts.get().minions} "/"
-                {move || desired_character_type_counts.get().minions}
-            </p>
-            <p>
-                "Demons: " {move || curr_character_type_counts.get().demons} "/"
-                {move || desired_character_type_counts.get().demons}
-            </p>
-        </div>
-        <div>
-            <For
-                each=move || script.get().roles
-                // WARN: Key might not always be unique in other scripts with repeated roles
-                key=|role| role.clone()
-                children=move |role| {
-                    let selected = RwSignal::new(false);
-                    view! {
-                        <button
-                            on:click=move |_| {
-                                let role_type = role.get_type();
-                                let desired_count = desired_character_type_counts
-                                    .get()
-                                    .get_count(role_type);
-                                let curr_count = curr_character_type_counts
-                                    .get()
-                                    .get_count(role_type);
-                                if !selected.get() {
-                                    let valid_choice = desired_count > curr_count;
-                                    if !valid_choice {
-                                        return;
-                                    }
-                                    roles.update(|v| v.push(role));
-                                    curr_character_type_counts
-                                        .update(|cct| cct.set_count(role_type, curr_count + 1));
-                                    desired_character_type_counts.update(|dct| dct.on_choose(role));
-                                } else {
-                                    let element_index = roles.get().iter().position(|r| *r == role);
-                                    let role_i = match element_index {
-                                        Some(i) => i,
-                                        None => return,
-                                    };
-                                    roles
-                                        .update(|v| {
-                                            v.swap_remove(role_i);
-                                        });
-                                    curr_character_type_counts
-                                        .update(|cct| cct.set_count(role_type, curr_count - 1));
-                                    desired_character_type_counts.update(|dct| dct.on_remove(role));
-                                }
-                                selected.set(!selected.get());
-                            }
-                            style:color=move || if selected.get() { "red" } else { "black" }
-                        >
-                            {move || role.to_string()}
-                        </button>
-                        <br />
+        <div class="flex flex-row gap-[2%]">
+            <div>
+                <p>
+                    "Townsfolk: " {move || curr_character_type_counts.get().townsfolk} "/"
+                    {move || desired_character_type_counts.get().townsfolk}
+                </p>
+                <p>
+                    "Outsiders: " {move || curr_character_type_counts.get().outsiders} "/"
+                    {move || desired_character_type_counts.get().outsiders}
+                </p>
+                <p>
+                    "Minions: " {move || curr_character_type_counts.get().minions} "/"
+                    {move || desired_character_type_counts.get().minions}
+                </p>
+                <p>
+                    "Demons: " {move || curr_character_type_counts.get().demons} "/"
+                    {move || desired_character_type_counts.get().demons}
+                </p>
+            </div>
+            <button
+                class="flex-1"
+                on:click=move |_| {
+                    if roles.get().len() == num_players {
+                        setup_stage.set(next_setup_stage);
                     }
                 }
-            />
+                disabled=move || { roles.get().len() != num_players }
+            >
+                "Finish"
+            </button>
         </div>
-        <button
-            on:click=move |_| {
-                if roles.get().len() == num_players {
-                    setup_stage.set(next_setup_stage);
-                }
-            }
-            disabled=move || { roles.get().len() != num_players }
-        >
-            "Finish"
-        </button>
+        <div class="flex flex-row justify-start gap-[2%]">
+            <div>
+                <h3>"Townsfolk"</h3>
+                {move || {
+                    script
+                        .get()
+                        .roles
+                        .into_iter()
+                        .filter(|role| role.get_type() == CharacterType::Townsfolk)
+                        .map(role_button)
+                        .collect_view()
+                }}
+            </div>
+            <div>
+                <h3>"Outsiders"</h3>
+                {move || {
+                    script
+                        .get()
+                        .roles
+                        .into_iter()
+                        .filter(|role| role.get_type() == CharacterType::Outsider)
+                        .map(role_button)
+                        .collect_view()
+                }}
+            </div>
+            <div>
+                <h3>"Minions"</h3>
+                {move || {
+                    script
+                        .get()
+                        .roles
+                        .into_iter()
+                        .filter(|role| role.get_type() == CharacterType::Minion)
+                        .map(role_button)
+                        .collect_view()
+                }}
+            </div>
+            <div>
+                <h3>"Demons"</h3>
+                {move || {
+                    script
+                        .get()
+                        .roles
+                        .into_iter()
+                        .filter(|role| role.get_type() == CharacterType::Demon)
+                        .map(role_button)
+                        .collect_view()
+                }}
+            </div>
+        </div>
+    }
+}
+
+#[derive(Clone, Store, Default)]
+struct TempState {
+    selected_player: Option<PlayerIndex>,
+    change_request: Option<ChangeRequest>,
+    selected_players: Vec<PlayerIndex>,
+    selected_roles: Vec<Role>,
+    players_to_resolve: Vec<PlayerIndex>,
+    currently_acting_player: Option<PlayerIndex>,
+}
+
+impl TempState {
+    fn reset(&mut self) {
+        self.selected_player = None;
+        self.change_request = None;
+        self.selected_players.clear();
+        self.selected_roles.clear();
     }
 }
 
 #[component]
 fn GameInterface(roles: Vec<Role>, player_names: Vec<String>, script: Script) -> impl IntoView {
-    // TODO: Create a new game using the data we have just collected from the user
-    let game = Store::new(Game::new(roles, player_names, script).unwrap());
+    // Create a new game using the data we have just collected from the user
+    let state = Store::new(State::new(roles, player_names, script).unwrap());
+    provide_context(state);
+    let temp_state = Store::new(TempState::default());
+    provide_context(temp_state);
 
-    let player_view = move |player: Player| {
-        view! {
-            <div style:border="solid">
-                <p>{player.name.to_string()}</p>
-                <p>{player.role.to_string()}</p>
-            </div>
-        }
-    };
     view! {
-        <p>"Not yet implemented"</p>
-        <div>
-            <For
-                each=move || game.get().players
-                key=|p| p.name.clone()
-                children=player_view
-            />
+        <div class="h-screen border border-dashed flex justify-between">
+            <Info />
+            <Game />
+            <Picker_Bar />
         </div>
     }
 }
 
-// struct GenSignal<T> {
-//     pub(crate) defined_at: &'static Location<'static>,
-//     read_signal: ReadSignal<T>,
-//     write_signal: WriteSignal<T>,
-// }
-//
-// impl<T: Sync + Send + 'static> GenSignal<T> {
-//     fn new(value: T) -> Self {
-//         let (read_signal, write_signal) = signal(value);
-//         Self {
-//             read_signal,
-//             write_signal,
-//         }
-//     }
-//
-// }
+#[component]
+fn Info() -> impl IntoView {
+    let game_state = expect_context::<Store<State>>();
+    let temp_state = expect_context::<Store<TempState>>();
+
+    let stage_info = move || {
+        let step = game_state.step().get();
+        match step {
+            Step::Start => "Start".to_string(),
+            Step::Setup => "Setup".to_string(),
+            Step::DayDiscussion | Step::DayExecution => {
+                format!("Day {}", game_state.day_num().get()).to_string()
+            }
+            Step::Night1 | Step::Night => format!("Day {}", game_state.day_num().get()).to_string(),
+        }
+    };
+
+    let change_info = move || {
+        let cr = temp_state.change_request().get();
+        match cr {
+            Some(cr) => match cr.change_type {
+                ChangeType::ChoosePlayers(num) => format!("Choose {} Players", num),
+                ChangeType::ChooseRoles(num) => format!("Choose {} Roles", num),
+                _ => "Not Yet Implemented".to_string(),
+            },
+            None => "None".to_string(),
+        }
+    };
+
+    let current_player_info = move || {
+        let player_index = temp_state.currently_acting_player().get();
+        let player_index = match player_index {
+            Some(pi) => pi,
+            None => {
+                return ().into_any();
+            }
+        };
+        let player = game_state.players().read()[player_index].clone();
+
+        return view! {
+            <div class="border border-solid w-full p-[1rem]">
+                <p class="mx-auto">{player.name}</p>
+                <p>"Role: "{player.role.to_string()}</p>
+                <p>
+                    "Status: "{if player.dead { "Dead" } else { "Alive" }}
+                    <button on:click=move |_| {
+                        game_state
+                            .players()
+                            .update(|players: &mut Vec<Player>| {
+                                let dead = &mut players[player_index].dead;
+                                *dead = !*dead;
+                            });
+                    }>"Toggle"</button>
+                </p>
+                <p>"Ghost Vote: "{if player.ghost_vote { "Yes" } else { "No" }}</p>
+                <p>
+                    "Alignment: "
+                    {match player.alignment {
+                        engine::player::Alignment::Good => "Good",
+                        engine::player::Alignment::Evil => "Evil",
+                    }}
+                </p>
+            </div>
+        }
+        .into_any();
+    };
+    let selected_player_info = move || {
+        let player_index = temp_state.selected_player().get();
+        let player_index = match player_index {
+            Some(pi) => pi,
+            None => {
+                return ().into_any();
+            }
+        };
+        let player = game_state.players().read()[player_index].clone();
+
+        return view! {
+            <div class="border border-solid w-full p-[1rem]">
+                <p class="mx-auto">{player.name}</p>
+                <p>"Role: "{player.role.to_string()}</p>
+                <p>
+                    "Status: "{if player.dead { "Dead" } else { "Alive" }}
+                    <button on:click=move |_| {
+                        game_state
+                            .players()
+                            .update(|players: &mut Vec<Player>| {
+                                let dead = &mut players[player_index].dead;
+                                *dead = !*dead;
+                            });
+                    }>"Toggle"</button>
+                </p>
+                <p>"Ghost Vote: "{if player.ghost_vote { "Yes" } else { "No" }}</p>
+                <p>
+                    "Alignment: "
+                    {match player.alignment {
+                        engine::player::Alignment::Good => "Good",
+                        engine::player::Alignment::Evil => "Evil",
+                    }}
+                </p>
+            </div>
+        }
+        .into_any();
+    };
+    view! {
+        <div class="flex flex-col items-start flex-1">
+            <div class="border border-solid w-full p-[1rem]">
+                <h3>"Game Info"</h3>
+                <p>{stage_info}</p>
+                <p>"Change Type: "{change_info}</p>
+            // <For
+            // each=move || players.get()
+            // key=|p| p.name.clone()
+            // children=move |player| {
+            // view! { <p>"Player "{player.name}</p> }
+            // }
+            // />
+            </div>
+            {selected_player_info}
+            {current_player_info}
+        </div>
+    }
+}
+
+#[component]
+fn Game() -> impl IntoView {
+    let game_state = expect_context::<Store<State>>();
+    let temp_state = expect_context::<Store<TempState>>();
+    let next_button = move |_| {
+        // Load up temp_state with players that act during setup
+        if game_state.step().get() == Step::Start {
+            let setup_players = game_state.read().get_active_players();
+            temp_state.players_to_resolve().set(setup_players);
+            game_state.step().set(Step::Setup);
+        }
+        if let Some(cr) = temp_state.change_request().get() {
+            // Do check func and return early if it doesn't pass
+            let args = match cr.change_type {
+                ChangeType::ChoosePlayers(_) => {
+                    Args::PlayerIndices(temp_state.selected_players().get())
+                }
+                ChangeType::ChooseRoles(_) => Args::Roles(temp_state.selected_roles().get()),
+                _ => todo!(),
+            };
+            let check_func = cr.check_func.clone();
+            let res = game_state.with(|gs| {
+                let cf = check_func.clone();
+                cf(gs, &args)
+            });
+            match res {
+                Ok(boolean) => {
+                    if boolean {
+                    } else {
+                        return;
+                    }
+                }
+                Err(()) => {
+                    return;
+                }
+            }
+            // If it passes, do the apply state func and move on
+            let state_func = cr.state_change_func.clone();
+            game_state.update(|gs| state_func(gs, args));
+        }
+        temp_state.update(|ts| ts.reset());
+        let next_player = temp_state
+            .players_to_resolve()
+            .try_update(|pv| pv.pop())
+            .unwrap();
+        let next_player = match next_player {
+            Some(p) => p,
+            None => todo!(),
+        };
+        let next_cr = game_state.try_update(|gs| gs.resolve(next_player));
+        temp_state.currently_acting_player().set(Some(next_player));
+        temp_state.change_request().set(next_cr.unwrap());
+    };
+    view! {
+        <div class="relative w-3/5 flex justify-center items-center">
+            <Player_Display />
+            <button class="absolute right-[0px] top-[0px]" on:click=next_button>
+                "Next"
+            </button>
+        </div>
+    }
+}
+
+#[component]
+fn Player_Display() -> impl IntoView {
+    // TODO: Create another store for temp data that changes often as opposed to global state
+    let game_state = expect_context::<Store<State>>();
+    let players = game_state.players();
+    let player_positions = calc_circle(players.read().len(), 75.0);
+
+    let temp_state = expect_context::<Store<TempState>>();
+    let currently_selected_player = temp_state.selected_player();
+    let curr_change_request = temp_state.change_request();
+    let selected_players = temp_state.selected_players();
+    // Want to place children in a circle within the container, centered around it's origin
+    // Radius of circle should dynamically grow based on number of items
+
+    view! {
+        <div class="relative origin-bottom-right size-1/2 flex flex-wrap rounded-full justify-between items-between">
+            // Static list because players don't change
+            {move || {
+                players
+                    .get()
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, player)| {
+                        let pos = player_positions[i];
+                        let selected = RwSignal::new(false);
+                        view! {
+                            <div
+                                class="translate-1/2 absolute size-fit"
+                                style:right=move || { format!("calc(50% + {}%)", pos.0) }
+                                style:top=move || format!("calc(35% + {}%)", pos.1)
+                            >
+                                <p class="absolute left-1/2 -translate-x-1/2 bottom-3/5 border-solid border text-center bg-[#ffffff]">
+                                    {player.name}
+                                </p>
+                                <button
+                                    class="size-[5rem] rounded-full text-center border border-[#000000]"
+                                    style:border-style=move || {
+                                        if selected.get() { "solid" } else { "none" }
+                                    }
+                                    style:color=move || {
+                                        if player.dead {
+                                            return "gray";
+                                        }
+                                        match player.alignment {
+                                            engine::player::Alignment::Good => "blue",
+                                            engine::player::Alignment::Evil => "red",
+                                        }
+                                    }
+                                    on:click=move |_| {
+                                        let cr = match curr_change_request.get() {
+                                            Some(cr) => cr,
+                                            None => {
+                                                currently_selected_player.set(Some(i));
+                                                return;
+                                            }
+                                        };
+                                        let requested_num = match cr.change_type {
+                                            ChangeType::ChoosePlayers(num) => num,
+                                            _ => {
+                                                currently_selected_player.set(Some(i));
+                                                return;
+                                            }
+                                        };
+                                        if selected.get() {
+                                            selected_players
+                                                .update(|pv| {
+                                                    let remove_index = pv
+                                                        .iter()
+                                                        .position(|pi| *pi == i)
+                                                        .unwrap();
+                                                    pv.remove(remove_index);
+                                                });
+                                            selected.set(false);
+                                            return;
+                                        }
+                                        if selected_players.read().len() >= requested_num {
+                                            return;
+                                        }
+                                        selected_players.update(|pv| pv.push(i));
+                                        selected.set(true);
+                                    }
+                                >
+                                    {move || {player.role.to_string() }}
+                                </button>
+                                // Status effects
+                                <div class="text-[0.5em] flex flex-col items-start absolute w-fit left-1/2 -translate-x-1/2 top-9/10 ">
+                                    {move || {
+                                        let status_effects = game_state
+                                            .with(|gs| gs.get_afflicted_statuses(i));
+                                        status_effects
+                                            .iter()
+                                            .map(|status_effect| {
+                                                let str = format!("{:?}", status_effect.status_type);
+                                                view! {
+                                                    <p class="w-full text-center border border-solid m-[0%] rounded-full p-px bg-[#ffff00]">
+                                                        {str}
+                                                    </p>
+                                                }
+                                            })
+                                            .collect_view()
+                                    }}
+                                </div>
+                            </div>
+                        }
+                    })
+                    .collect_view()
+            }}
+        </div>
+    }
+}
+
+fn calc_circle(num_players: usize, radius: f64) -> Vec<(f64, f64)> {
+    // Calculate circumference
+    // Calculate position using radius and angle
+    // First find differnence in angle
+    let angle_diff = -(360.0 / num_players as f64);
+
+    let mut res: Vec<(f64, f64)> = vec![];
+
+    for i in 0..num_players {
+        let angle = ((i as f64) * angle_diff - 90.0).to_radians();
+        let x = radius * angle.cos();
+        let y = radius * angle.sin();
+        res.push((x, y));
+    }
+
+    return res;
+}
+
+#[component]
+fn Picker_Bar() -> impl IntoView {
+    // TODO: Implement search bar with fuzzy finding
+    // Need input box bound to string signal
+    // Need a for function or something of the sort that shows a scrollable list of items
+    // Finish button that calls a generic function passed in through something
+    // When an item is selected, add it to a result list
+    // This should reset and disable after finish button is clicked
+    let _state = expect_context::<Store<State>>();
+    let script = expect_context::<RwSignal<Script>>();
+    let temp_state = expect_context::<Store<TempState>>();
+    let _input = RwSignal::new(String::new());
+
+    view! {
+        <div class="flex-1 border-solid border p-[1rem]">
+            <div>
+                <input bind:input />
+                <button>"Finish"</button>
+            </div>
+            <div class="flex flex-col">
+                <For
+                    each=move || script.get().roles
+                    key=|r| *r
+                    children=move |role| {
+                        let selected = RwSignal::new(false);
+                        view! {
+                            <button
+                            style:color= move || {if selected.get() {
+                                "red"
+                            } else {""}}
+                            on:click=move |_| {
+                                let cr = match temp_state.change_request().get() {
+                                    Some(cr) => cr,
+                                    None => {
+                                        return;
+                                    }
+                                };
+                                let requested_num = match cr.change_type {
+                                    ChangeType::ChooseRoles(num) => num,
+                                    _ => {
+                                        return;
+                                    }
+                                };
+                                let selected_roles = temp_state.selected_roles();
+                                if selected.get() {
+                                    selected_roles
+                                        .update(|pv| {
+                                            let remove_index = pv
+                                                .iter()
+                                                .position(|r| *r == role)
+                                                .unwrap();
+                                            pv.remove(remove_index);
+                                        });
+                                    selected.set(false);
+                                    return;
+                                }
+                                if selected_roles.read().len() >= requested_num {
+                                    return;
+                                }
+                                selected_roles.update(|pv| pv.push(role));
+                                selected.set(true);
+                            }>{role.to_string()}</button>
+                        }
+                    }
+                />
+            </div>
+        </div>
+    }
+}

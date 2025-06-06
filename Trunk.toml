@@ -1,0 +1,9 @@
+[[hooks]]
+stage = "pre_build"
+command = "sh"
+command_arguments = ["-c", "./tailwind -i ./input.css -o ./dist/tailwind.css"]
+
+[[hooks]]
+stage = "build"
+command = "sh"
+command_arguments = ["-c", "cargo build --release"]
