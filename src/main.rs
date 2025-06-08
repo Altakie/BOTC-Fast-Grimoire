@@ -16,7 +16,7 @@ use engine::{
 mod scripts;
 use scripts::*;
 
-const DEBUG: bool = true;
+const DEBUG: bool = false;
 // use leptos_router::components::*;
 // use leptos_router::path;
 
