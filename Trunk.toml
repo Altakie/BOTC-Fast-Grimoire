@@ -1,7 +1,7 @@
 [[hooks]]
 stage = "pre_build"
 command = "sh"
-command_arguments = ["-c", "./tailwind -i ./input.css -o ./dist/tailwind.css"]
+command_arguments = ["-c", "tailwindcss -i ./input.css -o ./dist/tailwind.css"]
 
 [[hooks]]
 stage = "build"

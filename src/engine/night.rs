@@ -1,112 +1,347 @@
-pub(crate) fn resolve_night_1(&mut self) {
-    self.day_phase = DayPhase::Night;
-    // Order the roles in this game to get the order they should be woken up in (should be
-    // unique to night 1)
-    let ordered_player_indices = self.get_night_1_order(self.get_active_roles());
-    // Wake each role up in order and show them the information they need to know, or the
-    // choices that they get
-    // For each choice:
-    //      If that choice impacts the game state, change the game state accordingly
-    //      If that choice tells the player info, give them that info
-    //      Should be calling a generic method on the role class to get info on the role's
-    //      ability
-    // Once you have gone through all the roles, nothing to do: wake everyone up
-    for i in ordered_player_indices.iter() {
-        self.resolve_night_1_ability(*i);
+use crate::{
+    engine::{
+        change_request::{ChangeRequest, ChangeType},
+        player::{Alignment, Role},
+        state::{PlayerIndex, State},
+    },
+    new_change_request,
+};
+use std::collections::HashMap;
+// pub(crate) fn resolve_night_1(&mut self) {
+//     self.day_phase = DayPhase::Night;
+//     // Order the roles in this game to get the order they should be woken up in (should be
+//     // unique to night 1)
+//     let ordered_player_indices = self.get_night_1_order(self.get_active_roles());
+//     // Wake each role up in order and show them the information they need to know, or the
+//     // choices that they get
+//     // For each choice:
+//     //      If that choice impacts the game state, change the game state accordingly
+//     //      If that choice tells the player info, give them that info
+//     //      Should be calling a generic method on the role class to get info on the role's
+//     //      ability
+//     // Once you have gone through all the roles, nothing to do: wake everyone up
+//     for i in ordered_player_indices.iter() {
+//         self.resolve_night_1_ability(*i);
+//     }
+// }
+
+fn get_role_order_night1(role: Role) -> usize {
+    match role {
+        // Role::DUSK => 0,
+        // Role::Lordoftyphon => 1,
+        // Role::Kazali => 2,
+        // Role::Apprentice => 3,
+        // Role::Barista => 4,
+        // Role::Bureaucrat => 5,
+        // Role::Thief => 6,
+        // Role::Boffin => 7,
+        // Role::Philosopher => 8,
+        // Role::Alchemist => 9,
+        // Role::Poppygrower => 10,
+        // Role::Yaggababble => 11
+        // Role::Magician => 12,
+        // Role::MINION => 13, TODO: Need to implement this shit
+        // Role::Snitch => 14,
+        // Role::Lunatic => 15,
+        // Role::Summoner => 16,
+        // Role::DEMON => 17, TODO: Need to implement this shit
+        // Role::King => 18,
+        // Role::Sailor => 19,
+        // Role::Marionette => 20,
+        // Role::Engineer => 21,
+        // Role::Preacher => 22,
+        // Role::Lilmonsta => 23,
+        // Role::Lleech => 24,
+        // Role::Xaan => 25,
+        Role::Poisoner => 26,
+        // Role::Widow => 27,
+        // Role::Courtier => 28,
+        // Role::Wizard => 29,
+        // Role::Snakecharmer => 30,
+        // Role::Godfather => 31,
+        // Role::Organgrinder => 32,
+        // Role::Devilsadvocate => 33,
+        // Role::Eviltwin => 34,
+        // Role::Witch => 35,
+        // Role::Cerenovus => 36,
+        // Role::Fearmonger => 37,
+        // Role::Harpy => 38,
+        // Role::Mezepheles => 39,
+        // Role::Pukka => 40,
+        // Role::Pixie => 41,
+        // Role::Huntsman => 42,
+        // Role::Damsel => 43,
+        // Role::Amnesiac => 44,
+        Role::Washerwoman => 45,
+        Role::Librarian => 46,
+        Role::Investigator => 47,
+        Role::Chef => 48,
+        Role::Empath => 49,
+        Role::Fortuneteller => 50,
+        Role::Butler => 51,
+        // Role::Grandmother => 52,
+        // Role::Clockmaker => 53,
+        // Role::Dreamer => 54,
+        // Role::Seamstress => 55,
+        // Role::Steward => 56,
+        // Role::Knight => 57,
+        // Role::Noble => 58,
+        // Role::Balloonist => 59,
+        // Role::Shugenja => 60,
+        // Role::Villageidiot => 61,
+        // Role::Bountyhunter => 62,
+        // Role::Nightwatchman => 63,
+        // Role::Cultleader => 64,
+        Role::Spy => 65,
+        // Role::Ogre => 66,
+        // Role::Highpriestess => 67,
+        // Role::General => 68,
+        // Role::Chambermaid => 69,
+        // Role::Mathematician => 70,
+        // Role::DAWN => 71, TODO: Figure out wtf this means
+        // Role::Leviathan => 72,
+        // Role::Vizier => 73
+        _ => 0,
     }
 }
-
 impl State {
-    pub(crate) fn get_night_1_order(&self, player_indices: Vec<PlayerIndex>) -> Vec<PlayerIndex> {
-        // Go through all roles and assign each of them a number
-        // Maps night_order to player index
-        let mut order_map: HashMap<usize, PlayerIndex> = HashMap::new();
-        for index in player_indices {
-            let role = self.players[index].role;
-            let order: usize = match role {
-                // Role::DUSK => 0,
-                // Role::Lordoftyphon => 1,
-                // Role::Kazali => 2,
-                // Role::Apprentice => 3,
-                // Role::Barista => 4,
-                // Role::Bureaucrat => 5,
-                // Role::Thief => 6,
-                // Role::Boffin => 7,
-                // Role::Philosopher => 8,
-                // Role::Alchemist => 9,
-                // Role::Poppygrower => 10,
-                // Role::Yaggababble => 11,
-                // Role::Magician => 12,
-                // Role::MINION => 13, TODO: Need to implement this shit
-                // Role::Snitch => 14,
-                // Role::Lunatic => 15,
-                // Role::Summoner => 16,
-                // Role::DEMON => 17, TODO: Need to implement this shit
-                // Role::King => 18,
-                // Role::Sailor => 19,
-                // Role::Marionette => 20,
-                // Role::Engineer => 21,
-                // Role::Preacher => 22,
-                // Role::Lilmonsta => 23,
-                // Role::Lleech => 24,
-                // Role::Xaan => 25,
-                Role::Poisoner => 26,
-                // Role::Widow => 27,
-                // Role::Courtier => 28,
-                // Role::Wizard => 29,
-                // Role::Snakecharmer => 30,
-                // Role::Godfather => 31,
-                // Role::Organgrinder => 32,
-                // Role::Devilsadvocate => 33,
-                // Role::Eviltwin => 34,
-                // Role::Witch => 35,
-                // Role::Cerenovus => 36,
-                // Role::Fearmonger => 37,
-                // Role::Harpy => 38,
-                // Role::Mezepheles => 39,
-                // Role::Pukka => 40,
-                // Role::Pixie => 41,
-                // Role::Huntsman => 42,
-                // Role::Damsel => 43,
-                // Role::Amnesiac => 44,
-                Role::Washerwoman => 45,
-                Role::Librarian => 46,
-                Role::Investigator => 47,
-                Role::Chef => 48,
-                Role::Empath => 49,
-                Role::Fortuneteller => 50,
-                Role::Butler => 51,
-                // Role::Grandmother => 52,
-                // Role::Clockmaker => 53,
-                // Role::Dreamer => 54,
-                // Role::Seamstress => 55,
-                // Role::Steward => 56,
-                // Role::Knight => 57,
-                // Role::Noble => 58,
-                // Role::Balloonist => 59,
-                // Role::Shugenja => 60,
-                // Role::Villageidiot => 61,
-                // Role::Bountyhunter => 62,
-                // Role::Nightwatchman => 63,
-                // Role::Cultleader => 64,
-                Role::Spy => 65,
-                // Role::Ogre => 66,
-                // Role::Highpriestess => 67,
-                // Role::General => 68,
-                // Role::Chambermaid => 69,
-                // Role::Mathematician => 70,
-                // Role::DAWN => 71, TODO: Figure out wtf this means
-                // Role::Leviathan => 72,
-                // Role::Vizier => 73
-                _ => 0,
+    // TODO: Fix this function to work incrementally
+    // Grab only players with higher order from the player's array
+    // Check which one of the higher players is active
+    // Problem here is you can't deal with duplicates
+    // For this, just check their absolute order in the players array, if it is lower, ignore, if
+    // it is higher, add them (only do this once)
+    pub(crate) fn get_next_active_night1(
+        &self,
+        previous_player: Option<PlayerIndex>,
+    ) -> Option<PlayerIndex> {
+        let prev_player_order = self.get_night_1_order(previous_player);
+        let mut next_player: Option<(PlayerIndex, usize)> = None;
+        for (player_index, _player) in self.players.iter().enumerate() {
+            let order = self.get_night_1_order(Some(player_index));
+            // Check that the player acts at night
+            let order = match order {
+                Some(order) => order,
+                None => continue,
             };
-            if order != 0 {
-                order_map.insert(order, index);
+            if prev_player_order.is_some() {
+                let prev_player_order = prev_player_order.unwrap();
+                if order < prev_player_order {
+                    continue;
+                } else if order == prev_player_order + 1 {
+                    return Some(player_index);
+                }
+                // If there's a duplicate, return the next player with a higher player index than the
+                // current player that has the same role
+                else if order == prev_player_order {
+                    let previous_player_index = match previous_player {
+                        Some(i) => i,
+                        None => panic!("Next player has order of 0, should be impossible"), // Should never happen
+                    };
+                    if player_index <= previous_player_index {
+                        continue;
+                    }
+                    return Some(player_index);
+                }
             }
+            let next_player_info = match next_player {
+                Some(info) => info,
+                None => {
+                    next_player = Some((player_index, order));
+                    continue;
+                }
+            };
+            if order > next_player_info.1 {
+                continue;
+            };
+            // Getting to this point means order is more than the previous_player but less than the
+            // current next_player
+            next_player = Some((player_index, order));
         }
 
-        return self.get_order_from_map(order_map);
+        match next_player {
+            Some(player) => return Some(player.0),
+            None => return None,
+        }
     }
+
+    pub(crate) fn get_night_1_order(
+        &self,
+        player_index: Option<PlayerIndex>,
+    ) -> Option<PlayerIndex> {
+        let player_index = player_index?;
+        let role = self.players[player_index].role;
+        let order = match role {
+            // Role::DUSK => 0,
+            // Role::Lordoftyphon => 1,
+            // Role::Kazali => 2,
+            // Role::Apprentice => 3,
+            // Role::Barista => 4,
+            // Role::Bureaucrat => 5,
+            // Role::Thief => 6,
+            // Role::Boffin => 7,
+            // Role::Philosopher => 8,
+            // Role::Alchemist => 9,
+            // Role::Poppygrower => 10,
+            // Role::Yaggababble => 11,
+            // Role::Magician => 12,
+            // Role::MINION => 13, TODO: Need to implement this shit
+            // Role::Snitch => 14,
+            // Role::Lunatic => 15,
+            // Role::Summoner => 16,
+            // Role::DEMON => 17, TODO: Need to implement this shit
+            // Role::King => 18,
+            // Role::Sailor => 19,
+            // Role::Marionette => 20,
+            // Role::Engineer => 21,
+            // Role::Preacher => 22,
+            // Role::Lilmonsta => 23,
+            // Role::Lleech => 24,
+            // Role::Xaan => 25,
+            Role::Poisoner => 26,
+            // Role::Widow => 27,
+            // Role::Courtier => 28,
+            // Role::Wizard => 29,
+            // Role::Snakecharmer => 30,
+            // Role::Godfather => 31,
+            // Role::Organgrinder => 32,
+            // Role::Devilsadvocate => 33,
+            // Role::Eviltwin => 34,
+            // Role::Witch => 35,
+            // Role::Cerenovus => 36,
+            // Role::Fearmonger => 37,
+            // Role::Harpy => 38,
+            // Role::Mezepheles => 39,
+            // Role::Pukka => 40,
+            // Role::Pixie => 41,
+            // Role::Huntsman => 42,
+            // Role::Damsel => 43,
+            // Role::Amnesiac => 44,
+            Role::Washerwoman => 45,
+            Role::Librarian => 46,
+            Role::Investigator => 47,
+            Role::Chef => 48,
+            Role::Empath => 49,
+            Role::Fortuneteller => 50,
+            Role::Butler => 51,
+            // Role::Grandmother => 52,
+            // Role::Clockmaker => 53,
+            // Role::Dreamer => 54,
+            // Role::Seamstress => 55,
+            // Role::Steward => 56,
+            // Role::Knight => 57,
+            // Role::Noble => 58,
+            // Role::Balloonist => 59,
+            // Role::Shugenja => 60,
+            // Role::Villageidiot => 61,
+            // Role::Bountyhunter => 62,
+            // Role::Nightwatchman => 63,
+            // Role::Cultleader => 64,
+            Role::Spy => 65,
+            // Role::Ogre => 66,
+            // Role::Highpriestess => 67,
+            // Role::General => 68,
+            // Role::Chambermaid => 69,
+            // Role::Mathematician => 70,
+            // Role::DAWN => 71, TODO: Figure out wtf this means
+            // Role::Leviathan => 72,
+            // Role::Vizier => 73
+            _ => return None,
+        };
+
+        return Some(order);
+    }
+
+    // pub(crate) fn get_night_1_order(&self, player_indices: Vec<PlayerIndex>) -> Vec<PlayerIndex> {
+    //     // Go through all roles and assign each of them a number
+    //     // Maps night_order to player index
+    //     let mut order_map: HashMap<usize, PlayerIndex> = HashMap::new();
+    //     for index in player_indices {
+    //         let role = self.players[index].role;
+    //         let order: usize = match role {
+    //             // Role::DUSK => 0,
+    //             // Role::Lordoftyphon => 1,
+    //             // Role::Kazali => 2,
+    //             // Role::Apprentice => 3,
+    //             // Role::Barista => 4,
+    //             // Role::Bureaucrat => 5,
+    //             // Role::Thief => 6,
+    //             // Role::Boffin => 7,
+    //             // Role::Philosopher => 8,
+    //             // Role::Alchemist => 9,
+    //             // Role::Poppygrower => 10,
+    //             // Role::Yaggababble => 11,
+    //             // Role::Magician => 12,
+    //             // Role::MINION => 13, TODO: Need to implement this shit
+    //             // Role::Snitch => 14,
+    //             // Role::Lunatic => 15,
+    //             // Role::Summoner => 16,
+    //             // Role::DEMON => 17, TODO: Need to implement this shit
+    //             // Role::King => 18,
+    //             // Role::Sailor => 19,
+    //             // Role::Marionette => 20,
+    //             // Role::Engineer => 21,
+    //             // Role::Preacher => 22,
+    //             // Role::Lilmonsta => 23,
+    //             // Role::Lleech => 24,
+    //             // Role::Xaan => 25,
+    //             Role::Poisoner => 26,
+    //             // Role::Widow => 27,
+    //             // Role::Courtier => 28,
+    //             // Role::Wizard => 29,
+    //             // Role::Snakecharmer => 30,
+    //             // Role::Godfather => 31,
+    //             // Role::Organgrinder => 32,
+    //             // Role::Devilsadvocate => 33,
+    //             // Role::Eviltwin => 34,
+    //             // Role::Witch => 35,
+    //             // Role::Cerenovus => 36,
+    //             // Role::Fearmonger => 37,
+    //             // Role::Harpy => 38,
+    //             // Role::Mezepheles => 39,
+    //             // Role::Pukka => 40,
+    //             // Role::Pixie => 41,
+    //             // Role::Huntsman => 42,
+    //             // Role::Damsel => 43,
+    //             // Role::Amnesiac => 44,
+    //             Role::Washerwoman => 45,
+    //             Role::Librarian => 46,
+    //             Role::Investigator => 47,
+    //             Role::Chef => 48,
+    //             Role::Empath => 49,
+    //             Role::Fortuneteller => 50,
+    //             Role::Butler => 51,
+    //             // Role::Grandmother => 52,
+    //             // Role::Clockmaker => 53,
+    //             // Role::Dreamer => 54,
+    //             // Role::Seamstress => 55,
+    //             // Role::Steward => 56,
+    //             // Role::Knight => 57,
+    //             // Role::Noble => 58,
+    //             // Role::Balloonist => 59,
+    //             // Role::Shugenja => 60,
+    //             // Role::Villageidiot => 61,
+    //             // Role::Bountyhunter => 62,
+    //             // Role::Nightwatchman => 63,
+    //             // Role::Cultleader => 64,
+    //             Role::Spy => 65,
+    //             // Role::Ogre => 66,
+    //             // Role::Highpriestess => 67,
+    //             // Role::General => 68,
+    //             // Role::Chambermaid => 69,
+    //             // Role::Mathematician => 70,
+    //             // Role::DAWN => 71, TODO: Figure out wtf this means
+    //             // Role::Leviathan => 72,
+    //             // Role::Vizier => 73
+    //             _ => 0,
+    //         };
+    //         if order != 0 {
+    //             order_map.insert(order, index);
+    //         }
+    //     }
+    //
+    //     return self.get_order_from_map(order_map);
+    // }
     pub(crate) fn get_night_order(&self, player_indices: Vec<PlayerIndex>) -> Vec<PlayerIndex> {
         // Go through all roles and assign each of them a number
         // Maps night_order to player index
@@ -218,218 +453,271 @@ impl State {
     }
 }
 
-pub(crate) fn resolve_night_1_ability(&mut self, player_index: PlayerIndex) {
-    // Check if the role is active before resolving their ability, skip if the role is
-    // inactive, but also warn
-    // eprintln!("An inactive role tried to act during the night");
-    // NOTE: I think that for info roles, the storyteller should still receive the correct
-    // info, but there will be a warning that the player is poisoned on the screen somewhere,
-    // letting the storyteller decide what number they should give
-    // TODO: Implement abilities for every role
-    let player = &mut self.players[player_index];
-    let role = player.role;
-    match role {
-        Role::Investigator => {
-            // WARNING: Can't actually resolve this, this should be decided during setup
-            todo!()
-        }
-        Role::Empath => {
-            let count = self.empath_ability(player_index);
-            // For now, just print output
-            println!("Empath count: {}", count);
-        }
-        Role::Gossip => todo!(),      // Should wait till v2
-        Role::Innkeeper => todo!(),   // Should wait till v2
-        Role::Washerwoman => todo!(), // Setup
-        Role::Librarian => todo!(),   // Setup
-        Role::Chef => {
-            // Count pairs of evil players
-            // For each evil, player, check if the right player is evil, if yes, increment the
-            // pair count
-            let mut pair_count = 0;
-
-            for player_index in 0..self.players.len() {
-                let player = &self.players[player_index];
-                if player.alignment != Alignment::Evil {
-                    continue;
-                }
-                let right_player = &self.players[self.right_player(player_index)];
-                if right_player.alignment == Alignment::Evil {
-                    pair_count += 1;
-                }
+impl Role {
+    pub(crate) fn resolve_night_1_ability(
+        &self,
+        player_index: PlayerIndex,
+        state: &State,
+    ) -> Option<ChangeRequest> {
+        // Check if the role is active before resolving their ability, skip if the role is
+        // inactive, but also warn
+        // eprintln!("An inactive role tried to act during the night");
+        // NOTE: I think that for info roles, the storyteller should still receive the correct
+        // info, but there will be a warning that the player is poisoned on the screen somewhere,
+        // letting the storyteller decide what number they should give
+        // TODO: Implement abilities for every role
+        match self {
+            Role::Investigator => {
+                // WARNING: Can't actually resolve this, this should be decided during setup
+                // TODO: Fix this
+                // Some(new_change_request!("Show Investigator smt))
+                todo!()
             }
-            println!("Chef Pair Count: {}", pair_count);
+            Role::Empath => Some(empath_ability(state, player_index)),
+            // Role::Gossip => todo!(),      // Should wait till v2
+            // Role::Innkeeper => todo!(),   // Should wait till v2
+            Role::Washerwoman => Some(washerwoman_ability()), // Setup
+            Role::Librarian => {
+                let message = "show librarian smth".to_string();
+                let change_type = ChangeType::Display(message);
+                Some(new_change_request!(change_type))
+            } // Setup
+            // Role::Chef => {
+            //     // Count pairs of evil players
+            //     // For each evil, player, check if the right player is evil, if yes, increment the
+            //     // pair count
+            //     let mut pair_count = 0;
+            //
+            //     for player_index in 0..self.players.len() {
+            //         let player = &self.players[player_index];
+            //         if player.alignment != Alignment::Evil {
+            //             continue;
+            //         }
+            //         let right_player = &self.players[self.right_player(player_index)];
+            //         if right_player.alignment == Alignment::Evil {
+            //             pair_count += 1;
+            //         }
+            //     }
+            //     println!("Chef Pair Count: {}", pair_count);
+            // }
+            // Role::Fortuneteller => todo!(), // Should be the same as ability from other nights, but
+            // // also need setup
+            // Role::Undertaker => {
+            //     // TODO: Should scan the log for the entire day yesterday
+            //     // If there was a execution event yesterday that resulted in death, grab the player
+            //     // from that event
+            //     // Grab that player's role and give it to the undertaker
+            //     todo!();
+            // }
+            // Role::Virgin => {
+            //     // Add a status effect that if someone nominates you, they die
+            //     // Maybe instead add this to the nominate method
+            //     todo!()
+            // }
+            // Role::Soldier => {
+            //     // Just add protected status effect and only remove upon death
+            //     self.add_status(StatusEffects::DemonProtected, player_index, player_index);
+            // }
+            // Role::Slayer => todo!(), // No night one ability
+            // Role::Mayor => {
+            //     // No night one ability, but add effect to yourself
+            //     self.add_status(StatusEffects::MayorBounceKill, player_index, player_index);
+            // }
+            // Role::Monk => todo!(), // No night one ability
+            // Role::Drunk => {
+            //     // WARNING: This one is a little difficult
+            //     // Maybe just add the role but make them drunk?
+            //     // Maybe during setup swap the drunk with another role if they are selected but
+            //     // give them a status effect as well?
+            //     todo!()
+            // } // Should be handled during setup, also gets mimiced
+            // // role's ability
+            // Role::Saint => todo!(),  // No night one ability
+            // Role::Butler => todo!(), // Status effect?, also same as normal ability
+            // Role::Recluse => {
+            //     // Status effect
+            //     self.add_status(StatusEffects::AppearsEvil, player_index, player_index);
+            // }
+            // Role::Spy => {
+            //     // Status effect and look at grimoire?
+            //     self.add_status(StatusEffects::AppearsEvil, player_index, player_index);
+            //     // Just tell the storyteller to let the spy look at the grimoire
+            //     todo!()
+            // }
+            // Role::Baron => todo!(),        // Should affect setup
+            // Role::Scarletwoman => todo!(), // Basically shouldn't happen night one
+            // Role::Poisoner => todo!(),     // Add poison to someone until next night, same as
+            // // normal ability
+            // Role::Imp => todo!(), // Nothing to do night one
+            // Role::Ravenkeeper => todo!(), // No night ability unless they die, same as normal
+            // ability
+            _ => None,
         }
-        Role::Fortuneteller => todo!(), // Should be the same as ability from other nights, but
-        // also need setup
-        Role::Undertaker => {
-            // TODO: Should scan the log for the entire day yesterday
-            // If there was a execution event yesterday that resulted in death, grab the player
-            // from that event
-            // Grab that player's role and give it to the undertaker
-            todo!();
-        }
-        Role::Virgin => {
-            // Add a status effect that if someone nominates you, they die
-            // Maybe instead add this to the nominate method
-            todo!()
-        }
-        Role::Soldier => {
-            // Just add protected status effect and only remove upon death
-            self.add_status(StatusEffects::DemonProtected, player_index, player_index);
-        }
-        Role::Slayer => todo!(), // No night one ability
-        Role::Mayor => {
-            // No night one ability, but add effect to yourself
-            self.add_status(StatusEffects::MayorBounceKill, player_index, player_index);
-        }
-        Role::Monk => todo!(), // No night one ability
-        Role::Drunk => {
-            // WARNING: This one is a little difficult
-            // Maybe just add the role but make them drunk?
-            // Maybe during setup swap the drunk with another role if they are selected but
-            // give them a status effect as well?
-            todo!()
-        } // Should be handled during setup, also gets mimiced
-        // role's ability
-        Role::Saint => todo!(),  // No night one ability
-        Role::Butler => todo!(), // Status effect?, also same as normal ability
-        Role::Recluse => {
-            // Status effect
-            self.add_status(StatusEffects::AppearsEvil, player_index, player_index);
-        }
-        Role::Spy => {
-            // Status effect and look at grimoire?
-            self.add_status(StatusEffects::AppearsEvil, player_index, player_index);
-            // Just tell the storyteller to let the spy look at the grimoire
-            todo!()
-        }
-        Role::Baron => todo!(),        // Should affect setup
-        Role::Scarletwoman => todo!(), // Basically shouldn't happen night one
-        Role::Poisoner => todo!(),     // Add poison to someone until next night, same as
-        // normal ability
-        Role::Imp => todo!(), // Nothing to do night one
-        Role::Ravenkeeper => todo!(), // No night ability unless they die, same as normal
-                               // ability
-    }
 
-    // TODO: Method should wait until storyteller explicitly advances to the next phase
+        // TODO: Method should wait until storyteller explicitly advances to the next phase
 
-    // TODO: The event should be logged at some point
-}
-
-pub(crate) fn resolve_night(&mut self) {
-    // TODO: Implement this method
-    // Order the roles in this game to get the order they should be woken up in (should be
-    // different from night 1)
-    // Wake each role up in order and show them the information they need to know, or the
-    // choices that they get
-    // For each choice:
-    //      If that choice impacts the game state, change the game state accordingly
-    //      If that choice tells the player info, give them that info
-    //      Should be calling a generic method on the role class to get info on the role's
-    //      ability
-    // Once you have gone through all the roles, nothing to do: wake everyone up
-    self.day_phase = DayPhase::Night;
-    // Order the roles in this game to get the order they should be woken up in (should be
-    // unique to night 1)
-    let ordered_player_indices = self.get_night_order(self.get_active_roles());
-    // Wake each role up in order and show them the information they need to know, or the
-    // choices that they get
-    // For each choice:
-    //      If that choice impacts the game state, change the game state accordingly
-    //      If that choice tells the player info, give them that info
-    //      Should be calling a generic method on the role class to get info on the role's
-    //      ability
-    // Once you have gone through all the roles, nothing to do: wake everyone up
-    for i in ordered_player_indices.iter() {
-        self.resolve_night_ability(*i);
+        // TODO: The event should be logged at some point
     }
 }
 
-pub(crate) fn resolve_night_ability(&mut self, player_index: PlayerIndex) {
-    // Check if the role is active before resolving their ability, skip if the role is
-    // inactive, but also warn
-    // eprintln!("An inactive role tried to act during the night");
-    // NOTE: I think that for info roles, the storyteller should still receive the correct
-    // info, but there will be a warning that the player is poisoned on the screen somewhere,
-    // letting the storyteller decide what number they should give
-    // TODO: Implement abilities for every role
-    let player = &mut self.players[player_index];
-    let role = player.role;
-    match role {
-        Role::Empath => {
-            let count = self.empath_ability(player_index);
-            // For now, just print output
-            println!("Empath count: {}", count);
-        }
-        Role::Gossip => todo!(),    // wait for v2
-        Role::Innkeeper => todo!(), // Wait for v2
-        Role::Fortuneteller => todo!(),
-        Role::Undertaker => todo!(),
-        Role::Monk => {
-            // Give the target the demon protected status effect
-            // TODO: Prompt the storyteller to choose a player
-            let target_index = todo!();
-            self.add_status(StatusEffects::DemonProtected, player_index, target_index);
-        }
-        Role::Ravenkeeper => {
-            // TODO:
-            // Should only happen when the ravenkeeper is dead
-            // Perhaps check every night if ravenkeeper is dead, or was killed that night?
-            // After death, prompt storyteller to choose player
-            let target_index: PlayerIndex = todo!();
-            let role = self.players[target_index].role;
-        }
-        Role::Butler => {
-            // TODO:
-            // Prompt the storyteller to choose a player
-            let target_index: PlayerIndex = self.choose_players(1)[0];
-            self.add_status(StatusEffects::ButlerMaster, player_index, target_index);
-        }
-        Role::Spy => {
-            // TODO: Literally just let them look at the grimoire
-            // End the phase when they're done looking at the grimoire
-        }
-        Role::Scarletwoman => {
-            // TODO: Check if the demon is dead at that point and there are more than 5 players
-            // Scarlet woman becomes the demon, should actually become the demon before this,
-            // but this is when they should be notified
-        }
-        Role::Poisoner => {
-            // TODO: Poison someone
-        }
-        Role::Imp => {
-            // TODO: Kill someone, if your target is yourself, kill yourself but transfer demon
-            // to a minion
-            // How to transfer demon to minion? Let storyteller decide. Prompt the storyteller
-            // to choose a player. Validate that the player is a minion, if they aren't, prompt
-            // them to choose again. If there are no minions in play, don't even give them the
-            // option
-        }
-        _ => {
-            eprintln!("A role that wasn't supposed to act acted");
-            panic!()
-        }
-    }
-
-    // TODO: Method should wait until storyteller explicitly advances to the next phase
-
-    // TODO: The event should be logged at some point
-}
+// pub(crate) fn resolve_night(&mut self) {
+//     // TODO: Implement this method
+//     // Order the roles in this game to get the order they should be woken up in (should be
+//     // different from night 1)
+//     // Wake each role up in order and show them the information they need to know, or the
+//     // choices that they get
+//     // For each choice:
+//     //      If that choice impacts the game state, change the game state accordingly
+//     //      If that choice tells the player info, give them that info
+//     //      Should be calling a generic method on the role class to get info on the role's
+//     //      ability
+//     // Once you have gone through all the roles, nothing to do: wake everyone up
+//     self.day_phase = DayPhase::Night;
+//     // Order the roles in this game to get the order they should be woken up in (should be
+//     // unique to night 1)
+//     let ordered_player_indices = self.get_night_order(self.get_active_roles());
+//     // Wake each role up in order and show them the information they need to know, or the
+//     // choices that they get
+//     // For each choice:
+//     //      If that choice impacts the game state, change the game state accordingly
+//     //      If that choice tells the player info, give them that info
+//     //      Should be calling a generic method on the role class to get info on the role's
+//     //      ability
+//     // Once you have gone through all the roles, nothing to do: wake everyone up
+//     for i in ordered_player_indices.iter() {
+//         self.resolve_night_ability(*i);
+//     }
+// }
+//
+// pub(crate) fn resolve_night_ability(&mut self, player_index: PlayerIndex) {
+//     // Check if the role is active before resolving their ability, skip if the role is
+//     // inactive, but also warn
+//     // eprintln!("An inactive role tried to act during the night");
+//     // NOTE: I think that for info roles, the storyteller should still receive the correct
+//     // info, but there will be a warning that the player is poisoned on the screen somewhere,
+//     // letting the storyteller decide what number they should give
+//     // TODO: Implement abilities for every role
+//     let player = &mut self.players[player_index];
+//     let role = player.role;
+//     match role {
+//         Role::Empath => {
+//             let count = self.empath_ability(player_index);
+//             // For now, just print output
+//             println!("Empath count: {}", count);
+//         }
+//         Role::Gossip => todo!(),    // wait for v2
+//         Role::Innkeeper => todo!(), // Wait for v2
+//         Role::Fortuneteller => todo!(),
+//         Role::Undertaker => todo!(),
+//         Role::Monk => {
+//             // Give the target the demon protected status effect
+//             // TODO: Prompt the storyteller to choose a player
+//             let target_index = todo!();
+//             self.add_status(StatusEffects::DemonProtected, player_index, target_index);
+//         }
+//         Role::Ravenkeeper => {
+//             // TODO:
+//             // Should only happen when the ravenkeeper is dead
+//             // Perhaps check every night if ravenkeeper is dead, or was killed that night?
+//             // After death, prompt storyteller to choose player
+//             let target_index: PlayerIndex = todo!();
+//             let role = self.players[target_index].role;
+//         }
+//         Role::Butler => {
+//             // TODO:
+//             // Prompt the storyteller to choose a player
+//             let target_index: PlayerIndex = self.choose_players(1)[0];
+//             self.add_status(StatusEffects::ButlerMaster, player_index, target_index);
+//         }
+//         Role::Spy => {
+//             // TODO: Literally just let them look at the grimoire
+//             // End the phase when they're done looking at the grimoire
+//         }
+//         Role::Scarletwoman => {
+//             // TODO: Check if the demon is dead at that point and there are more than 5 players
+//             // Scarlet woman becomes the demon, should actually become the demon before this,
+//             // but this is when they should be notified
+//         }
+//         Role::Poisoner => {
+//             // TODO: Poison someone
+//         }
+//         Role::Imp => {
+//             // TODO: Kill someone, if your target is yourself, kill yourself but transfer demon
+//             // to a minion
+//             // How to transfer demon to minion? Let storyteller decide. Prompt the storyteller
+//             // to choose a player. Validate that the player is a minion, if they aren't, prompt
+//             // them to choose again. If there are no minions in play, don't even give them the
+//             // option
+//         }
+//         _ => {
+//             eprintln!("A role that wasn't supposed to act acted");
+//             panic!()
+//         }
+//     }
+//
+//     // TODO: Method should wait until storyteller explicitly advances to the next phase
+//
+//     // TODO: The event should be logged at some point
+// }
 
 // NOTE: Role Specific Abilities
-pub(crate) fn empath_ability(&mut self, player_index: PlayerIndex) -> usize {
+fn empath_ability(state: &State, player_index: PlayerIndex) -> ChangeRequest {
     // Check how many players next to the empath are evil
     let mut count = 0;
-    let left_player = &self.players[self.left_player(player_index)];
-    let right_player = &self.players[self.right_player(player_index)];
-    if left_player.alignment == Alignment::Evil {
-        count += 1;
+    {
+        let left_player = &state.players[state.left_player(player_index)];
+        if left_player.alignment == Alignment::Evil {
+            count += 1;
+        }
     }
-    if right_player.alignment == Alignment::Evil {
-        count += 1;
+    {
+        let right_player = &state.players[state.right_player(player_index)];
+        if right_player.alignment == Alignment::Evil {
+            count += 1;
+        }
     }
+    let message = format!("Empath has {} evil neighbors", count);
 
-    return count;
+    let change_type = ChangeType::Display(message);
+
+    new_change_request!(change_type)
+}
+
+fn washerwoman_ability() -> ChangeRequest {
+    // TODO: Perhaps need find status method
+    let message = "Show washerwoman the correct roles".to_string();
+    let change_type = ChangeType::Display(message);
+
+    new_change_request!(change_type)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{Role, engine::state::tests::setup_test_game};
+    #[test]
+    fn test_get_order() {
+        let game = setup_test_game().0;
+
+        let mut next_player_index = None;
+
+        let mut assert_next_role = |role: Role| {
+            next_player_index = game.get_next_active_night1(next_player_index);
+            let role_pos = game.players.iter().position(|p| p.role == role).unwrap();
+            assert_eq!(
+                next_player_index.unwrap(),
+                role_pos,
+                "Next Player Role: {}\n {}'s Position is {}",
+                game.players[next_player_index.unwrap()].role,
+                role,
+                role_pos
+            );
+        };
+
+        assert_next_role(Role::Poisoner);
+        assert_next_role(Role::Investigator);
+        assert_next_role(Role::Chef);
+
+        next_player_index = game.get_next_active_player(next_player_index);
+        assert!(next_player_index.is_none());
+    }
 }

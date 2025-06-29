@@ -3,7 +3,8 @@ use super::{PlayerIndex, Role, State};
 // TODO: Add status effect id
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct StatusEffect {
-    pub(crate) status_type: StatusEffects,
+    // pub(crate) status_type: StatusEffects,
+    pub(crate) status_type: String,
     pub(crate) source_role: Role,
     pub(crate) source_player_index: PlayerIndex,
     pub(crate) affected_player_index: PlayerIndex,
@@ -11,7 +12,7 @@ pub(crate) struct StatusEffect {
 
 impl StatusEffect {
     pub(crate) fn new(
-        status_type: StatusEffects,
+        status_type: String,
         source_player_index: PlayerIndex,
         source_role: Role,
         affected_player_index: PlayerIndex,
@@ -24,6 +25,13 @@ impl StatusEffect {
         }
     }
 }
+
+pub(crate) const DRUNK: &str = "Drunk";
+pub(crate) const POISONED: &str = "Poisoned";
+pub(crate) const NIGHT_PROTECTED: &str = "Night Protected";
+pub(crate) const DEMON_PROTECTED: &str = "Demon Protected";
+pub(crate) const DEATH_PROTECTED: &str = "Death Protected";
+pub(crate) const NO_ABILITY: &str = "No Ability";
 #[derive(Clone, Copy, Hash, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum StatusEffects {
     // General
@@ -51,7 +59,7 @@ pub(crate) enum StatusEffects {
 impl State {
     pub(crate) fn add_status(
         &mut self,
-        effect_type: StatusEffects,
+        effect_type: String,
         source_player_index: PlayerIndex,
         affected_player_index: PlayerIndex,
     ) {
@@ -66,7 +74,7 @@ impl State {
 
     pub(crate) fn remove_status(
         &mut self,
-        effect_type: StatusEffects,
+        effect_type: String,
         source_player_index: PlayerIndex,
         affected_player_index: PlayerIndex,
     ) {
@@ -74,7 +82,7 @@ impl State {
             .status_effects
             .iter()
             .position(|s| {
-                s.status_type == effect_type
+                s.status_type.trim().to_lowercase() == effect_type.trim().to_lowercase()
                     && s.source_player_index == source_player_index
                     && s.affected_player_index == affected_player_index
             })

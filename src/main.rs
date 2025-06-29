@@ -8,15 +8,15 @@ use initialization::{CharacterTypeCounts, Script, ScriptJson};
 
 mod engine;
 use engine::{
+    change_request::{ChangeArgs, ChangeRequest, ChangeType},
     player::{CharacterType, Player, Role},
-    setup::{Args, ChangeRequest, ChangeType},
     state::{PlayerIndex, State, StateStoreFields, Step},
 };
 
 mod scripts;
 use scripts::*;
 
-const DEBUG: bool = false;
+const DEBUG: bool = true;
 // use leptos_router::components::*;
 // use leptos_router::path;
 
@@ -51,9 +51,10 @@ fn App() -> impl IntoView {
             Role::Investigator,
             Role::Librarian,
             Role::Fortuneteller,
-            Role::Monk,
+            // Role::Monk,
             Role::Drunk,
-            Role::Scarletwoman,
+            Role::Empath,
+            Role::Spy,
             Role::Imp,
         ]);
 
@@ -480,7 +481,6 @@ struct TempState {
     change_request: Option<ChangeRequest>,
     selected_players: Vec<PlayerIndex>,
     selected_roles: Vec<Role>,
-    players_to_resolve: Vec<PlayerIndex>,
     currently_acting_player: Option<PlayerIndex>,
 }
 
@@ -490,6 +490,7 @@ impl TempState {
         self.change_request = None;
         self.selected_players.clear();
         self.selected_roles.clear();
+        self.currently_acting_player = None;
     }
 }
 
@@ -508,6 +509,7 @@ fn GameInterface(roles: Vec<Role>, player_names: Vec<String>, script: Script) ->
             <Picker_Bar />
         </div>
     }
+    .into_any()
 }
 
 #[component]
@@ -523,7 +525,9 @@ fn Info() -> impl IntoView {
             Step::DayDiscussion | Step::DayExecution => {
                 format!("Day {}", game_state.day_num().get()).to_string()
             }
-            Step::Night1 | Step::Night => format!("Day {}", game_state.day_num().get()).to_string(),
+            Step::Night1 | Step::Night => {
+                format!("Night {}", game_state.day_num().get()).to_string()
+            }
         }
     };
 
@@ -533,6 +537,7 @@ fn Info() -> impl IntoView {
             Some(cr) => match cr.change_type {
                 ChangeType::ChoosePlayers(num) => format!("Choose {} Players", num),
                 ChangeType::ChooseRoles(num) => format!("Choose {} Roles", num),
+                ChangeType::Display(string) => string,
                 _ => "Not Yet Implemented".to_string(),
             },
             None => "None".to_string(),
@@ -638,53 +643,69 @@ fn Game() -> impl IntoView {
     let game_state = expect_context::<Store<State>>();
     let temp_state = expect_context::<Store<TempState>>();
     let next_button = move |_| {
-        // Load up temp_state with players that act during setup
-        if game_state.step().get() == Step::Start {
-            let setup_players = game_state.read().get_active_players();
-            temp_state.players_to_resolve().set(setup_players);
-            game_state.step().set(Step::Setup);
-        }
         if let Some(cr) = temp_state.change_request().get() {
             // Do check func and return early if it doesn't pass
             let args = match cr.change_type {
-                ChangeType::ChoosePlayers(_) => {
-                    Args::PlayerIndices(temp_state.selected_players().get())
+                ChangeType::ChoosePlayers(_) => Some(ChangeArgs::PlayerIndices(
+                    temp_state.selected_players().get(),
+                )),
+                ChangeType::ChooseRoles(_) => {
+                    Some(ChangeArgs::Roles(temp_state.selected_roles().get()))
                 }
-                ChangeType::ChooseRoles(_) => Args::Roles(temp_state.selected_roles().get()),
-                _ => todo!(),
+                _ => None,
             };
-            let check_func = cr.check_func.clone();
-            let res = game_state.with(|gs| {
-                let cf = check_func.clone();
-                cf(gs, &args)
-            });
-            match res {
-                Ok(boolean) => {
-                    if boolean {
-                    } else {
+
+            // Only apply funcs if change_type requires action
+            if args.is_some() {
+                let args = args.unwrap();
+                let check_func = cr.check_func.clone();
+                let res = game_state.with(|gs| {
+                    let cf = check_func.unwrap().clone();
+                    cf(gs, &args)
+                });
+                match res {
+                    Ok(boolean) => {
+                        if boolean {
+                        } else {
+                            return;
+                        }
+                    }
+                    Err(()) => {
                         return;
                     }
                 }
-                Err(()) => {
-                    return;
+                // If it passes, do the apply state func and move on
+                let state_func = cr.state_change_func.unwrap().clone();
+                game_state.update(|gs| state_func(gs, args));
+            }
+        }
+        // Get next active player based off of current player
+        let mut loop_break = false;
+        loop {
+            let currently_acting_player = temp_state.read().currently_acting_player;
+            temp_state.update(|ts| ts.reset());
+            // Check for next active player
+            let next_player = game_state
+                .read()
+                .get_next_active_player(currently_acting_player);
+            match next_player {
+                Some(p) => {
+                    let next_cr = game_state.try_update(|gs| gs.resolve(p));
+                    temp_state.currently_acting_player().set(Some(p));
+                    temp_state.change_request().set(next_cr.unwrap());
+                    break;
+                }
+                // Switch to next step when get next active player yields None
+                None => {
+                    game_state.update(|gs| gs.next_step());
+                    if loop_break {
+                        break;
+                    }
+                    loop_break = true;
+                    // TODO: Should call the function again automatically
                 }
             }
-            // If it passes, do the apply state func and move on
-            let state_func = cr.state_change_func.clone();
-            game_state.update(|gs| state_func(gs, args));
         }
-        temp_state.update(|ts| ts.reset());
-        let next_player = temp_state
-            .players_to_resolve()
-            .try_update(|pv| pv.pop())
-            .unwrap();
-        let next_player = match next_player {
-            Some(p) => p,
-            None => todo!(),
-        };
-        let next_cr = game_state.try_update(|gs| gs.resolve(next_player));
-        temp_state.currently_acting_player().set(Some(next_player));
-        temp_state.change_request().set(next_cr.unwrap());
     };
     view! {
         <div class="relative w-3/5 flex justify-center items-center">
@@ -778,19 +799,20 @@ fn Player_Display() -> impl IntoView {
                                         selected.set(true);
                                     }
                                 >
-                                    {move || {player.role.to_string() }}
+                                    {move || { player.role.to_string() }}
                                 </button>
                                 // Status effects
-                                <div class="text-[0.5em] flex flex-col items-start absolute w-fit left-1/2 -translate-x-1/2 top-9/10 ">
+                                <div class="text-[0.5rem] flex flex-col justify-center items-start absolute w-fit border left-1/2 -translate-x-1/2 top-9/10 ">
                                     {move || {
                                         let status_effects = game_state
                                             .with(|gs| gs.get_afflicted_statuses(i));
                                         status_effects
                                             .iter()
                                             .map(|status_effect| {
-                                                let str = format!("{:?}", status_effect.status_type);
+                                                let str = format!("{}", status_effect.status_type);
                                                 view! {
-                                                    <p class="w-full text-center border border-solid m-[0%] rounded-full p-px bg-[#ffff00]">
+                                                    // TODO: Standardize effect box sizes
+                                                    <p class="w-fit h-[1rem] text-center border border-solid m-[0%] rounded-full p-[5px] bg-[#ffff00]">
                                                         {str}
                                                     </p>
                                                 }
@@ -852,41 +874,42 @@ fn Picker_Bar() -> impl IntoView {
                         let selected = RwSignal::new(false);
                         view! {
                             <button
-                            style:color= move || {if selected.get() {
-                                "red"
-                            } else {""}}
-                            on:click=move |_| {
-                                let cr = match temp_state.change_request().get() {
-                                    Some(cr) => cr,
-                                    None => {
+                                style:color=move || { if selected.get() { "red" } else { "" } }
+                                on:click=move |_| {
+                                    let cr = match temp_state.change_request().get() {
+                                        Some(cr) => cr,
+                                        None => {
+                                            return;
+                                        }
+                                    };
+                                    let requested_num = match cr.change_type {
+                                        ChangeType::ChooseRoles(num) => num,
+                                        _ => {
+                                            return;
+                                        }
+                                    };
+                                    let selected_roles = temp_state.selected_roles();
+                                    if selected.get() {
+                                        selected_roles
+                                            .update(|pv| {
+                                                let remove_index = pv
+                                                    .iter()
+                                                    .position(|r| *r == role)
+                                                    .unwrap();
+                                                pv.remove(remove_index);
+                                            });
+                                        selected.set(false);
                                         return;
                                     }
-                                };
-                                let requested_num = match cr.change_type {
-                                    ChangeType::ChooseRoles(num) => num,
-                                    _ => {
+                                    if selected_roles.read().len() >= requested_num {
                                         return;
                                     }
-                                };
-                                let selected_roles = temp_state.selected_roles();
-                                if selected.get() {
-                                    selected_roles
-                                        .update(|pv| {
-                                            let remove_index = pv
-                                                .iter()
-                                                .position(|r| *r == role)
-                                                .unwrap();
-                                            pv.remove(remove_index);
-                                        });
-                                    selected.set(false);
-                                    return;
+                                    selected_roles.update(|pv| pv.push(role));
+                                    selected.set(true);
                                 }
-                                if selected_roles.read().len() >= requested_num {
-                                    return;
-                                }
-                                selected_roles.update(|pv| pv.push(role));
-                                selected.set(true);
-                            }>{role.to_string()}</button>
+                            >
+                                {role.to_string()}
+                            </button>
                         }
                     }
                 />
