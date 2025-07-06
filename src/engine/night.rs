@@ -458,7 +458,7 @@ impl Role {
         &self,
         player_index: PlayerIndex,
         state: &State,
-    ) -> Option<ChangeRequest> {
+    ) -> Option<Vec<ChangeRequest>> {
         // Check if the role is active before resolving their ability, skip if the role is
         // inactive, but also warn
         // eprintln!("An inactive role tried to act during the night");
@@ -479,8 +479,8 @@ impl Role {
             Role::Washerwoman => Some(washerwoman_ability()), // Setup
             Role::Librarian => {
                 let message = "show librarian smth".to_string();
-                let change_type = ChangeType::Display(message);
-                Some(new_change_request!(change_type))
+                let change_type = ChangeType::Display;
+                Some(vec![new_change_request!(change_type, message)])
             } // Setup
             // Role::Chef => {
             //     // Count pairs of evil players
@@ -661,7 +661,7 @@ impl Role {
 // }
 
 // NOTE: Role Specific Abilities
-fn empath_ability(state: &State, player_index: PlayerIndex) -> ChangeRequest {
+fn empath_ability(state: &State, player_index: PlayerIndex) -> Vec<ChangeRequest> {
     // Check how many players next to the empath are evil
     let mut count = 0;
     {
@@ -678,17 +678,17 @@ fn empath_ability(state: &State, player_index: PlayerIndex) -> ChangeRequest {
     }
     let message = format!("Empath has {} evil neighbors", count);
 
-    let change_type = ChangeType::Display(message);
+    let change_type = ChangeType::Display;
 
-    new_change_request!(change_type)
+    vec![new_change_request!(change_type, message)]
 }
 
-fn washerwoman_ability() -> ChangeRequest {
+fn washerwoman_ability() -> Vec<ChangeRequest> {
     // TODO: Perhaps need find status method
     let message = "Show washerwoman the correct roles".to_string();
-    let change_type = ChangeType::Display(message);
+    let change_type = ChangeType::Display;
 
-    new_change_request!(change_type)
+    vec![new_change_request!(change_type, message)]
 }
 
 #[cfg(test)]

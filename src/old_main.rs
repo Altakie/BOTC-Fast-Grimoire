@@ -7,19 +7,6 @@ use std::{io, usize};
 mod game;
 mod setup;
 
-// TODO: ACTUALLY IMPORTANT STUFF
-// Split this file into 3 parts: 1 for the setup, 1 for the engine, and 1 for the all the commonly
-// used stuff (enums for roles, alignment, etc)
-// Maybe even split up the engine into two parts, one part for the setup of the engine and the
-// other parts for game logic
-// Definitely need more modularity, maybe sketch out all the modules that need to be in your system
-// and how they will interact: what data they should be passing to each other and what not
-//
-// TODO: Seems to be a lot of prompting the storyteller to do something, but that isn't actually
-// implemented
-// Need to figure out types of prompts for the storyteller:
-// Choose a number of players
-// Choose a role/roles
 // TODO: Communication between frontend and backend
 // Also need a generic method to show something to the storyteller
 // Could be json that I deserialize?

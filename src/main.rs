@@ -2,6 +2,7 @@
 use leptos::mount::mount_to_body;
 use leptos::prelude::*;
 use reactive_stores::Store;
+use std::collections::VecDeque;
 
 mod initialization;
 use initialization::{CharacterTypeCounts, Script, ScriptJson};
@@ -478,7 +479,7 @@ fn RoleChooser(
 #[derive(Clone, Store, Default)]
 struct TempState {
     selected_player: Option<PlayerIndex>,
-    change_request: Option<ChangeRequest>,
+    change_requests: VecDeque<ChangeRequest>,
     selected_players: Vec<PlayerIndex>,
     selected_roles: Vec<Role>,
     currently_acting_player: Option<PlayerIndex>,
@@ -487,7 +488,7 @@ struct TempState {
 impl TempState {
     fn reset(&mut self) {
         self.selected_player = None;
-        self.change_request = None;
+        self.change_requests.clear();
         self.selected_players.clear();
         self.selected_roles.clear();
         self.currently_acting_player = None;
@@ -532,14 +533,15 @@ fn Info() -> impl IntoView {
     };
 
     let change_info = move || {
-        let cr = temp_state.change_request().get();
-        match cr {
-            Some(cr) => match cr.change_type {
-                ChangeType::ChoosePlayers(num) => format!("Choose {} Players", num),
-                ChangeType::ChooseRoles(num) => format!("Choose {} Roles", num),
-                ChangeType::Display(string) => string,
-                _ => "Not Yet Implemented".to_string(),
-            },
+        let crs = temp_state.change_requests().get();
+        match crs.front() {
+            Some(cr) => cr.description.clone(),
+            // match cr.change_type {
+            //     ChangeType::ChoosePlayers(num) => format!("Choose {} Players", num),
+            //     ChangeType::ChooseRoles(num) => format!("Choose {} Roles", num),
+            //     ChangeType::Display(string) => string,
+            //     _ => "Not Yet Implemented".to_string(),
+            // }
             None => "None".to_string(),
         }
     };
@@ -640,10 +642,13 @@ fn Info() -> impl IntoView {
 
 #[component]
 fn Game() -> impl IntoView {
+    // TODO: Should pop off of change_request queue, and
     let game_state = expect_context::<Store<State>>();
     let temp_state = expect_context::<Store<TempState>>();
     let next_button = move |_| {
-        if let Some(cr) = temp_state.change_request().get() {
+        // If there is a change request in the queue, process it
+        if !temp_state.change_requests().read().is_empty() {
+            let cr = temp_state.change_requests().read().front().unwrap().clone();
             // Do check func and return early if it doesn't pass
             let args = match cr.change_type {
                 ChangeType::ChoosePlayers(_) => Some(ChangeArgs::PlayerIndices(
@@ -677,8 +682,18 @@ fn Game() -> impl IntoView {
                 // If it passes, do the apply state func and move on
                 let state_func = cr.state_change_func.unwrap().clone();
                 game_state.update(|gs| state_func(gs, args));
+                // If the state change func is applied, pop the current_cr off of the queue
+                temp_state.change_requests().update(|crs| {
+                    crs.pop_front();
+                });
             }
         }
+
+        // Only get the next player's change requests if the current change request queue is empty
+        if !temp_state.change_requests().read().is_empty() {
+            return;
+        }
+
         // Get next active player based off of current player
         let mut loop_break = false;
         loop {
@@ -689,11 +704,22 @@ fn Game() -> impl IntoView {
                 .read()
                 .get_next_active_player(currently_acting_player);
             match next_player {
+                // TODO: Each resolve function should actually return a list of change requests,
+                // each of which should be added to the queue
                 Some(p) => {
-                    let next_cr = game_state.try_update(|gs| gs.resolve(p));
+                    let next_crs = game_state.try_update(|gs| gs.resolve(p));
                     temp_state.currently_acting_player().set(Some(p));
-                    temp_state.change_request().set(next_cr.unwrap());
-                    break;
+                    // FIX: I think this can fail if the next cr is None, this fix is weird, figure
+                    // out when the none case can happen
+                    match next_crs.unwrap() {
+                        Some(next_crs) => {
+                            temp_state
+                                .change_requests()
+                                .update(|crs| crs.extend(next_crs.into_iter()));
+                            break;
+                        }
+                        None => todo!(),
+                    }
                 }
                 // Switch to next step when get next active player yields None
                 None => {
@@ -719,14 +745,12 @@ fn Game() -> impl IntoView {
 
 #[component]
 fn Player_Display() -> impl IntoView {
-    // TODO: Create another store for temp data that changes often as opposed to global state
     let game_state = expect_context::<Store<State>>();
     let players = game_state.players();
     let player_positions = calc_circle(players.read().len(), 75.0);
 
     let temp_state = expect_context::<Store<TempState>>();
     let currently_selected_player = temp_state.selected_player();
-    let curr_change_request = temp_state.change_request();
     let selected_players = temp_state.selected_players();
     // Want to place children in a circle within the container, centered around it's origin
     // Radius of circle should dynamically grow based on number of items
@@ -766,9 +790,9 @@ fn Player_Display() -> impl IntoView {
                                         }
                                     }
                                     on:click=move |_| {
-                                        let cr = match curr_change_request.get() {
-                                            Some(cr) => cr,
-                                            None => {
+                                        let cr = match temp_state.change_requests().read().is_empty() {
+                                            false => temp_state.change_requests().read().front().unwrap().clone(),
+                                            true => {
                                                 currently_selected_player.set(Some(i));
                                                 return;
                                             }
@@ -809,7 +833,7 @@ fn Player_Display() -> impl IntoView {
                                         status_effects
                                             .iter()
                                             .map(|status_effect| {
-                                                let str = format!("{}", status_effect.status_type);
+                                                let str = status_effect.status_type.to_string();
                                                 view! {
                                                     // TODO: Standardize effect box sizes
                                                     <p class="w-fit h-[1rem] text-center border border-solid m-[0%] rounded-full p-[5px] bg-[#ffff00]">
@@ -876,11 +900,11 @@ fn Picker_Bar() -> impl IntoView {
                             <button
                                 style:color=move || { if selected.get() { "red" } else { "" } }
                                 on:click=move |_| {
-                                    let cr = match temp_state.change_request().get() {
-                                        Some(cr) => cr,
-                                        None => {
+                                    let cr = {
+                                        if temp_state.change_requests().read().is_empty() {
                                             return;
                                         }
+                                        temp_state.change_requests().get().front().unwrap().clone()
                                     };
                                     let requested_num = match cr.change_type {
                                         ChangeType::ChooseRoles(num) => num,

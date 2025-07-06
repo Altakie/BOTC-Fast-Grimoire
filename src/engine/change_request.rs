@@ -10,7 +10,7 @@ pub(crate) enum ChangeType {
     ChooseRoles(usize),
     Voting,
     // Display
-    Display(String),
+    Display,
 }
 
 #[derive(Debug, Clone)]
@@ -56,22 +56,26 @@ pub(crate) struct ChangeRequest {
     pub(crate) check_func:
         Option<Arc<dyn Fn(&State, &ChangeArgs) -> Result<bool, ()> + Send + Sync>>,
     pub(crate) state_change_func: Option<Arc<dyn Fn(&mut State, ChangeArgs) + Send + Sync>>,
+    pub(crate) description: String,
 }
 
+// TODO: Update this macro to actually return a vec, maybe
 #[macro_export]
 macro_rules! new_change_request {
-    ($ct:expr, $cf:expr, $scf:expr) => {
+    ($ct:expr, $cf:expr, $scf:expr, $desc:expr) => {
         ChangeRequest {
             change_type: $ct,
             check_func: Some(std::sync::Arc::new($cf)),
             state_change_func: Some(std::sync::Arc::new($scf)),
+            description: $desc,
         }
     };
-    ($ct:expr) => {
+    ($ct:expr, $desc:expr) => {
         ChangeRequest {
             change_type: $ct,
             check_func: None,
             state_change_func: None,
+            description: $desc,
         }
     };
 }

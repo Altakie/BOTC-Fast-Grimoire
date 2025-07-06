@@ -10,21 +10,6 @@ use crate::unwrap_args_panic;
 // use leptos::prelude::*;
 // use reactive_stores::Store;
 
-// TODO: Iterate through all players until none left
-// Iteration done manually using button
-// Each iter step:
-// Check how current player's role affects setup - trigger appropriate components with proper
-// parameters, if doesn't affect, skip
-// Parameters to components -> trigger specic parameters, and a function that can be applied to
-// the game state with the information gotten from the user
-// Function passed should apply changes to game state, and then return to setup
-// Don't need different components based on game state, just need to pass different functions
-
-// TODO: What to do what to do
-// Easy -> Want generic components for different types of inputs
-// Those components should take in a signal, and also act kind of like a form
-// When they return, they should what component it wants rendered and a function to be applied to
-// the game state
 impl State {
     // pub(crate) fn get_active_players(&self) -> Vec<PlayerIndex> {
     //     let mut res: Vec<PlayerIndex> = vec![];
@@ -72,7 +57,7 @@ impl State {
 }
 
 impl Role {
-    pub(super) fn setup_action(&self, player_index: PlayerIndex) -> Option<ChangeRequest> {
+    pub(super) fn setup_action(&self, player_index: PlayerIndex) -> Option<Vec<ChangeRequest>> {
         match self {
             Role::Washerwoman => Some(washerwoman_librarian_investigator(
                 player_index,
@@ -108,11 +93,22 @@ fn washerwoman_librarian_investigator(
     target_char_type: CharacterType,
     right_effect: String,
     wrong_effect: String,
-) -> ChangeRequest {
+) -> Vec<ChangeRequest> {
+    // Only these 3 roles should be calling this method (for now)
     assert!(matches!(
         role,
         Role::Washerwoman | Role::Librarian | Role::Investigator
     ));
+
+    let target_type = {
+        match role {
+            Role::Washerwoman => "Townsfolk",
+            Role::Librarian => "Outsider",
+            Role::Investigator => "Minion",
+            _ => panic!("Should never happen"),
+        }
+    };
+    let description = format!("Select a {target_type} and one other player");
 
     // TODO: Update this, a role should be able to trigger multiple chained change reqeusts
     let change_type = ChangeType::ChoosePlayers(2);
@@ -150,16 +146,26 @@ fn washerwoman_librarian_investigator(
         }
     };
 
-    new_change_request!(change_type, check_func, state_change)
+    vec![new_change_request!(
+        change_type,
+        check_func,
+        state_change,
+        description
+    )]
 }
 
-fn drunk(player_index: PlayerIndex) -> ChangeRequest {
+fn drunk(player_index: PlayerIndex) -> Vec<ChangeRequest> {
+    let description = "Select a not in play townfolk role".to_string();
     let change_type = ChangeType::ChooseRoles(1);
     let check_func = move |_: &State, args: &ChangeArgs| -> Result<bool, ()> {
         let roles = unwrap_args_err!(args, ChangeArgs::Roles(r) => r);
 
         if roles.len() != 1 {
             return Err(());
+        }
+
+        if roles[0].get_type() != CharacterType::Townsfolk {
+            return Ok(false);
         }
 
         return Ok(true);
@@ -179,10 +185,17 @@ fn drunk(player_index: PlayerIndex) -> ChangeRequest {
         state.add_status(format!("{} Ability", roles[0]), player_index, player_index);
     };
 
-    new_change_request!(change_type, check_func, state_change)
+    vec![new_change_request!(
+        change_type,
+        check_func,
+        state_change,
+        description
+    )]
 }
 
-fn fortune_teller(player_index: PlayerIndex) -> ChangeRequest {
+fn fortune_teller(player_index: PlayerIndex) -> Vec<ChangeRequest> {
+    let description = "Select a red-herring for the Fortune Teller".to_string();
+
     let change_type = ChangeType::ChoosePlayers(1);
     let check_func = move |_: &State, args: &ChangeArgs| -> Result<bool, ()> {
         let target_players = unwrap_args_err!(args, ChangeArgs::PlayerIndices(v) => v);
@@ -205,5 +218,10 @@ fn fortune_teller(player_index: PlayerIndex) -> ChangeRequest {
         );
     };
 
-    new_change_request!(change_type, check_func, state_change)
+    vec![new_change_request!(
+        change_type,
+        check_func,
+        state_change,
+        description
+    )]
 }
