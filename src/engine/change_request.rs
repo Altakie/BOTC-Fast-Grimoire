@@ -4,7 +4,7 @@ use super::{
 };
 use std::sync::Arc;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub(crate) enum ChangeType {
     ChoosePlayers(usize),
     ChooseRoles(usize),

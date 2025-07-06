@@ -1,6 +1,9 @@
 #![allow(clippy::needless_return)]
 use leptos::mount::mount_to_body;
-use leptos::prelude::*;
+use leptos::{
+    leptos_dom::logging::{console_error, console_log},
+    prelude::*,
+};
 use reactive_stores::Store;
 use std::collections::VecDeque;
 
@@ -486,10 +489,14 @@ struct TempState {
 }
 
 impl TempState {
+    fn clear_selected(&mut self) {
+        self.selected_players.clear();
+        self.selected_roles.clear();
+    }
     fn reset(&mut self) {
         self.selected_player = None;
-        self.change_requests.clear();
         self.selected_players.clear();
+        self.change_requests.clear();
         self.selected_roles.clear();
         self.currently_acting_player = None;
     }
@@ -504,11 +511,26 @@ fn GameInterface(roles: Vec<Role>, player_names: Vec<String>, script: Script) ->
     provide_context(temp_state);
 
     view! {
-        <div class="h-screen border border-dashed flex justify-between">
-            <Info />
-            <Game />
-            <Picker_Bar />
-        </div>
+        <ErrorBoundary fallback=|errors| {
+            view! {
+                <p>"Errors:"</p>
+                <ul>
+                    {move || {
+                        errors
+                            .get()
+                            .into_iter()
+                            .map(|(_, e)| view! { <li>{e.to_string()}</li> })
+                            .collect_view()
+                    }}
+                </ul>
+            }
+        }>
+            <div class="h-screen border border-dashed flex justify-between">
+                <Info />
+                <Game />
+                <Picker_Bar />
+            </div>
+        </ErrorBoundary>
     }
     .into_any()
 }
@@ -689,10 +711,13 @@ fn Game() -> impl IntoView {
             }
         }
 
+        temp_state.update(|ts| ts.clear_selected());
+
         // Only get the next player's change requests if the current change request queue is empty
         if !temp_state.change_requests().read().is_empty() {
             return;
         }
+        console_log("Last cr");
 
         // Get next active player based off of current player
         let mut loop_break = false;
@@ -715,10 +740,13 @@ fn Game() -> impl IntoView {
                         Some(next_crs) => {
                             temp_state
                                 .change_requests()
-                                .update(|crs| crs.extend(next_crs.into_iter()));
+                                .update(|crs| crs.extend(next_crs));
                             break;
                         }
-                        None => todo!(),
+                        None => {
+                            console_error("Next Change Request is none");
+                            break;
+                        }
                     }
                 }
                 // Switch to next step when get next active player yields None
@@ -790,13 +818,16 @@ fn Player_Display() -> impl IntoView {
                                         }
                                     }
                                     on:click=move |_| {
-                                        let cr = match temp_state.change_requests().read().is_empty() {
-                                            false => temp_state.change_requests().read().front().unwrap().clone(),
-                                            true => {
-                                                currently_selected_player.set(Some(i));
-                                                return;
-                                            }
-                                        };
+                                        if temp_state.change_requests().read().is_empty() {
+                                            currently_selected_player.set(Some(i));
+                                            return;
+                                        }
+                                        let cr = temp_state
+                                            .change_requests()
+                                            .read()
+                                            .front()
+                                            .unwrap()
+                                            .clone();
                                         let requested_num = match cr.change_type {
                                             ChangeType::ChoosePlayers(num) => num,
                                             _ => {

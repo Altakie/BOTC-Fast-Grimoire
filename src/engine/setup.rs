@@ -63,25 +63,25 @@ impl Role {
                 player_index,
                 *self,
                 CharacterType::Townsfolk,
-                "Washerwoman Townsfolk".to_owned(),
-                "Washerwoman Wrong".to_owned(),
+                "Washerwoman Townsfolk",
+                "Washerwoman Wrong",
             )),
             Role::Librarian => Some(washerwoman_librarian_investigator(
                 player_index,
                 *self,
                 CharacterType::Outsider,
-                "Librarian Outsider".to_owned(),
-                "Librarian Wrong".to_owned(),
+                "Librarian Outsider",
+                "Librarian Wrong",
             )),
             Role::Investigator => Some(washerwoman_librarian_investigator(
                 player_index,
                 *self,
                 CharacterType::Minion,
-                "Investigator Minion".to_owned(),
-                "Investigator Wrong".to_owned(),
+                "Investigator Minion",
+                "Investigator Wrong",
             )),
-            Role::Drunk => Some(drunk(player_index)),
             Role::Fortuneteller => Some(fortune_teller(player_index)),
+            Role::Drunk => Some(drunk(player_index)),
             _ => None,
         }
     }
@@ -91,8 +91,8 @@ fn washerwoman_librarian_investigator(
     player_index: PlayerIndex,
     role: Role,
     target_char_type: CharacterType,
-    right_effect: String,
-    wrong_effect: String,
+    right_effect: &'static str,
+    wrong_effect: &'static str,
 ) -> Vec<ChangeRequest> {
     // Only these 3 roles should be calling this method (for now)
     assert!(matches!(
@@ -108,21 +108,25 @@ fn washerwoman_librarian_investigator(
             _ => panic!("Should never happen"),
         }
     };
-    let description = format!("Select a {target_type} and one other player");
+    let right_description = format!("Select a {target_type}");
+    let wrong_description = "Select a different player".to_string();
 
     // TODO: Update this, a role should be able to trigger multiple chained change reqeusts
-    let change_type = ChangeType::ChoosePlayers(2);
-    let check_func = move |state: &State, args: &ChangeArgs| -> Result<bool, ()> {
+    // Trigger two chained change requests, one to choose the player the washerwoman is targeting,
+    // and one for the wrong player
+    let change_type = ChangeType::ChoosePlayers(1);
+    let right_check_func = move |state: &State, args: &ChangeArgs| -> Result<bool, ()> {
         // let target_player_indices: &Vec<PlayerIndex> = match args {
         //     Args::PlayerIndices(pv) => pv,
         //     _ => return Err(()),
         // };
         let target_player_indices = unwrap_args_err!(args, ChangeArgs::PlayerIndices(v) => v);
 
-        if target_player_indices.len() != 2 {
+        if target_player_indices.len() != 1 {
             return Err(());
         }
 
+        // TODO: Redundant code that can be cleaned up here
         for target_player_index in target_player_indices {
             let player = &state.players[*target_player_index];
             if player.role.get_type() == target_char_type || player.role == Role::Spy {
@@ -133,29 +137,68 @@ fn washerwoman_librarian_investigator(
         return Ok(false);
     };
 
-    let state_change = move |state: &mut State, args: ChangeArgs| {
+    let right_state_change = move |state: &mut State, args: ChangeArgs| {
         let target_player_indices = unwrap_args_panic!(args, ChangeArgs::PlayerIndices(v) => v);
 
+        // TODO: Redundant code that can be cleaned up here
         for target_player_index in target_player_indices {
             let player = &state.players[target_player_index];
             if player.role.get_type() == target_char_type || player.role == Role::Spy {
-                state.add_status(right_effect.clone(), player_index, target_player_index);
+                state.add_status(right_effect.to_string(), player_index, target_player_index);
             } else {
-                state.add_status(wrong_effect.clone(), player_index, target_player_index);
+                state.add_status(wrong_effect.to_string(), player_index, target_player_index);
             }
         }
     };
 
-    vec![new_change_request!(
-        change_type,
-        check_func,
-        state_change,
-        description
-    )]
+    let wrong_check_func = move |state: &State, args: &ChangeArgs| -> Result<bool, ()> {
+        // let target_player_indices: &Vec<PlayerIndex> = match args {
+        //     Args::PlayerIndices(pv) => pv,
+        //     _ => return Err(()),
+        // };
+        let target_player_indices = unwrap_args_err!(args, ChangeArgs::PlayerIndices(v) => v);
+
+        if target_player_indices.len() != 1 {
+            return Err(());
+        }
+
+        let target_player_index = target_player_indices[0];
+        if state
+            .get_afflicted_statuses(target_player_index)
+            .iter()
+            .any(|se| se.status_type == *right_effect.to_string())
+        {
+            return Ok(false);
+        }
+        return Ok(true);
+    };
+
+    let wrong_state_change = move |state: &mut State, args: ChangeArgs| {
+        let target_player_indices = unwrap_args_panic!(args, ChangeArgs::PlayerIndices(v) => v);
+
+        // Assign the chosen player the wrong status effect
+        let target_player_index = target_player_indices[0];
+        state.add_status(wrong_effect.to_string(), player_index, target_player_index);
+    };
+
+    vec![
+        new_change_request!(
+            change_type,
+            right_check_func,
+            right_state_change,
+            right_description
+        ),
+        new_change_request!(
+            change_type,
+            wrong_check_func,
+            wrong_state_change,
+            wrong_description
+        ),
+    ]
 }
 
 fn drunk(player_index: PlayerIndex) -> Vec<ChangeRequest> {
-    let description = "Select a not in play townfolk role".to_string();
+    let description = "Select a not in play Townfolk role".to_string();
     let change_type = ChangeType::ChooseRoles(1);
     let check_func = move |_: &State, args: &ChangeArgs| -> Result<bool, ()> {
         let roles = unwrap_args_err!(args, ChangeArgs::Roles(r) => r);
@@ -171,12 +214,6 @@ fn drunk(player_index: PlayerIndex) -> Vec<ChangeRequest> {
         return Ok(true);
     };
 
-    // Choose a townsfolk role for the storyteller to replace the drunk with
-    // Swap the chosen role with drunk, but give them a status effect that they
-    // are actually the drunk
-    // Essentially, the drunk should never actually be in play, the actual role
-    // should be swapped out but a note is added that this player is indeed the
-    // drunk
     let state_change = move |state: &mut State, args: ChangeArgs| {
         let roles = match args {
             ChangeArgs::Roles(rv) => rv,
