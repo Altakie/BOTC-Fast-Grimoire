@@ -664,7 +664,6 @@ fn Info() -> impl IntoView {
 
 #[component]
 fn Game() -> impl IntoView {
-    // TODO: Should pop off of change_request queue, and
     let game_state = expect_context::<Store<State>>();
     let temp_state = expect_context::<Store<TempState>>();
     let next_button = move |_| {
@@ -704,15 +703,15 @@ fn Game() -> impl IntoView {
                 // If it passes, do the apply state func and move on
                 let state_func = cr.state_change_func.unwrap().clone();
                 game_state.update(|gs| state_func(gs, args));
-                // If the state change func is applied, pop the current_cr off of the queue
-                temp_state.change_requests().update(|crs| {
-                    crs.pop_front();
-                });
             }
+            // If the state change func is applied, pop the current_cr off of the queue
+            // If we get to this point, we can assume the change request is applied
+            temp_state.change_requests().update(|crs| {
+                crs.pop_front();
+            });
         }
 
         temp_state.update(|ts| ts.clear_selected());
-
         // Only get the next player's change requests if the current change request queue is empty
         if !temp_state.change_requests().read().is_empty() {
             return;
@@ -720,6 +719,12 @@ fn Game() -> impl IntoView {
         console_log("Last cr");
 
         // Get next active player based off of current player
+        // TODO: Need phases for dawn dusk (maybe), but also waking up minions and demons to reveal
+        // themselves to each other. These are problematic because they are not tied to players,
+        // and thus not actively with the night order. They need to be inserted in there, maybe
+        // just as a player, or maybe resolve the system to not work off of a next active player,
+        // but maybe a next active event, that has an associated player? Might just have to redo
+        // the whole ordering system at some point
         let mut loop_break = false;
         loop {
             let currently_acting_player = temp_state.read().currently_acting_player;
@@ -728,14 +733,15 @@ fn Game() -> impl IntoView {
             let next_player = game_state
                 .read()
                 .get_next_active_player(currently_acting_player);
+            console_log(format!("Next Player is {:?}", next_player).as_str());
             match next_player {
-                // TODO: Each resolve function should actually return a list of change requests,
-                // each of which should be added to the queue
                 Some(p) => {
                     let next_crs = game_state.try_update(|gs| gs.resolve(p));
                     temp_state.currently_acting_player().set(Some(p));
                     // FIX: I think this can fail if the next cr is None, this fix is weird, figure
-                    // out when the none case can happen
+                    // out when the none case can happen. It's when a player doesn't have an
+                    // associated change request, which means something is broken. Meaning it's
+                    // okay to panic
                     match next_crs.unwrap() {
                         Some(next_crs) => {
                             temp_state
@@ -751,10 +757,10 @@ fn Game() -> impl IntoView {
                 }
                 // Switch to next step when get next active player yields None
                 None => {
-                    game_state.update(|gs| gs.next_step());
                     if loop_break {
                         break;
                     }
+                    game_state.update(|gs| gs.next_step());
                     loop_break = true;
                     // TODO: Should call the function again automatically
                 }
@@ -857,7 +863,7 @@ fn Player_Display() -> impl IntoView {
                                     {move || { player.role.to_string() }}
                                 </button>
                                 // Status effects
-                                <div class="text-[0.5rem] flex flex-col justify-center items-start absolute w-fit border left-1/2 -translate-x-1/2 top-9/10 ">
+                                <div class="text-[0.5rem] flex flex-row flex-wrap justify-center items-start absolute w-fit border left-1/2 -translate-x-1/2 top-9/10 ">
                                     {move || {
                                         let status_effects = game_state
                                             .with(|gs| gs.get_afflicted_statuses(i));
@@ -867,7 +873,7 @@ fn Player_Display() -> impl IntoView {
                                                 let str = status_effect.status_type.to_string();
                                                 view! {
                                                     // TODO: Standardize effect box sizes
-                                                    <p class="w-fit h-[1rem] text-center border border-solid m-[0%] rounded-full p-[5px] bg-[#ffff00]">
+                                                    <p class="size-fit text-center border border-solid m-[0%] rounded-full p-[5px] bg-[#ffff00]">
                                                         {str}
                                                     </p>
                                                 }

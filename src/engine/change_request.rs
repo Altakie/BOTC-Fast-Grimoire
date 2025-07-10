@@ -57,17 +57,18 @@ pub(crate) struct ChangeRequest {
         Option<Arc<dyn Fn(&State, &ChangeArgs) -> Result<bool, ()> + Send + Sync>>,
     pub(crate) state_change_func: Option<Arc<dyn Fn(&mut State, ChangeArgs) + Send + Sync>>,
     pub(crate) description: String,
+    pub(crate) clear: bool,
 }
 
-// TODO: Update this macro to actually return a vec, maybe
 #[macro_export]
 macro_rules! new_change_request {
-    ($ct:expr, $cf:expr, $scf:expr, $desc:expr) => {
+    ($ct:expr, $desc:expr, $cf:expr, $scf:expr) => {
         ChangeRequest {
             change_type: $ct,
+            description: $desc,
             check_func: Some(std::sync::Arc::new($cf)),
             state_change_func: Some(std::sync::Arc::new($scf)),
-            description: $desc,
+            clear: true,
         }
     };
     ($ct:expr, $desc:expr) => {
@@ -76,6 +77,16 @@ macro_rules! new_change_request {
             check_func: None,
             state_change_func: None,
             description: $desc,
+            clear: true,
+        }
+    };
+    (noclear: $ct:expr, $desc:expr, $cf:expr, $scf:expr) => {
+        ChangeRequest {
+            change_type: $ct,
+            description: $desc,
+            check_func: Some(std::sync::Arc::new($cf)),
+            state_change_func: Some(std::sync::Arc::new($scf)),
+            clear: false,
         }
     };
 }

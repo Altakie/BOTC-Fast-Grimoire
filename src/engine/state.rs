@@ -2,7 +2,7 @@
 pub(crate) mod log;
 use log::{DayPhase, Log};
 pub(crate) mod status_effects;
-use status_effects::StatusEffect;
+use status_effects::{StatusEffect, StatusType};
 
 use rand::{self, seq::SliceRandom};
 use reactive_stores::*;
@@ -40,9 +40,6 @@ pub enum Step {
 
 #[derive(Clone, Store)]
 pub(crate) struct State {
-    // TODO: Make players a store
-    #[store(key: String = |player| player.name.clone())]
-    // #[store]
     pub(crate) players: Vec<Player>,
     win_cond_i: Option<PlayerIndex>,
     status_effects: Vec<StatusEffect>,
@@ -104,7 +101,24 @@ impl State {
             .expect("Player should be in player array")
     }
 
-    // Should return true if the player was successfully killed, false if the player failed to die
+    /// Get the player's role for ability resolutions (which may differ from their actual role)
+    pub(crate) fn get_acting_role(&self, player_index: PlayerIndex) -> Role {
+        let role_ability_status = self
+            .get_afflicted_statuses(player_index)
+            .into_iter()
+            .find(|status| matches!(status.status_type, StatusType::OtherRoleAbility(_)));
+
+        if let Some(StatusEffect {
+            status_type: StatusType::OtherRoleAbility(role),
+            ..
+        }) = role_ability_status
+        {
+            return role;
+        }
+
+        return self.players[player_index].role;
+    }
+    /// Should return true if the player was successfully killed, false if the player failed to die
     pub(crate) fn kill_player(
         &mut self,
         attacking_player_index: PlayerIndex,
@@ -114,10 +128,10 @@ impl State {
         if self
             .get_afflicted_statuses(target_player_index)
             .iter()
-            .any(|s| match s.status_type.trim() {
-                "Death Protected" => true,
-                "Night Protected" if self.day_phase == DayPhase::Night => true,
-                "Demon Protected"
+            .any(|s| match s.status_type {
+                StatusType::DeathProtected => true,
+                StatusType::NightProtected if self.day_phase == DayPhase::Night => true,
+                StatusType::DemonProtected
                     if self.players[attacking_player_index].role.get_type()
                         == CharacterType::Demon =>
                 {
@@ -266,8 +280,6 @@ impl State {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::engine::player::Alignment;
-    use crate::engine::state::status_effects::{DEATH_PROTECTED, DEMON_PROTECTED, NIGHT_PROTECTED};
 
     // NOTE: Testing Utils
 
@@ -390,7 +402,7 @@ pub mod tests {
     fn kill_death_protected_player() {
         let mut game = setup_test_game().0;
 
-        game.add_status(DEATH_PROTECTED.to_string(), 1, 1);
+        game.add_status(StatusType::DeathProtected, 1, 1);
 
         game.kill_player(0, 0);
         assert!(game.players[0].dead);
@@ -399,7 +411,7 @@ pub mod tests {
         game.kill_player(2, 2);
         assert!(game.players[2].dead);
 
-        game.remove_status(DEATH_PROTECTED.to_string(), 1, 1);
+        game.remove_status(StatusType::DeathProtected, 1, 1);
         game.kill_player(1, 1);
         assert!(game.players[1].dead);
     }
@@ -409,7 +421,7 @@ pub mod tests {
         let mut game = setup_test_game().0;
 
         game.day_phase = DayPhase::Night;
-        game.add_status(NIGHT_PROTECTED.to_string(), 1, 1);
+        game.add_status(StatusType::NightProtected, 1, 1);
 
         game.kill_player(0, 0);
         assert!(game.players[0].dead);
@@ -427,7 +439,7 @@ pub mod tests {
     fn kill_demon_protected_player() {
         let mut game = setup_test_game().0;
 
-        game.add_status(DEMON_PROTECTED.to_string(), 1, 1);
+        game.add_status(StatusType::DemonProtected, 1, 1);
 
         let demon_index = game.win_cond_i.unwrap();
 
@@ -441,7 +453,7 @@ pub mod tests {
         game.kill_player(demon_index, 1);
         assert!(!game.players[1].dead);
 
-        game.remove_status(DEMON_PROTECTED.to_string(), 1, 1);
+        game.remove_status(StatusType::DemonProtected, 1, 1);
         game.kill_player(demon_index, 1);
         assert!(game.players[1].dead);
     }

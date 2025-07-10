@@ -5,6 +5,10 @@ use std::fmt::Display;
 #[derive(Clone, Copy, Hash, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub(crate) enum Role {
+    // Special Roles that are in every game
+    // DEMON,
+    // MINION,
+    // Normal Roles
     Investigator,
     Empath,
     Gossip,

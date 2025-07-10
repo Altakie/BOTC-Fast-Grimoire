@@ -1,29 +1,12 @@
 use crate::{
     engine::{
-        change_request::{ChangeRequest, ChangeType},
+        change_request::{ChangeArgs, ChangeRequest, ChangeType},
         player::{Alignment, Role},
-        state::{PlayerIndex, State},
+        state::{PlayerIndex, State, status_effects::StatusType},
     },
-    new_change_request,
+    new_change_request, unwrap_args_err, unwrap_args_panic,
 };
 use std::collections::HashMap;
-// pub(crate) fn resolve_night_1(&mut self) {
-//     self.day_phase = DayPhase::Night;
-//     // Order the roles in this game to get the order they should be woken up in (should be
-//     // unique to night 1)
-//     let ordered_player_indices = self.get_night_1_order(self.get_active_roles());
-//     // Wake each role up in order and show them the information they need to know, or the
-//     // choices that they get
-//     // For each choice:
-//     //      If that choice impacts the game state, change the game state accordingly
-//     //      If that choice tells the player info, give them that info
-//     //      Should be calling a generic method on the role class to get info on the role's
-//     //      ability
-//     // Once you have gone through all the roles, nothing to do: wake everyone up
-//     for i in ordered_player_indices.iter() {
-//         self.resolve_night_1_ability(*i);
-//     }
-// }
 
 fn get_role_order_night1(role: Role) -> usize {
     match role {
@@ -40,11 +23,11 @@ fn get_role_order_night1(role: Role) -> usize {
         // Role::Poppygrower => 10,
         // Role::Yaggababble => 11
         // Role::Magician => 12,
-        // Role::MINION => 13, TODO: Need to implement this shit
+        // Role::MINION => 13, // TODO: Need to implement this shit
         // Role::Snitch => 14,
         // Role::Lunatic => 15,
         // Role::Summoner => 16,
-        // Role::DEMON => 17, TODO: Need to implement this shit
+        // Role::DEMON => 17, // TODO: Need to implement this shit
         // Role::King => 18,
         // Role::Sailor => 19,
         // Role::Marionette => 20,
@@ -105,18 +88,15 @@ fn get_role_order_night1(role: Role) -> usize {
     }
 }
 impl State {
-    // TODO: Fix this function to work incrementally
-    // Grab only players with higher order from the player's array
-    // Check which one of the higher players is active
-    // Problem here is you can't deal with duplicates
-    // For this, just check their absolute order in the players array, if it is lower, ignore, if
-    // it is higher, add them (only do this once)
     pub(crate) fn get_next_active_night1(
         &self,
         previous_player: Option<PlayerIndex>,
     ) -> Option<PlayerIndex> {
         let prev_player_order = self.get_night_1_order(previous_player);
         let mut next_player: Option<(PlayerIndex, usize)> = None;
+
+        // TODO: Check for special roles
+
         for (player_index, _player) in self.players.iter().enumerate() {
             let order = self.get_night_1_order(Some(player_index));
             // Check that the player acts at night
@@ -170,7 +150,7 @@ impl State {
         player_index: Option<PlayerIndex>,
     ) -> Option<PlayerIndex> {
         let player_index = player_index?;
-        let role = self.players[player_index].role;
+        let role = self.get_acting_role(player_index);
         let order = match role {
             // Role::DUSK => 0,
             // Role::Lordoftyphon => 1,
@@ -342,6 +322,7 @@ impl State {
     //
     //     return self.get_order_from_map(order_map);
     // }
+
     pub(crate) fn get_night_order(&self, player_indices: Vec<PlayerIndex>) -> Vec<PlayerIndex> {
         // Go through all roles and assign each of them a number
         // Maps night_order to player index
@@ -467,94 +448,27 @@ impl Role {
         // letting the storyteller decide what number they should give
         // TODO: Implement abilities for every role
         match self {
-            Role::Investigator => {
-                // WARNING: Can't actually resolve this, this should be decided during setup
-                // TODO: Fix this
-                // Some(new_change_request!("Show Investigator smt))
-                todo!()
-            }
+            Role::Investigator => Some(washerwoman_librarian_investigator_ability(*self)),
             Role::Empath => Some(empath_ability(state, player_index)),
             // Role::Gossip => todo!(),      // Should wait till v2
             // Role::Innkeeper => todo!(),   // Should wait till v2
-            Role::Washerwoman => Some(washerwoman_ability()), // Setup
-            Role::Librarian => {
-                let message = "show librarian smth".to_string();
-                let change_type = ChangeType::Display;
-                Some(vec![new_change_request!(change_type, message)])
-            } // Setup
-            // Role::Chef => {
-            //     // Count pairs of evil players
-            //     // For each evil, player, check if the right player is evil, if yes, increment the
-            //     // pair count
-            //     let mut pair_count = 0;
-            //
-            //     for player_index in 0..self.players.len() {
-            //         let player = &self.players[player_index];
-            //         if player.alignment != Alignment::Evil {
-            //             continue;
-            //         }
-            //         let right_player = &self.players[self.right_player(player_index)];
-            //         if right_player.alignment == Alignment::Evil {
-            //             pair_count += 1;
-            //         }
-            //     }
-            //     println!("Chef Pair Count: {}", pair_count);
-            // }
-            // Role::Fortuneteller => todo!(), // Should be the same as ability from other nights, but
-            // // also need setup
-            // Role::Undertaker => {
-            //     // TODO: Should scan the log for the entire day yesterday
-            //     // If there was a execution event yesterday that resulted in death, grab the player
-            //     // from that event
-            //     // Grab that player's role and give it to the undertaker
-            //     todo!();
-            // }
-            // Role::Virgin => {
-            //     // Add a status effect that if someone nominates you, they die
-            //     // Maybe instead add this to the nominate method
-            //     todo!()
-            // }
-            // Role::Soldier => {
-            //     // Just add protected status effect and only remove upon death
-            //     self.add_status(StatusEffects::DemonProtected, player_index, player_index);
-            // }
-            // Role::Slayer => todo!(), // No night one ability
-            // Role::Mayor => {
-            //     // No night one ability, but add effect to yourself
-            //     self.add_status(StatusEffects::MayorBounceKill, player_index, player_index);
-            // }
-            // Role::Monk => todo!(), // No night one ability
-            // Role::Drunk => {
-            //     // WARNING: This one is a little difficult
-            //     // Maybe just add the role but make them drunk?
-            //     // Maybe during setup swap the drunk with another role if they are selected but
-            //     // give them a status effect as well?
-            //     todo!()
-            // } // Should be handled during setup, also gets mimiced
-            // // role's ability
-            // Role::Saint => todo!(),  // No night one ability
-            // Role::Butler => todo!(), // Status effect?, also same as normal ability
-            // Role::Recluse => {
-            //     // Status effect
-            //     self.add_status(StatusEffects::AppearsEvil, player_index, player_index);
-            // }
-            // Role::Spy => {
-            //     // Status effect and look at grimoire?
-            //     self.add_status(StatusEffects::AppearsEvil, player_index, player_index);
-            //     // Just tell the storyteller to let the spy look at the grimoire
-            //     todo!()
-            // }
-            // Role::Baron => todo!(),        // Should affect setup
-            // Role::Scarletwoman => todo!(), // Basically shouldn't happen night one
-            // Role::Poisoner => todo!(),     // Add poison to someone until next night, same as
-            // // normal ability
-            // Role::Imp => todo!(), // Nothing to do night one
-            // Role::Ravenkeeper => todo!(), // No night ability unless they die, same as normal
-            // ability
+            Role::Washerwoman => Some(washerwoman_librarian_investigator_ability(*self)),
+            Role::Librarian => Some(washerwoman_librarian_investigator_ability(*self)),
+            Role::Chef => Some(chef_ability(state)),
+            Role::Fortuneteller => Some(fortuneteller_ability(state)),
+            Role::Drunk => {
+                let role = state.get_acting_role(player_index);
+                role.resolve_night_1_ability(player_index, state)
+            }
+            Role::Butler => Some(butler_ability(player_index)),
+            Role::Spy => {
+                // Just tell the storyteller to let the spy look at the grimoire
+                Some(spy_ability())
+            }
+            Role::Poisoner => Some(poisoner_ability(player_index)), // Add poison to someone until next night, same as
+            // normal ability
             _ => None,
         }
-
-        // TODO: Method should wait until storyteller explicitly advances to the next phase
 
         // TODO: The event should be logged at some point
     }
@@ -608,7 +522,13 @@ impl Role {
 //         Role::Gossip => todo!(),    // wait for v2
 //         Role::Innkeeper => todo!(), // Wait for v2
 //         Role::Fortuneteller => todo!(),
-//         Role::Undertaker => todo!(),
+// Role::Undertaker => {
+//     // TODO: Should scan the log for the entire day yesterday
+//     // If there was a execution event yesterday that resulted in death, grab the player
+//     // from that event
+//     // Grab that player's role and give it to the undertaker
+//     todo!();
+// }
 //         Role::Monk => {
 //             // Give the target the demon protected status effect
 //             // TODO: Prompt the storyteller to choose a player
@@ -683,17 +603,274 @@ fn empath_ability(state: &State, player_index: PlayerIndex) -> Vec<ChangeRequest
     vec![new_change_request!(change_type, message)]
 }
 
-fn washerwoman_ability() -> Vec<ChangeRequest> {
-    // TODO: Perhaps need find status method
-    let message = "Show washerwoman the correct roles".to_string();
+fn washerwoman_librarian_investigator_ability(role: Role) -> Vec<ChangeRequest> {
+    // TODO: Perhaps need find status method, or highlight the players with these statuses
+    let message = format!("Show {} the correct roles", role);
     let change_type = ChangeType::Display;
 
     vec![new_change_request!(change_type, message)]
 }
 
+fn chef_ability(state: &State) -> Vec<ChangeRequest> {
+    // Count pairs of evil players
+    // For each evil, player, check if the right player is evil, if yes, increment the
+    // pair count
+    let change_type = ChangeType::Display;
+    let mut pair_count = 0;
+
+    for player_index in 0..state.players.len() {
+        let player = &state.players[player_index];
+        if player.alignment != Alignment::Evil {
+            continue;
+        }
+        let right_player = &state.players[state.right_player(player_index)];
+        if right_player.alignment == Alignment::Evil {
+            pair_count += 1;
+        }
+    }
+    let message = format!(
+        "Show the chef that there are {} pairs of evil players",
+        pair_count
+    );
+
+    vec![new_change_request!(change_type, message)]
+}
+
+fn fortuneteller_ability(state: &State) -> Vec<ChangeRequest> {
+    // TODO: Prompt for a choice of two players
+    // Should yield True or false based on whether at least one of those players is a demon or has the red
+    // herring status effect
+    // Chained change effects, but also need a way to communicate between them?
+    // Maybe don't clear selected players between change effects unless specified?
+    // Could add bool for this
+    // Not exactly actually, message should switch when two players are selected?
+
+    let message1 = "Prompt the FortuneTeller to point to two players";
+
+    let change_type1 = ChangeType::ChoosePlayers(2);
+    let change_type2 = ChangeType::Display;
+
+    // let check_func = move |state, args| {};
+
+    // let state_change_func = move |state, args| {};
+
+    todo!()
+}
+
+fn butler_ability(player_index: PlayerIndex) -> Vec<ChangeRequest> {
+    // Clean up the old butler master status effect (if there is one), prompt for another
+    // player, and give them the butler master status effect
+
+    let message = "Prompt the butler to pick a player to be their master".to_string();
+    let change_type = ChangeType::ChoosePlayers(1);
+
+    let check_func = move |_: &State, args: &ChangeArgs| -> Result<bool, ()> {
+        let target_players = unwrap_args_err!(args, ChangeArgs::PlayerIndices(v) => v);
+
+        if target_players.len() != 1 {
+            return Err(());
+        }
+
+        // Check that the butler is not picking themselves
+        if target_players[0] == player_index {
+            return Ok(false);
+        }
+
+        return Ok(true);
+    };
+
+    let state_change_func = move |state: &mut State, args: ChangeArgs| {
+        // Check if there are any butler master status effects inflicted by this player and clear
+        // them
+        let prev_effects = state.get_inflicted_statuses(player_index);
+
+        let prev_effect = prev_effects
+            .iter()
+            .find(|se| se.status_type == StatusType::ButlerMaster);
+
+        if let Some(prev_effect) = prev_effect {
+            state.remove_status(
+                prev_effect.status_type,
+                prev_effect.source_player_index,
+                prev_effect.affected_player_index,
+            );
+        }
+
+        let target_player_index = unwrap_args_panic!(args, ChangeArgs::PlayerIndices(pv) => pv)[0];
+        state.add_status(StatusType::ButlerMaster, player_index, target_player_index);
+    };
+
+    vec![new_change_request!(
+        change_type,
+        message,
+        check_func,
+        state_change_func
+    )]
+}
+
+fn spy_ability() -> Vec<ChangeRequest> {
+    let change_type = ChangeType::Display;
+    let message = "Show the Spy the grimoire".to_string();
+
+    vec![new_change_request!(change_type, message)]
+}
+
+// TODO: Merge abilities that add a new status every night (monk, poisoner, )
+fn poisoner_ability(player_index: PlayerIndex) -> Vec<ChangeRequest> {
+    // Clean up the old poisoned effect, prompt for another
+    // player, and give them the poisoned effect
+
+    let message = "Prompt the poisoner to pick a player to poison".to_string();
+    let change_type = ChangeType::ChoosePlayers(1);
+
+    let check_func = move |_: &State, args: &ChangeArgs| -> Result<bool, ()> {
+        let target_players = unwrap_args_err!(args, ChangeArgs::PlayerIndices(v) => v);
+
+        if target_players.len() != 1 {
+            return Err(());
+        }
+
+        return Ok(true);
+    };
+
+    let state_change_func = move |state: &mut State, args: ChangeArgs| {
+        // Check if there are any poisoned status effects inflicted by this player and clear
+        // them
+        let prev_effects = state.get_inflicted_statuses(player_index);
+
+        let prev_effect = prev_effects
+            .iter()
+            .find(|se| se.status_type == StatusType::Poisoned);
+
+        if let Some(prev_effect) = prev_effect {
+            state.remove_status(
+                prev_effect.status_type,
+                prev_effect.source_player_index,
+                prev_effect.affected_player_index,
+            );
+        }
+
+        let target_player_index = unwrap_args_panic!(args, ChangeArgs::PlayerIndices(pv) => pv)[0];
+        state.add_status(StatusType::Poisoned, player_index, target_player_index);
+    };
+
+    vec![new_change_request!(
+        change_type,
+        message,
+        check_func,
+        state_change_func
+    )]
+}
+
+fn monk_ability(player_index: PlayerIndex) -> Vec<ChangeRequest> {
+    let change_type = ChangeType::ChoosePlayers(1);
+    let message = "Have the monk select a player to protect".to_string();
+
+    let check_func = move |_: &State, args: &ChangeArgs| -> Result<bool, ()> {
+        let target_players = unwrap_args_err!(args, ChangeArgs::PlayerIndices(v) => v);
+
+        if target_players.len() != 1 {
+            return Err(());
+        }
+
+        // Make sure the monk can't protect themselves
+        if target_players[0] == player_index {
+            return Ok(false);
+        }
+
+        return Ok(true);
+    };
+
+    let state_change_func = move |state: &mut State, args: ChangeArgs| {
+        // Check if there are any poisoned status effects inflicted by this player and clear
+        // them
+        let prev_effects = state.get_inflicted_statuses(player_index);
+
+        let prev_effect = prev_effects
+            .iter()
+            .find(|se| se.status_type == StatusType::DemonProtected);
+
+        if let Some(prev_effect) = prev_effect {
+            state.remove_status(
+                prev_effect.status_type,
+                prev_effect.source_player_index,
+                prev_effect.affected_player_index,
+            );
+        }
+
+        let target_player_index = unwrap_args_panic!(args, ChangeArgs::PlayerIndices(pv) => pv)[0];
+        state.add_status(
+            StatusType::DemonProtected,
+            player_index,
+            target_player_index,
+        );
+    };
+
+    vec![new_change_request!(
+        change_type,
+        message,
+        check_func,
+        state_change_func
+    )]
+}
+
+// TODO: Most demons kill, so maybe add a generic demon kill ability at some point
+fn imp_ability(player_index: PlayerIndex) -> Vec<ChangeRequest> {
+    let change_type = ChangeType::ChoosePlayers(1);
+    let message = "".to_string();
+
+    let check_func = move |_: &State, args: &ChangeArgs| -> Result<bool, ()> {
+        let target_players = unwrap_args_err!(args, ChangeArgs::PlayerIndices(v) => v);
+
+        if target_players.len() != 1 {
+            return Err(());
+        }
+
+        return Ok(true);
+    };
+
+    let state_change_func = move |state: &mut State, args: ChangeArgs| {
+        // Check if there are any poisoned status effects inflicted by this player and clear
+        // them
+        let prev_effects = state.get_inflicted_statuses(player_index);
+
+        let prev_effect = prev_effects
+            .iter()
+            .find(|se| se.status_type == StatusType::DemonProtected);
+
+        if let Some(prev_effect) = prev_effect {
+            state.remove_status(
+                prev_effect.status_type,
+                prev_effect.source_player_index,
+                prev_effect.affected_player_index,
+            );
+        }
+
+        let target_player_index = unwrap_args_panic!(args, ChangeArgs::PlayerIndices(pv) => pv)[0];
+        state.add_status(
+            StatusType::DemonProtected,
+            player_index,
+            target_player_index,
+        );
+    };
+
+    vec![new_change_request!(
+        change_type,
+        message,
+        check_func,
+        state_change_func
+    )]
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::{Role, engine::state::tests::setup_test_game};
+    use crate::{
+        Role,
+        engine::{
+            night::{chef_ability, empath_ability},
+            state::{PlayerIndex, tests::setup_test_game},
+        },
+    };
     #[test]
     fn test_get_order() {
         let game = setup_test_game().0;
@@ -720,4 +897,292 @@ mod tests {
         next_player_index = game.get_next_active_player(next_player_index);
         assert!(next_player_index.is_none());
     }
+
+    #[test]
+    fn test_empath_ability() {
+        let test_cases = [
+            (
+                "Empath 0 evil neighbors",
+                vec![Role::Investigator, Role::Empath, Role::Saint],
+                vec![],
+                0,
+            ),
+            (
+                "Empath dead right neighbor",
+                vec![
+                    Role::Investigator,
+                    Role::Empath,
+                    Role::Saint,
+                    Role::Poisoner,
+                ],
+                vec![2],
+                1,
+            ),
+            (
+                "Empath dead left neighbor",
+                vec![
+                    Role::Investigator,
+                    Role::Empath,
+                    Role::Saint,
+                    Role::Chef,
+                    Role::Scarletwoman,
+                ],
+                vec![0],
+                1,
+            ),
+            (
+                "Empath right evil neighbor",
+                vec![Role::Investigator, Role::Empath, Role::Baron],
+                vec![],
+                1,
+            ),
+            (
+                "Empath dead right neighbor initially evil",
+                vec![
+                    Role::Investigator,
+                    Role::Empath,
+                    Role::Baron,
+                    Role::Saint,
+                    Role::Washerwoman,
+                ],
+                vec![2],
+                0,
+            ),
+            (
+                "Empath dead right neighbor initially evil, new neighbor also evil",
+                vec![
+                    Role::Investigator,
+                    Role::Empath,
+                    Role::Baron,
+                    Role::Saint,
+                    Role::Washerwoman,
+                ],
+                vec![2],
+                0,
+            ),
+            (
+                "Empath left evil neighbor",
+                vec![Role::Scarletwoman, Role::Empath, Role::Saint],
+                vec![],
+                1,
+            ),
+            (
+                "Empath dead left evil neighbor initially evil",
+                vec![
+                    Role::Scarletwoman,
+                    Role::Empath,
+                    Role::Saint,
+                    Role::Chef,
+                    Role::Investigator,
+                ],
+                vec![0],
+                0,
+            ),
+            (
+                "Empath dead left evil neighbor initially evil, new neighbor also evil",
+                vec![
+                    Role::Scarletwoman,
+                    Role::Empath,
+                    Role::Saint,
+                    Role::Chef,
+                    Role::Poisoner,
+                ],
+                vec![0],
+                1,
+            ),
+            (
+                "Empath both evil neighbors",
+                vec![Role::Poisoner, Role::Empath, Role::Imp],
+                vec![],
+                2,
+            ),
+            (
+                "Empath initallly both evil neighbors, right dead",
+                vec![
+                    Role::Poisoner,
+                    Role::Empath,
+                    Role::Imp,
+                    Role::Chef,
+                    Role::Investigator,
+                ],
+                vec![0],
+                1,
+            ),
+            (
+                "Empath initallly both evil neighbors, left dead",
+                vec![
+                    Role::Poisoner,
+                    Role::Empath,
+                    Role::Imp,
+                    Role::Chef,
+                    Role::Investigator,
+                ],
+                vec![2],
+                1,
+            ),
+            (
+                "Empath initallly both evil neighbors, both dead",
+                vec![
+                    Role::Poisoner,
+                    Role::Empath,
+                    Role::Imp,
+                    Role::Chef,
+                    Role::Investigator,
+                ],
+                vec![0, 2],
+                0,
+            ),
+            // TODO: I want the storyteller to be aware in some kind of way that an ability is
+            // affecting the information
+            // Perhaps duplicates of information passed out?
+            // Perhaps just a reminder that something is amiss, to check the roles?
+            // Need a cleaner solution for recluse and spy rather than just calling them evil
+            // So actually, this is correct, it should give them the truth of the matter, BUT ALSO
+            // NOTIFY THE STORYTELLER THAT THE RECLUSE OR SPY CAN AFFECT INFORMATION, GIVING THE
+            // STORYTELLER THE CHOICE TO DO THAT IF THEY WISH
+            // Maybe add a star to the message and highlight the relevant statuses on select?
+            // Perhaps each change effect should also come with statues to highlight?
+            (
+                "Empath recluse evil neighbor",
+                vec![Role::Investigator, Role::Empath, Role::Recluse],
+                vec![],
+                0,
+            ),
+            (
+                "Empath spy evil neighbor",
+                vec![Role::Spy, Role::Empath, Role::Investigator],
+                vec![],
+                1,
+            ),
+        ];
+
+        for test_case in test_cases {
+            // Create clean environment for each test
+            let mut game = setup_test_game().0;
+            let mut convert_player = |player_index: PlayerIndex| {
+                game.players[player_index].role = test_case.1[player_index];
+                game.players[player_index].alignment =
+                    test_case.1[player_index].get_default_alignment();
+            };
+
+            for (i, _) in test_case.1.iter().enumerate() {
+                convert_player(i);
+            }
+
+            for i in test_case.2 {
+                game.players[i].dead = true;
+            }
+
+            let desired_num = test_case.3;
+
+            let empath_message = empath_ability(&game, 1)[0].description.clone();
+            let desired_message = format!("Empath has {} evil neighbors", desired_num);
+            assert!(
+                empath_message == desired_message,
+                "{} failed. Expected {} evil neighbors, got {}",
+                test_case.0,
+                desired_num,
+                empath_message
+            )
+        }
+    }
+
+    #[test]
+    fn test_chef_ability() {
+        let mut game = setup_test_game().0;
+
+        let test_cases = [
+            (
+                "0 Chef Pairs",
+                [
+                    Role::Imp,
+                    Role::Chef,
+                    Role::Spy,
+                    Role::Washerwoman,
+                    Role::Empath,
+                ],
+                0,
+            ),
+            (
+                "1 Chef Pair",
+                [
+                    Role::Chef,
+                    Role::Imp,
+                    Role::Spy,
+                    Role::Washerwoman,
+                    Role::Empath,
+                ],
+                1,
+            ),
+            (
+                "1 Chef Pair with Wrap",
+                [
+                    Role::Imp,
+                    Role::Chef,
+                    Role::Washerwoman,
+                    Role::Empath,
+                    Role::Spy,
+                ],
+                1,
+            ),
+            (
+                "3 Evil Players, two sitting together other separate",
+                [
+                    Role::Chef,
+                    Role::Imp,
+                    Role::Spy,
+                    Role::Washerwoman,
+                    Role::Poisoner,
+                ],
+                1,
+            ),
+            (
+                "3 Evil in a row",
+                [
+                    Role::Imp,
+                    Role::Chef,
+                    Role::Washerwoman,
+                    Role::Baron,
+                    Role::Spy,
+                ],
+                2,
+            ),
+        ];
+
+        for test_case in test_cases {
+            let mut convert_player = |player_index: PlayerIndex| {
+                game.players[player_index].role = test_case.1[player_index];
+                game.players[player_index].alignment =
+                    test_case.1[player_index].get_default_alignment();
+            };
+
+            for i in 0..5 {
+                convert_player(i);
+            }
+
+            let chef_message = chef_ability(&game)[0].description.clone();
+            let desired_message = format!(
+                "Show the chef that there are {} pairs of evil players",
+                test_case.2
+            );
+            assert!(
+                chef_message == desired_message,
+                "{} failed. Expected {} pairs of evil players, got {}",
+                test_case.0,
+                test_case.2,
+                chef_message
+            )
+        }
+    }
+
+    // TODO: Test all night abilities (both check funcs and state application funcs)
+    // Imp
+    // Empath
+    // Monk
+    // Poisoner
+    // Butler
+    // Scarletwoman
+    // FortuneTeller
+    // Ravenkeeper
+    // Undertaker
 }
