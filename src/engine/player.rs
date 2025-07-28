@@ -131,7 +131,13 @@ pub(crate) enum CharacterType {
 }
 
 // TODO: How am I actually going to do this
-//
+// Players should have default behavior
+// Wait what is our problem right now
+// The code isn't scalable because it isn't modular
+// The state should handle interactions between players and the interface but ultimately players
+// should manage their own state, and the state should only tell them how to modify their state
+// Thus players should have default behavior that lets them modify this state, but this behavior
+// should change based on their role and what status effects they have inflicted
 #[derive(Store, Clone)]
 pub(crate) struct Player {
     pub(crate) name: String,
