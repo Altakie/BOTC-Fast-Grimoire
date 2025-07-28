@@ -1,3 +1,14 @@
+// TODO: Realistically we are facing a couple major issues right now that are stopping us from
+// implementing abilites
+// 1. A change type that doesn't require storyteller intervention and is skipped by the interface
+//    when it is detected (nothing pops up, the change is just applied)
+//    - Really easy, just add another change type and have the next button detect it, apply the
+//    change func, and skip to the next change effect without stopping
+// 2. Some abilites need the log to be implemented so they can scan it
+// 3. Some abilities need change effects to be able to be chained, but also somehow share
+//    information
+//  TODO: Think of clever solutions for all of these
+
 use crate::{
     engine::{
         change_request::{ChangeArgs, ChangeRequest, ChangeType},
@@ -782,7 +793,7 @@ fn monk_ability(player_index: PlayerIndex) -> Vec<ChangeRequest> {
     };
 
     let state_change_func = move |state: &mut State, args: ChangeArgs| {
-        // Check if there are any poisoned status effects inflicted by this player and clear
+        // Check if there are any protected status effects inflicted by this player and clear
         // them
         let prev_effects = state.get_inflicted_statuses(player_index);
 
@@ -830,28 +841,10 @@ fn imp_ability(player_index: PlayerIndex) -> Vec<ChangeRequest> {
     };
 
     let state_change_func = move |state: &mut State, args: ChangeArgs| {
-        // Check if there are any poisoned status effects inflicted by this player and clear
-        // them
-        let prev_effects = state.get_inflicted_statuses(player_index);
-
-        let prev_effect = prev_effects
-            .iter()
-            .find(|se| se.status_type == StatusType::DemonProtected);
-
-        if let Some(prev_effect) = prev_effect {
-            state.remove_status(
-                prev_effect.status_type,
-                prev_effect.source_player_index,
-                prev_effect.affected_player_index,
-            );
-        }
-
         let target_player_index = unwrap_args_panic!(args, ChangeArgs::PlayerIndices(pv) => pv)[0];
-        state.add_status(
-            StatusType::DemonProtected,
-            player_index,
-            target_player_index,
-        );
+        state.kill_player(player_index, target_player_index);
+        // TODO: If the imp kills themselves, TRIGGER ANOTHER CHANGE REQUEST THAT ALLOWS THE
+        // STORYTELLER TO PICK A NEW IMP
     };
 
     vec![new_change_request!(
@@ -860,6 +853,17 @@ fn imp_ability(player_index: PlayerIndex) -> Vec<ChangeRequest> {
         check_func,
         state_change_func
     )]
+}
+
+fn ravenkeeper_ability() -> Vec<ChangeRequest> {
+    // TODO: Need to do this somewhere else, but when the ravenkeeper dies, set their ability to
+    // active
+    // Perhaps check here if the ravenkeeper died and if their ability is active, and skip if not?
+    // Change Request could be no storyteller intervention, which needs to be added anyway
+    // Also, this is really simple, maybe doesn't even need to be handled by the game, could just
+    // ask the storyteller to do it
+    // Or could hide display and display the role name
+    todo!()
 }
 
 #[cfg(test)]

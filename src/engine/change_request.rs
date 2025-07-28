@@ -9,7 +9,7 @@ pub(crate) enum ChangeType {
     ChoosePlayers(usize),
     ChooseRoles(usize),
     Voting,
-    // Display
+    NoStoryteller,
     Display,
 }
 

@@ -667,66 +667,84 @@ fn Game() -> impl IntoView {
     let game_state = expect_context::<Store<State>>();
     let temp_state = expect_context::<Store<TempState>>();
     let next_button = move |_| {
-        // If there is a change request in the queue, process it
-        if !temp_state.change_requests().read().is_empty() {
-            let cr = temp_state.change_requests().read().front().unwrap().clone();
-            // Do check func and return early if it doesn't pass
-            let args = match cr.change_type {
-                ChangeType::ChoosePlayers(_) => Some(ChangeArgs::PlayerIndices(
-                    temp_state.selected_players().get(),
-                )),
-                ChangeType::ChooseRoles(_) => {
-                    Some(ChangeArgs::Roles(temp_state.selected_roles().get()))
-                }
-                _ => None,
-            };
+        // TODO: This function is too complicated and I don't like it
+        // Want to make the logic a little simpler so it is easier to debug
+        // Break it up into multiple functions
+        // Maybe a clean up func at the end
+        // Maybe check check func and a apply state func function? Could be good to split them
+        // because there is not always a change func and state change func
+        let mut loop_break = false;
+        loop {
+            // If there is a change request in the queue, process it
+            if !temp_state.change_requests().read().is_empty() {
+                let cr = temp_state.change_requests().read().front().unwrap().clone();
+                // Do check func and return early if it doesn't pass
+                let args = match &cr.change_type {
+                    ChangeType::ChoosePlayers(_) => Some(ChangeArgs::PlayerIndices(
+                        temp_state.selected_players().get(),
+                    )),
+                    ChangeType::ChooseRoles(_) => {
+                        Some(ChangeArgs::Roles(temp_state.selected_roles().get()))
+                    }
+                    _ => None,
+                };
 
-            // Only apply funcs if change_type requires action
-            if args.is_some() {
-                let args = args.unwrap();
-                let check_func = cr.check_func.clone();
-                let res = game_state.with(|gs| {
-                    let cf = check_func.unwrap().clone();
-                    cf(gs, &args)
-                });
-                match res {
-                    Ok(boolean) => {
-                        if boolean {
-                        } else {
+                // Only apply funcs if change_type requires action
+                if let Some(args) = args {
+                    let check_func = cr.check_func.clone();
+                    let res = game_state.with(|gs| {
+                        let cf = check_func.unwrap().clone();
+                        cf(gs, &args)
+                    });
+                    match res {
+                        Ok(boolean) => {
+                            if boolean {
+                            } else {
+                                return;
+                            }
+                        }
+                        Err(()) => {
                             return;
                         }
                     }
-                    Err(()) => {
-                        return;
-                    }
+                    // If it passes, do the apply state func and move on
+                    let state_func = cr.state_change_func.unwrap().clone();
+                    game_state.update(|gs| state_func(gs, args));
+                } else if let ChangeRequest {
+                    change_type: ChangeType::NoStoryteller,
+                    state_change_func: Some(change_func),
+                    ..
+                } = cr
+                {
+                    // TODO: Apply the state change func and skip to the next thing without another
+                    // press of the button
+                    // Current problem: this will be added to the queue, but will not automatically
+                    // call the function again
+                    // Can be fixed by making this a loop and having it not return
+
+                    todo!()
                 }
-                // If it passes, do the apply state func and move on
-                let state_func = cr.state_change_func.unwrap().clone();
-                game_state.update(|gs| state_func(gs, args));
+                // If the state change func is applied, pop the current_cr off of the queue
+                // If we get to this point, we can assume the change request is applied
+                temp_state.change_requests().update(|crs| {
+                    crs.pop_front();
+                });
             }
-            // If the state change func is applied, pop the current_cr off of the queue
-            // If we get to this point, we can assume the change request is applied
-            temp_state.change_requests().update(|crs| {
-                crs.pop_front();
-            });
-        }
 
-        temp_state.update(|ts| ts.clear_selected());
-        // Only get the next player's change requests if the current change request queue is empty
-        if !temp_state.change_requests().read().is_empty() {
-            return;
-        }
-        console_log("Last cr");
+            temp_state.update(|ts| ts.clear_selected());
+            // Only get the next player's change requests if the current change request queue is empty
+            if !temp_state.change_requests().read().is_empty() {
+                return;
+            }
+            console_log("Last cr");
 
-        // Get next active player based off of current player
-        // TODO: Need phases for dawn dusk (maybe), but also waking up minions and demons to reveal
-        // themselves to each other. These are problematic because they are not tied to players,
-        // and thus not actively with the night order. They need to be inserted in there, maybe
-        // just as a player, or maybe resolve the system to not work off of a next active player,
-        // but maybe a next active event, that has an associated player? Might just have to redo
-        // the whole ordering system at some point
-        let mut loop_break = false;
-        loop {
+            // Get next active player based off of current player
+            // TODO: Need phases for dawn dusk (maybe), but also waking up minions and demons to reveal
+            // themselves to each other. These are problematic because they are not tied to players,
+            // and thus not actively with the night order. They need to be inserted in there, maybe
+            // just as a player, or maybe resolve the system to not work off of a next active player,
+            // but maybe a next active event, that has an associated player? Might just have to redo
+            // the whole ordering system at some point
             let currently_acting_player = temp_state.read().currently_acting_player;
             temp_state.update(|ts| ts.reset());
             // Check for next active player
@@ -747,7 +765,7 @@ fn Game() -> impl IntoView {
                             temp_state
                                 .change_requests()
                                 .update(|crs| crs.extend(next_crs));
-                            break;
+                            // Should not break
                         }
                         None => {
                             console_error("Next Change Request is none");
@@ -762,7 +780,6 @@ fn Game() -> impl IntoView {
                     }
                     game_state.update(|gs| gs.next_step());
                     loop_break = true;
-                    // TODO: Should call the function again automatically
                 }
             }
         }
