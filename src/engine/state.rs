@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use crate::{
     engine::{
         change_request::ChangeRequest,
-        player::{CharacterType, Player, Role},
+        player::{CharacterType, Player, Roles},
     },
     initialization::Script,
 };
@@ -52,7 +52,7 @@ pub(crate) struct State {
 
 impl State {
     pub(crate) fn new(
-        mut roles: Vec<Role>,
+        mut roles: Vec<Roles>,
         player_names: Vec<String>,
         script: Script,
     ) -> Result<Self, ()> {
@@ -102,7 +102,7 @@ impl State {
     }
 
     /// Get the player's role for ability resolutions (which may differ from their actual role)
-    pub(crate) fn get_acting_role(&self, player_index: PlayerIndex) -> Role {
+    pub(crate) fn get_acting_role(&self, player_index: PlayerIndex) -> Roles {
         let role_ability_status = self
             .get_afflicted_statuses(player_index)
             .into_iter()
@@ -283,13 +283,13 @@ pub mod tests {
 
     // NOTE: Testing Utils
 
-    pub(crate) fn setup_test_game() -> (State, Vec<Role>) {
+    pub(crate) fn setup_test_game() -> (State, Vec<Roles>) {
         let roles = vec![
-            Role::Investigator,
-            Role::Innkeeper,
-            Role::Imp,
-            Role::Chef,
-            Role::Poisoner,
+            Roles::Investigator,
+            Roles::Innkeeper,
+            Roles::Imp,
+            Roles::Chef,
+            Roles::Poisoner,
         ];
         let player_names = vec![
             String::from("P1"),

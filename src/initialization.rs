@@ -1,4 +1,4 @@
-use crate::engine::player::{CharacterType, Role};
+use crate::engine::player::{CharacterType, Roles};
 
 use serde_derive::{Deserialize, Serialize};
 
@@ -14,7 +14,7 @@ struct Metadata {
 #[serde(untagged)]
 enum ScriptEntry {
     Metadata(Metadata),
-    Role(Role),
+    Role(Roles),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -22,12 +22,12 @@ pub(crate) struct ScriptJson(Vec<ScriptEntry>);
 
 #[derive(Clone)]
 pub(crate) struct Script {
-    pub(crate) roles: Vec<Role>,
+    pub(crate) roles: Vec<Roles>,
 }
 
 impl Script {
     pub(crate) fn new_from_json(json: ScriptJson) -> Self {
-        let mut roles: Vec<Role> = vec![];
+        let mut roles: Vec<Roles> = vec![];
         for entry in json.0 {
             match entry {
                 ScriptEntry::Metadata(_metadata) => (),
@@ -144,17 +144,17 @@ impl CharacterTypeCounts {
         }
     }
 
-    pub(crate) fn on_choose(&mut self, role: Role) {
+    pub(crate) fn on_choose(&mut self, role: Roles) {
         self.role_effects(role, 1);
     }
 
-    pub(crate) fn on_remove(&mut self, role: Role) {
+    pub(crate) fn on_remove(&mut self, role: Roles) {
         self.role_effects(role, -1);
     }
 
-    fn role_effects(&mut self, role: Role, multiplier: isize) {
+    fn role_effects(&mut self, role: Roles, multiplier: isize) {
         match role {
-            Role::Baron => {
+            Roles::Baron => {
                 let num = 2 * multiplier;
                 self.outsiders += num;
                 self.townsfolk -= num;

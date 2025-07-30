@@ -1,5 +1,5 @@
 use super::{
-    player::Role,
+    player::Roles,
     state::{PlayerIndex, State},
 };
 use std::sync::Arc;
@@ -16,7 +16,7 @@ pub(crate) enum ChangeType {
 #[derive(Debug, Clone)]
 pub(crate) enum ChangeArgs {
     PlayerIndices(Vec<PlayerIndex>),
-    Roles(Vec<Role>),
+    Roles(Vec<Roles>),
 }
 
 #[macro_export]

@@ -13,7 +13,7 @@ use initialization::{CharacterTypeCounts, Script, ScriptJson};
 mod engine;
 use engine::{
     change_request::{ChangeArgs, ChangeRequest, ChangeType},
-    player::{CharacterType, Player, Role},
+    player::{CharacterType, Player, Roles},
     state::{PlayerIndex, State, StateStoreFields, Step},
 };
 
@@ -44,22 +44,22 @@ enum InitializationStage {
 fn App() -> impl IntoView {
     let initialization_stage = RwSignal::new(InitializationStage::Start);
     let player_names = RwSignal::new(Vec::<String>::new());
-    let roles = RwSignal::new(Vec::<Role>::new());
+    let roles = RwSignal::new(Vec::<Roles>::new());
     let script = RwSignal::new(Script { roles: vec![] });
     provide_context(script);
 
     // NOTE: Debug only
     if DEBUG {
         roles.set(vec![
-            Role::Washerwoman,
-            Role::Investigator,
-            Role::Librarian,
-            Role::Fortuneteller,
+            Roles::Washerwoman,
+            Roles::Investigator,
+            Roles::Librarian,
+            Roles::Fortuneteller,
             // Role::Monk,
-            Role::Drunk,
-            Role::Empath,
-            Role::Spy,
-            Role::Imp,
+            Roles::Drunk,
+            Roles::Empath,
+            Roles::Spy,
+            Roles::Imp,
         ]);
 
         player_names.set(vec![
@@ -340,7 +340,7 @@ fn RoleChooser(
     setup_stage: WriteSignal<InitializationStage>,
     num_players: usize,
     script: ReadSignal<Script>,
-    roles: RwSignal<Vec<Role>>,
+    roles: RwSignal<Vec<Roles>>,
     next_setup_stage: InitializationStage,
 ) -> impl IntoView {
     // Iterate through roles in script
@@ -353,7 +353,7 @@ fn RoleChooser(
         RwSignal::new(CharacterTypeCounts::new(num_players).unwrap());
     let curr_character_type_counts = RwSignal::new(CharacterTypeCounts::new_empty());
 
-    let role_button = move |role: Role| {
+    let role_button = move |role: Roles| {
         let selected = RwSignal::new(false);
         view! {
             <button
@@ -484,7 +484,7 @@ struct TempState {
     selected_player: Option<PlayerIndex>,
     change_requests: VecDeque<ChangeRequest>,
     selected_players: Vec<PlayerIndex>,
-    selected_roles: Vec<Role>,
+    selected_roles: Vec<Roles>,
     currently_acting_player: Option<PlayerIndex>,
 }
 
@@ -503,7 +503,7 @@ impl TempState {
 }
 
 #[component]
-fn GameInterface(roles: Vec<Role>, player_names: Vec<String>, script: Script) -> impl IntoView {
+fn GameInterface(roles: Vec<Roles>, player_names: Vec<String>, script: Script) -> impl IntoView {
     // Create a new game using the data we have just collected from the user
     let state = Store::new(State::new(roles, player_names, script).unwrap());
     provide_context(state);
