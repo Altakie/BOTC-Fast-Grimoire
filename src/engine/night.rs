@@ -12,14 +12,14 @@
 use crate::{
     engine::{
         change_request::{ChangeArgs, ChangeRequest, ChangeType},
-        player::{Alignment, Role},
+        player::{Alignment, Roles},
         state::{PlayerIndex, State, status_effects::StatusType},
     },
     new_change_request, unwrap_args_err, unwrap_args_panic,
 };
 use std::collections::HashMap;
 
-fn get_role_order_night1(role: Role) -> usize {
+fn get_role_order_night1(role: Roles) -> usize {
     match role {
         // Role::DUSK => 0,
         // Role::Lordoftyphon => 1,
@@ -47,7 +47,7 @@ fn get_role_order_night1(role: Role) -> usize {
         // Role::Lilmonsta => 23,
         // Role::Lleech => 24,
         // Role::Xaan => 25,
-        Role::Poisoner => 26,
+        Roles::Poisoner => 26,
         // Role::Widow => 27,
         // Role::Courtier => 28,
         // Role::Wizard => 29,
@@ -66,13 +66,13 @@ fn get_role_order_night1(role: Role) -> usize {
         // Role::Huntsman => 42,
         // Role::Damsel => 43,
         // Role::Amnesiac => 44,
-        Role::Washerwoman => 45,
-        Role::Librarian => 46,
-        Role::Investigator => 47,
-        Role::Chef => 48,
-        Role::Empath => 49,
-        Role::Fortuneteller => 50,
-        Role::Butler => 51,
+        Roles::Washerwoman => 45,
+        Roles::Librarian => 46,
+        Roles::Investigator => 47,
+        Roles::Chef => 48,
+        Roles::Empath => 49,
+        Roles::Fortuneteller => 50,
+        Roles::Butler => 51,
         // Role::Grandmother => 52,
         // Role::Clockmaker => 53,
         // Role::Dreamer => 54,
@@ -86,7 +86,7 @@ fn get_role_order_night1(role: Role) -> usize {
         // Role::Bountyhunter => 62,
         // Role::Nightwatchman => 63,
         // Role::Cultleader => 64,
-        Role::Spy => 65,
+        Roles::Spy => 65,
         // Role::Ogre => 66,
         // Role::Highpriestess => 67,
         // Role::General => 68,
@@ -189,7 +189,7 @@ impl State {
             // Role::Lilmonsta => 23,
             // Role::Lleech => 24,
             // Role::Xaan => 25,
-            Role::Poisoner => 26,
+            Roles::Poisoner => 26,
             // Role::Widow => 27,
             // Role::Courtier => 28,
             // Role::Wizard => 29,
@@ -208,13 +208,13 @@ impl State {
             // Role::Huntsman => 42,
             // Role::Damsel => 43,
             // Role::Amnesiac => 44,
-            Role::Washerwoman => 45,
-            Role::Librarian => 46,
-            Role::Investigator => 47,
-            Role::Chef => 48,
-            Role::Empath => 49,
-            Role::Fortuneteller => 50,
-            Role::Butler => 51,
+            Roles::Washerwoman => 45,
+            Roles::Librarian => 46,
+            Roles::Investigator => 47,
+            Roles::Chef => 48,
+            Roles::Empath => 49,
+            Roles::Fortuneteller => 50,
+            Roles::Butler => 51,
             // Role::Grandmother => 52,
             // Role::Clockmaker => 53,
             // Role::Dreamer => 54,
@@ -228,7 +228,7 @@ impl State {
             // Role::Bountyhunter => 62,
             // Role::Nightwatchman => 63,
             // Role::Cultleader => 64,
-            Role::Spy => 65,
+            Roles::Spy => 65,
             // Role::Ogre => 66,
             // Role::Highpriestess => 67,
             // Role::General => 68,
@@ -355,14 +355,14 @@ impl State {
                 // Role::Engineer => 9,
                 // Role::Preacher => 10,
                 // Role::Xaan => 11,
-                Role::Poisoner => 12,
+                Roles::Poisoner => 12,
                 // Role::Courtier => 13,
-                Role::Innkeeper => 14,
+                Roles::Innkeeper => 14,
                 // Role::Wizard => 15,
                 // Role::Gambler => 16,
                 // Role::Acrobat => 17,
                 // Role::Snakecharmer => 18,
-                Role::Monk => 19,
+                Roles::Monk => 19,
                 // Role::Organgrinder => 20,
                 // Role::Devilsadvocate => 21,
                 // Role::Witch => 22,
@@ -371,13 +371,13 @@ impl State {
                 // Role::Fearmonger => 25,
                 // Role::Harpy => 26,
                 // Role::Mezepheles => 27,
-                Role::Scarletwoman => 28,
+                Roles::Scarletwoman => 28,
                 // Role::Summoner => 29,
                 // Role::Lunatic => 30,
                 // Role::Exorcist => 31,
                 // Role::Lycanthrope => 32,
                 // Role::Legion => 33,
-                Role::Imp => 34,
+                Roles::Imp => 34,
                 // Role::Zombuul => 35,
                 // Role::Pukka => 36,
                 // Role::Shabaloth => 37,
@@ -410,10 +410,10 @@ impl State {
                 // Role::Tinker => 64,
                 // Role::Moonchild => 65,
                 // Role::Grandmother => 66,
-                Role::Ravenkeeper => 67,
-                Role::Empath => 68,
-                Role::Fortuneteller => 69,
-                Role::Undertaker => 70,
+                Roles::Ravenkeeper => 67,
+                Roles::Empath => 68,
+                Roles::Fortuneteller => 69,
+                Roles::Undertaker => 70,
                 // Role::Dreamer => 71,
                 // Role::Flowergirl => 72,
                 // Role::Towncrier => 73,
@@ -426,8 +426,8 @@ impl State {
                 // Role::Bountyhunter => 80,
                 // Role::Nightwatchman => 81,
                 // Role::Cultleader => 82,
-                Role::Butler => 83,
-                Role::Spy => 84,
+                Roles::Butler => 83,
+                Roles::Spy => 84,
                 // Role::Highpriestess => 85,
                 // Role::General => 86,
                 // Role::Chambermaid => 87,
@@ -445,7 +445,7 @@ impl State {
     }
 }
 
-impl Role {
+impl Roles {
     pub(crate) fn resolve_night_1_ability(
         &self,
         player_index: PlayerIndex,
@@ -459,24 +459,24 @@ impl Role {
         // letting the storyteller decide what number they should give
         // TODO: Implement abilities for every role
         match self {
-            Role::Investigator => Some(washerwoman_librarian_investigator_ability(*self)),
-            Role::Empath => Some(empath_ability(state, player_index)),
+            Roles::Investigator => Some(washerwoman_librarian_investigator_ability(*self)),
+            Roles::Empath => Some(empath_ability(state, player_index)),
             // Role::Gossip => todo!(),      // Should wait till v2
             // Role::Innkeeper => todo!(),   // Should wait till v2
-            Role::Washerwoman => Some(washerwoman_librarian_investigator_ability(*self)),
-            Role::Librarian => Some(washerwoman_librarian_investigator_ability(*self)),
-            Role::Chef => Some(chef_ability(state)),
-            Role::Fortuneteller => Some(fortuneteller_ability(state)),
-            Role::Drunk => {
+            Roles::Washerwoman => Some(washerwoman_librarian_investigator_ability(*self)),
+            Roles::Librarian => Some(washerwoman_librarian_investigator_ability(*self)),
+            Roles::Chef => Some(chef_ability(state)),
+            Roles::Fortuneteller => Some(fortuneteller_ability(state)),
+            Roles::Drunk => {
                 let role = state.get_acting_role(player_index);
                 role.resolve_night_1_ability(player_index, state)
             }
-            Role::Butler => Some(butler_ability(player_index)),
-            Role::Spy => {
+            Roles::Butler => Some(butler_ability(player_index)),
+            Roles::Spy => {
                 // Just tell the storyteller to let the spy look at the grimoire
                 Some(spy_ability())
             }
-            Role::Poisoner => Some(poisoner_ability(player_index)), // Add poison to someone until next night, same as
+            Roles::Poisoner => Some(poisoner_ability(player_index)), // Add poison to someone until next night, same as
             // normal ability
             _ => None,
         }
@@ -614,7 +614,7 @@ fn empath_ability(state: &State, player_index: PlayerIndex) -> Vec<ChangeRequest
     vec![new_change_request!(change_type, message)]
 }
 
-fn washerwoman_librarian_investigator_ability(role: Role) -> Vec<ChangeRequest> {
+fn washerwoman_librarian_investigator_ability(role: Roles) -> Vec<ChangeRequest> {
     // TODO: Perhaps need find status method, or highlight the players with these statuses
     let message = format!("Show {} the correct roles", role);
     let change_type = ChangeType::Display;
@@ -869,7 +869,7 @@ fn ravenkeeper_ability() -> Vec<ChangeRequest> {
 #[cfg(test)]
 mod tests {
     use crate::{
-        Role,
+        Roles,
         engine::{
             night::{chef_ability, empath_ability},
             state::{PlayerIndex, tests::setup_test_game},
@@ -881,7 +881,7 @@ mod tests {
 
         let mut next_player_index = None;
 
-        let mut assert_next_role = |role: Role| {
+        let mut assert_next_role = |role: Roles| {
             next_player_index = game.get_next_active_night1(next_player_index);
             let role_pos = game.players.iter().position(|p| p.role == role).unwrap();
             assert_eq!(
@@ -894,9 +894,9 @@ mod tests {
             );
         };
 
-        assert_next_role(Role::Poisoner);
-        assert_next_role(Role::Investigator);
-        assert_next_role(Role::Chef);
+        assert_next_role(Roles::Poisoner);
+        assert_next_role(Roles::Investigator);
+        assert_next_role(Roles::Chef);
 
         next_player_index = game.get_next_active_player(next_player_index);
         assert!(next_player_index.is_none());
@@ -907,17 +907,17 @@ mod tests {
         let test_cases = [
             (
                 "Empath 0 evil neighbors",
-                vec![Role::Investigator, Role::Empath, Role::Saint],
+                vec![Roles::Investigator, Roles::Empath, Roles::Saint],
                 vec![],
                 0,
             ),
             (
                 "Empath dead right neighbor",
                 vec![
-                    Role::Investigator,
-                    Role::Empath,
-                    Role::Saint,
-                    Role::Poisoner,
+                    Roles::Investigator,
+                    Roles::Empath,
+                    Roles::Saint,
+                    Roles::Poisoner,
                 ],
                 vec![2],
                 1,
@@ -925,29 +925,29 @@ mod tests {
             (
                 "Empath dead left neighbor",
                 vec![
-                    Role::Investigator,
-                    Role::Empath,
-                    Role::Saint,
-                    Role::Chef,
-                    Role::Scarletwoman,
+                    Roles::Investigator,
+                    Roles::Empath,
+                    Roles::Saint,
+                    Roles::Chef,
+                    Roles::Scarletwoman,
                 ],
                 vec![0],
                 1,
             ),
             (
                 "Empath right evil neighbor",
-                vec![Role::Investigator, Role::Empath, Role::Baron],
+                vec![Roles::Investigator, Roles::Empath, Roles::Baron],
                 vec![],
                 1,
             ),
             (
                 "Empath dead right neighbor initially evil",
                 vec![
-                    Role::Investigator,
-                    Role::Empath,
-                    Role::Baron,
-                    Role::Saint,
-                    Role::Washerwoman,
+                    Roles::Investigator,
+                    Roles::Empath,
+                    Roles::Baron,
+                    Roles::Saint,
+                    Roles::Washerwoman,
                 ],
                 vec![2],
                 0,
@@ -955,29 +955,29 @@ mod tests {
             (
                 "Empath dead right neighbor initially evil, new neighbor also evil",
                 vec![
-                    Role::Investigator,
-                    Role::Empath,
-                    Role::Baron,
-                    Role::Saint,
-                    Role::Washerwoman,
+                    Roles::Investigator,
+                    Roles::Empath,
+                    Roles::Baron,
+                    Roles::Saint,
+                    Roles::Washerwoman,
                 ],
                 vec![2],
                 0,
             ),
             (
                 "Empath left evil neighbor",
-                vec![Role::Scarletwoman, Role::Empath, Role::Saint],
+                vec![Roles::Scarletwoman, Roles::Empath, Roles::Saint],
                 vec![],
                 1,
             ),
             (
                 "Empath dead left evil neighbor initially evil",
                 vec![
-                    Role::Scarletwoman,
-                    Role::Empath,
-                    Role::Saint,
-                    Role::Chef,
-                    Role::Investigator,
+                    Roles::Scarletwoman,
+                    Roles::Empath,
+                    Roles::Saint,
+                    Roles::Chef,
+                    Roles::Investigator,
                 ],
                 vec![0],
                 0,
@@ -985,29 +985,29 @@ mod tests {
             (
                 "Empath dead left evil neighbor initially evil, new neighbor also evil",
                 vec![
-                    Role::Scarletwoman,
-                    Role::Empath,
-                    Role::Saint,
-                    Role::Chef,
-                    Role::Poisoner,
+                    Roles::Scarletwoman,
+                    Roles::Empath,
+                    Roles::Saint,
+                    Roles::Chef,
+                    Roles::Poisoner,
                 ],
                 vec![0],
                 1,
             ),
             (
                 "Empath both evil neighbors",
-                vec![Role::Poisoner, Role::Empath, Role::Imp],
+                vec![Roles::Poisoner, Roles::Empath, Roles::Imp],
                 vec![],
                 2,
             ),
             (
                 "Empath initallly both evil neighbors, right dead",
                 vec![
-                    Role::Poisoner,
-                    Role::Empath,
-                    Role::Imp,
-                    Role::Chef,
-                    Role::Investigator,
+                    Roles::Poisoner,
+                    Roles::Empath,
+                    Roles::Imp,
+                    Roles::Chef,
+                    Roles::Investigator,
                 ],
                 vec![0],
                 1,
@@ -1015,11 +1015,11 @@ mod tests {
             (
                 "Empath initallly both evil neighbors, left dead",
                 vec![
-                    Role::Poisoner,
-                    Role::Empath,
-                    Role::Imp,
-                    Role::Chef,
-                    Role::Investigator,
+                    Roles::Poisoner,
+                    Roles::Empath,
+                    Roles::Imp,
+                    Roles::Chef,
+                    Roles::Investigator,
                 ],
                 vec![2],
                 1,
@@ -1027,11 +1027,11 @@ mod tests {
             (
                 "Empath initallly both evil neighbors, both dead",
                 vec![
-                    Role::Poisoner,
-                    Role::Empath,
-                    Role::Imp,
-                    Role::Chef,
-                    Role::Investigator,
+                    Roles::Poisoner,
+                    Roles::Empath,
+                    Roles::Imp,
+                    Roles::Chef,
+                    Roles::Investigator,
                 ],
                 vec![0, 2],
                 0,
@@ -1048,13 +1048,13 @@ mod tests {
             // Perhaps each change effect should also come with statues to highlight?
             (
                 "Empath recluse evil neighbor",
-                vec![Role::Investigator, Role::Empath, Role::Recluse],
+                vec![Roles::Investigator, Roles::Empath, Roles::Recluse],
                 vec![],
                 0,
             ),
             (
                 "Empath spy evil neighbor",
-                vec![Role::Spy, Role::Empath, Role::Investigator],
+                vec![Roles::Spy, Roles::Empath, Roles::Investigator],
                 vec![],
                 1,
             ),
@@ -1099,55 +1099,55 @@ mod tests {
             (
                 "0 Chef Pairs",
                 [
-                    Role::Imp,
-                    Role::Chef,
-                    Role::Spy,
-                    Role::Washerwoman,
-                    Role::Empath,
+                    Roles::Imp,
+                    Roles::Chef,
+                    Roles::Spy,
+                    Roles::Washerwoman,
+                    Roles::Empath,
                 ],
                 0,
             ),
             (
                 "1 Chef Pair",
                 [
-                    Role::Chef,
-                    Role::Imp,
-                    Role::Spy,
-                    Role::Washerwoman,
-                    Role::Empath,
+                    Roles::Chef,
+                    Roles::Imp,
+                    Roles::Spy,
+                    Roles::Washerwoman,
+                    Roles::Empath,
                 ],
                 1,
             ),
             (
                 "1 Chef Pair with Wrap",
                 [
-                    Role::Imp,
-                    Role::Chef,
-                    Role::Washerwoman,
-                    Role::Empath,
-                    Role::Spy,
+                    Roles::Imp,
+                    Roles::Chef,
+                    Roles::Washerwoman,
+                    Roles::Empath,
+                    Roles::Spy,
                 ],
                 1,
             ),
             (
                 "3 Evil Players, two sitting together other separate",
                 [
-                    Role::Chef,
-                    Role::Imp,
-                    Role::Spy,
-                    Role::Washerwoman,
-                    Role::Poisoner,
+                    Roles::Chef,
+                    Roles::Imp,
+                    Roles::Spy,
+                    Roles::Washerwoman,
+                    Roles::Poisoner,
                 ],
                 1,
             ),
             (
                 "3 Evil in a row",
                 [
-                    Role::Imp,
-                    Role::Chef,
-                    Role::Washerwoman,
-                    Role::Baron,
-                    Role::Spy,
+                    Roles::Imp,
+                    Roles::Chef,
+                    Roles::Washerwoman,
+                    Roles::Baron,
+                    Roles::Spy,
                 ],
                 2,
             ),

@@ -1,6 +1,6 @@
 use crate::engine::{
     change_request::{ChangeArgs, ChangeRequest, ChangeType},
-    player::{CharacterType, Role},
+    player::{CharacterType, Roles},
     state::{PlayerIndex, State, status_effects::StatusType},
 };
 use crate::new_change_request;
@@ -42,11 +42,11 @@ impl State {
             let role = self.players[i].role;
             match role {
                 // TODO : Saint, Recluse, Mayor, Soldier, Spy
-                Role::Washerwoman
-                | Role::Librarian
-                | Role::Investigator
-                | Role::Drunk
-                | Role::Fortuneteller => {
+                Roles::Washerwoman
+                | Roles::Librarian
+                | Roles::Investigator
+                | Roles::Drunk
+                | Roles::Fortuneteller => {
                     return Some(i);
                 }
                 _ => (),
@@ -57,33 +57,33 @@ impl State {
     }
 }
 
-impl Role {
+impl Roles {
     pub(super) fn setup_action(&self, player_index: PlayerIndex) -> Option<Vec<ChangeRequest>> {
         match self {
-            Role::Washerwoman => Some(washerwoman_librarian_investigator(
+            Roles::Washerwoman => Some(washerwoman_librarian_investigator(
                 player_index,
                 *self,
                 CharacterType::Townsfolk,
                 StatusType::WasherwomanTownsfolk,
                 StatusType::WasherwomanWrong,
             )),
-            Role::Librarian => Some(washerwoman_librarian_investigator(
+            Roles::Librarian => Some(washerwoman_librarian_investigator(
                 player_index,
                 *self,
                 CharacterType::Outsider,
                 StatusType::LibrarianOutsider,
                 StatusType::LibrarianWrong,
             )),
-            Role::Investigator => Some(washerwoman_librarian_investigator(
+            Roles::Investigator => Some(washerwoman_librarian_investigator(
                 player_index,
                 *self,
                 CharacterType::Minion,
                 StatusType::InvestigatorMinion,
                 StatusType::InvestigatorWrong,
             )),
-            Role::Fortuneteller => Some(fortune_teller(player_index)),
-            Role::Drunk => Some(drunk(player_index)),
-            Role::Soldier => {
+            Roles::Fortuneteller => Some(fortune_teller(player_index)),
+            Roles::Drunk => Some(drunk(player_index)),
+            Roles::Soldier => {
                 // Just add protected status effect and only remove upon death
                 Some(add_status_to_self(
                     player_index,
@@ -91,7 +91,7 @@ impl Role {
                     StatusType::DemonProtected,
                 ))
             }
-            Role::Mayor => {
+            Roles::Mayor => {
                 // No night one ability, but add effect to yourself
                 Some(add_status_to_self(
                     player_index,
@@ -99,12 +99,12 @@ impl Role {
                     StatusType::MayorBounceKill,
                 ))
             }
-            Role::Recluse => Some(add_status_to_self(
+            Roles::Recluse => Some(add_status_to_self(
                 player_index,
                 *self,
                 StatusType::AppearsEvil,
             )),
-            Role::Spy => Some(add_status_to_self(
+            Roles::Spy => Some(add_status_to_self(
                 player_index,
                 *self,
                 StatusType::AppearsGood,
@@ -129,7 +129,7 @@ impl Role {
 
 fn washerwoman_librarian_investigator(
     player_index: PlayerIndex,
-    role: Role,
+    role: Roles,
     target_char_type: CharacterType,
     right_effect: StatusType,
     wrong_effect: StatusType,
@@ -137,14 +137,14 @@ fn washerwoman_librarian_investigator(
     // Only these 3 roles should be calling this method (for now)
     assert!(matches!(
         role,
-        Role::Washerwoman | Role::Librarian | Role::Investigator
+        Roles::Washerwoman | Roles::Librarian | Roles::Investigator
     ));
 
     let target_type = {
         match role {
-            Role::Washerwoman => "Townsfolk",
-            Role::Librarian => "Outsider",
-            Role::Investigator => "Minion",
+            Roles::Washerwoman => "Townsfolk",
+            Roles::Librarian => "Outsider",
+            Roles::Investigator => "Minion",
             _ => panic!("Should never happen"),
         }
     };
@@ -171,7 +171,7 @@ fn washerwoman_librarian_investigator(
 
             let player = &state.players[*target_player_index];
             if player.role.get_type() == target_char_type
-                || matches!(player.role, Role::Spy | Role::Recluse)
+                || matches!(player.role, Roles::Spy | Roles::Recluse)
             {
                 return Ok(true);
             }
@@ -187,7 +187,7 @@ fn washerwoman_librarian_investigator(
         for target_player_index in target_player_indices {
             let player = &state.players[target_player_index];
             if player.role.get_type() == target_char_type
-                || matches!(player.role, Role::Spy | Role::Recluse)
+                || matches!(player.role, Roles::Spy | Roles::Recluse)
             {
                 state.add_status(right_effect, player_index, target_player_index);
             } else {
@@ -324,7 +324,7 @@ fn fortune_teller(player_index: PlayerIndex) -> Vec<ChangeRequest> {
 
 fn add_status_to_self(
     player_index: PlayerIndex,
-    role: Role,
+    role: Roles,
     status_type: StatusType,
 ) -> Vec<ChangeRequest> {
     // TODO: Need new change type that requires no storyteller involvement
