@@ -830,7 +830,6 @@ fn imp_ability(player_index: PlayerIndex) -> Vec<ChangeRequest> {
     };
 
     let state_change_func = move |state: &mut State, args: ChangeArgs| {
-        // Check if there are any poisoned status effects inflicted by this player and clear
         // them
         let prev_effects = state.get_inflicted_statuses(player_index);
 
@@ -1175,9 +1174,56 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_monk_ability() {
+        todo!()
+        // TODO: Should be relatively easy to test
+        // Bunch of cases
+        // Try to call the kill method on a player protected by the monk
+        // Make sure that if the demon tries to kill the monk, it works, but otherwise it works
+    }
+
+    #[test]
+    fn test_butler_ability() {
+        todo!()
+        // TODO:
+        // Check if the butler master status is on the right person
+        // Also make sure that the butler can only vote if their butler master votes
+        //
+        // Actually I think i'm approaching roles and players wrong
+        // Perhaps players should have a trait that needs to be implemented by an ability?
+        // That trait includes both a check func and a state change func (I think we still need
+        // that)
+        // Is there a way to do that, implement a trait differently for inidivual instances of
+        // players?
+        // Actually I think this is the way
+        // That way each player can have generic ways they play the game
+        // Like for butler, a generic vote ability right, but the butler overrides the generic vote
+        // ability
+        // I feel like this is a better implementation that would work better.
+        // I also feel like the player should willingly "give up" the state
+        // Like they can lock it (can implement a lock on the state)
+        // The lock can contain registers for data
+        // There can be a player register, a role register (etc)
+        // That way we can pass data back and forth but also keep a state between chained state
+        // changes
+        // But the player should be the one actually making changes, the interface should never
+        // make direct changes, it should be the player through the game engine
+        // This also solves weird ass status effects and keeps the logic out of a general
+        // place (just all in the state)
+        // Statuses can be associated with players and causes a overwrite of their general
+        // functions
+        // Statuses can come with an on remove function that is called when they are removed from
+        // the player and resets them to how they were before
+    }
+
+    #[test]
+    fn test_poisoner_ability() {
+        todo!()
+    }
+
     // TODO: Test all night abilities (both check funcs and state application funcs)
     // Imp
-    // Empath
     // Monk
     // Poisoner
     // Butler
