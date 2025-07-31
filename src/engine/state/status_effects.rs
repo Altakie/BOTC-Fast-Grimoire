@@ -47,7 +47,7 @@ impl PartialEq for StatusEffect {
     }
 }
 
-pub(crate) trait StatusType: Send + Sync {
+pub(crate) trait StatusType: Send + Sync + Display {
     fn name(&self) -> String;
     // TODO: How to actually handle overwriting default player behaviors
     // Could check every effect manually to see if it affects any aspect of a player
