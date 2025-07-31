@@ -1,34 +1,16 @@
-use crate::engine::{
-    change_request::{ChangeArgs, ChangeRequest, ChangeType},
-    player::{CharacterType, Roles},
-    state::{PlayerIndex, State, status_effects::StatusType},
+use crate::{
+    engine::{
+        change_request::{ChangeArgs, ChangeRequest, ChangeType},
+        player::{CharacterType, roles::Roles},
+        state::{PlayerIndex, State, status_effects::StatusType},
+    },
+    new_change_request, unwrap_args_err, unwrap_args_panic,
 };
-use crate::new_change_request;
-use crate::unwrap_args_err;
-use crate::unwrap_args_panic;
 
 // use leptos::prelude::*;
 // use reactive_stores::Store;
 
 impl State {
-    // pub(crate) fn get_active_players(&self) -> Vec<PlayerIndex> {
-    //     let mut res: Vec<PlayerIndex> = vec![];
-    //     for (i, player) in self.players.iter().enumerate() {
-    //         match player.role {
-    //             Role::Washerwoman
-    //             | Role::Librarian
-    //             | Role::Investigator
-    //             | Role::Drunk
-    //             | Role::Fortuneteller => {
-    //                 res.push(i);
-    //             }
-    //             _ => (),
-    //         }
-    //     }
-    //
-    //     return res;
-    // }
-
     pub(super) fn get_next_active_setup(
         &self,
         previous_player: Option<PlayerIndex>,
@@ -38,18 +20,11 @@ impl State {
             None => 0,
         };
 
-        for i in start_index..self.players.len() {
-            let role = self.players[i].role;
-            match role {
-                // TODO : Saint, Recluse, Mayor, Soldier, Spy
-                Roles::Washerwoman
-                | Roles::Librarian
-                | Roles::Investigator
-                | Roles::Drunk
-                | Roles::Fortuneteller => {
-                    return Some(i);
-                }
-                _ => (),
+        let players = self.get_players();
+
+        for (i, player) in players.iter().skip(start_index + 1).enumerate() {
+            if let Some(_) = player.role.setup_order() {
+                return Some(i);
             }
         }
 
@@ -57,6 +32,8 @@ impl State {
     }
 }
 
+// TODO: Move all this logic to separate files for each role. Perhaps make a mod that contains all
+// the roles
 impl Roles {
     pub(super) fn setup_action(&self, player_index: PlayerIndex) -> Option<Vec<ChangeRequest>> {
         match self {

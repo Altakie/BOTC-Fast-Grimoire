@@ -12,7 +12,7 @@
 use crate::{
     engine::{
         change_request::{ChangeArgs, ChangeRequest, ChangeType},
-        player::{Alignment, Roles},
+        player::{Alignment, roles::Roles},
         state::{PlayerIndex, State, status_effects::StatusType},
     },
     new_change_request, unwrap_args_err, unwrap_args_panic,
@@ -103,20 +103,25 @@ impl State {
         &self,
         previous_player: Option<PlayerIndex>,
     ) -> Option<PlayerIndex> {
-        let prev_player_order = self.get_night_1_order(previous_player);
+        let prev_player_order = {
+            match previous_player {
+                Some(player_index) => self.get_player(player_index).role.night_one_order(),
+                None => None,
+            }
+        };
         let mut next_player: Option<(PlayerIndex, usize)> = None;
 
         // TODO: Check for special roles
 
-        for (player_index, _player) in self.players.iter().enumerate() {
-            let order = self.get_night_1_order(Some(player_index));
+        let players = self.get_players();
+        for (player_index, player) in players.iter().enumerate() {
+            let order = player.role.night_one_order();
             // Check that the player acts at night
             let order = match order {
                 Some(order) => order,
                 None => continue,
             };
-            if prev_player_order.is_some() {
-                let prev_player_order = prev_player_order.unwrap();
+            if let Some(prev_player_order) = prev_player_order {
                 if order < prev_player_order {
                     continue;
                 } else if order == prev_player_order + 1 {
@@ -156,92 +161,92 @@ impl State {
         }
     }
 
-    pub(crate) fn get_night_1_order(
-        &self,
-        player_index: Option<PlayerIndex>,
-    ) -> Option<PlayerIndex> {
-        let player_index = player_index?;
-        let role = self.get_acting_role(player_index);
-        let order = match role {
-            // Role::DUSK => 0,
-            // Role::Lordoftyphon => 1,
-            // Role::Kazali => 2,
-            // Role::Apprentice => 3,
-            // Role::Barista => 4,
-            // Role::Bureaucrat => 5,
-            // Role::Thief => 6,
-            // Role::Boffin => 7,
-            // Role::Philosopher => 8,
-            // Role::Alchemist => 9,
-            // Role::Poppygrower => 10,
-            // Role::Yaggababble => 11,
-            // Role::Magician => 12,
-            // Role::MINION => 13, TODO: Need to implement this shit
-            // Role::Snitch => 14,
-            // Role::Lunatic => 15,
-            // Role::Summoner => 16,
-            // Role::DEMON => 17, TODO: Need to implement this shit
-            // Role::King => 18,
-            // Role::Sailor => 19,
-            // Role::Marionette => 20,
-            // Role::Engineer => 21,
-            // Role::Preacher => 22,
-            // Role::Lilmonsta => 23,
-            // Role::Lleech => 24,
-            // Role::Xaan => 25,
-            Roles::Poisoner => 26,
-            // Role::Widow => 27,
-            // Role::Courtier => 28,
-            // Role::Wizard => 29,
-            // Role::Snakecharmer => 30,
-            // Role::Godfather => 31,
-            // Role::Organgrinder => 32,
-            // Role::Devilsadvocate => 33,
-            // Role::Eviltwin => 34,
-            // Role::Witch => 35,
-            // Role::Cerenovus => 36,
-            // Role::Fearmonger => 37,
-            // Role::Harpy => 38,
-            // Role::Mezepheles => 39,
-            // Role::Pukka => 40,
-            // Role::Pixie => 41,
-            // Role::Huntsman => 42,
-            // Role::Damsel => 43,
-            // Role::Amnesiac => 44,
-            Roles::Washerwoman => 45,
-            Roles::Librarian => 46,
-            Roles::Investigator => 47,
-            Roles::Chef => 48,
-            Roles::Empath => 49,
-            Roles::Fortuneteller => 50,
-            Roles::Butler => 51,
-            // Role::Grandmother => 52,
-            // Role::Clockmaker => 53,
-            // Role::Dreamer => 54,
-            // Role::Seamstress => 55,
-            // Role::Steward => 56,
-            // Role::Knight => 57,
-            // Role::Noble => 58,
-            // Role::Balloonist => 59,
-            // Role::Shugenja => 60,
-            // Role::Villageidiot => 61,
-            // Role::Bountyhunter => 62,
-            // Role::Nightwatchman => 63,
-            // Role::Cultleader => 64,
-            Roles::Spy => 65,
-            // Role::Ogre => 66,
-            // Role::Highpriestess => 67,
-            // Role::General => 68,
-            // Role::Chambermaid => 69,
-            // Role::Mathematician => 70,
-            // Role::DAWN => 71, TODO: Figure out wtf this means
-            // Role::Leviathan => 72,
-            // Role::Vizier => 73
-            _ => return None,
-        };
-
-        return Some(order);
-    }
+    // pub(crate) fn get_night_1_order(
+    //     &self,
+    //     player_index: Option<PlayerIndex>,
+    // ) -> Option<PlayerIndex> {
+    //     let player_index = player_index?;
+    //     let role = self.get_acting_role(player_index);
+    //     let order = match role {
+    //         // Role::DUSK => 0,
+    //         // Role::Lordoftyphon => 1,
+    //         // Role::Kazali => 2,
+    //         // Role::Apprentice => 3,
+    //         // Role::Barista => 4,
+    //         // Role::Bureaucrat => 5,
+    //         // Role::Thief => 6,
+    //         // Role::Boffin => 7,
+    //         // Role::Philosopher => 8,
+    //         // Role::Alchemist => 9,
+    //         // Role::Poppygrower => 10,
+    //         // Role::Yaggababble => 11,
+    //         // Role::Magician => 12,
+    //         // Role::MINION => 13, TODO: Need to implement this shit
+    //         // Role::Snitch => 14,
+    //         // Role::Lunatic => 15,
+    //         // Role::Summoner => 16,
+    //         // Role::DEMON => 17, TODO: Need to implement this shit
+    //         // Role::King => 18,
+    //         // Role::Sailor => 19,
+    //         // Role::Marionette => 20,
+    //         // Role::Engineer => 21,
+    //         // Role::Preacher => 22,
+    //         // Role::Lilmonsta => 23,
+    //         // Role::Lleech => 24,
+    //         // Role::Xaan => 25,
+    //         Roles::Poisoner => 26,
+    //         // Role::Widow => 27,
+    //         // Role::Courtier => 28,
+    //         // Role::Wizard => 29,
+    //         // Role::Snakecharmer => 30,
+    //         // Role::Godfather => 31,
+    //         // Role::Organgrinder => 32,
+    //         // Role::Devilsadvocate => 33,
+    //         // Role::Eviltwin => 34,
+    //         // Role::Witch => 35,
+    //         // Role::Cerenovus => 36,
+    //         // Role::Fearmonger => 37,
+    //         // Role::Harpy => 38,
+    //         // Role::Mezepheles => 39,
+    //         // Role::Pukka => 40,
+    //         // Role::Pixie => 41,
+    //         // Role::Huntsman => 42,
+    //         // Role::Damsel => 43,
+    //         // Role::Amnesiac => 44,
+    //         Roles::Washerwoman => 45,
+    //         Roles::Librarian => 46,
+    //         Roles::Investigator => 47,
+    //         Roles::Chef => 48,
+    //         Roles::Empath => 49,
+    //         Roles::Fortuneteller => 50,
+    //         Roles::Butler => 51,
+    //         // Role::Grandmother => 52,
+    //         // Role::Clockmaker => 53,
+    //         // Role::Dreamer => 54,
+    //         // Role::Seamstress => 55,
+    //         // Role::Steward => 56,
+    //         // Role::Knight => 57,
+    //         // Role::Noble => 58,
+    //         // Role::Balloonist => 59,
+    //         // Role::Shugenja => 60,
+    //         // Role::Villageidiot => 61,
+    //         // Role::Bountyhunter => 62,
+    //         // Role::Nightwatchman => 63,
+    //         // Role::Cultleader => 64,
+    //         Roles::Spy => 65,
+    //         // Role::Ogre => 66,
+    //         // Role::Highpriestess => 67,
+    //         // Role::General => 68,
+    //         // Role::Chambermaid => 69,
+    //         // Role::Mathematician => 70,
+    //         // Role::DAWN => 71, TODO: Figure out wtf this means
+    //         // Role::Leviathan => 72,
+    //         // Role::Vizier => 73
+    //         _ => return None,
+    //     };
+    //
+    //     return Some(order);
+    // }
 
     // pub(crate) fn get_night_1_order(&self, player_indices: Vec<PlayerIndex>) -> Vec<PlayerIndex> {
     //     // Go through all roles and assign each of them a number
@@ -334,117 +339,118 @@ impl State {
     //     return self.get_order_from_map(order_map);
     // }
 
-    pub(crate) fn get_night_order(&self, player_indices: Vec<PlayerIndex>) -> Vec<PlayerIndex> {
-        // Go through all roles and assign each of them a number
-        // Maps night_order to player index
-        let mut order_map: HashMap<usize, PlayerIndex> = HashMap::new();
-        for index in player_indices {
-            let role = self.players[index].role;
-            let order: usize = match role {
-                // TODO: make this work
-
-                // Role::DUSK => 0,
-                // Role::Barista => 1,
-                // Role::Bureaucrat => 2,
-                // Role::Thief => 3,
-                // Role::Harlot => 4,
-                // Role::Bonecollector => 5,
-                // Role::Philosopher => 6,
-                // Role::Poppygrower => 7,
-                // Role::Sailor => 8,
-                // Role::Engineer => 9,
-                // Role::Preacher => 10,
-                // Role::Xaan => 11,
-                Roles::Poisoner => 12,
-                // Role::Courtier => 13,
-                Roles::Innkeeper => 14,
-                // Role::Wizard => 15,
-                // Role::Gambler => 16,
-                // Role::Acrobat => 17,
-                // Role::Snakecharmer => 18,
-                Roles::Monk => 19,
-                // Role::Organgrinder => 20,
-                // Role::Devilsadvocate => 21,
-                // Role::Witch => 22,
-                // Role::Cerenovus => 23,
-                // Role::Pithag => 24,
-                // Role::Fearmonger => 25,
-                // Role::Harpy => 26,
-                // Role::Mezepheles => 27,
-                Roles::Scarletwoman => 28,
-                // Role::Summoner => 29,
-                // Role::Lunatic => 30,
-                // Role::Exorcist => 31,
-                // Role::Lycanthrope => 32,
-                // Role::Legion => 33,
-                Roles::Imp => 34,
-                // Role::Zombuul => 35,
-                // Role::Pukka => 36,
-                // Role::Shabaloth => 37,
-                // Role::Po => 38,
-                // Role::Fanggu => 39,
-                // Role::Nodashii => 40,
-                // Role::Vortox => 41,
-                // Role::Lordoftyphon => 42,
-                // Role::Vigormortis => 43,
-                // Role::Ojo => 44,
-                // Role::Alhadikhia => 45,
-                // Role::Lleech => 46,
-                // Role::Lilmonsta => 47,
-                // Role::Yaggababble => 48,
-                // Role::Kazali => 49,
-                // Role::Assassin => 50,
-                // Role::Godfather => 51,
-                // Role::Gossip => 52,
-                // Role::Hatter => 53,
-                // Role::Barber => 54,
-                // Role::Sweetheart => 55,
-                // Role::Sage => 56,
-                // Role::Banshee => 57,
-                // Role::Professor => 58,
-                // Role::Choirboy => 59,
-                // Role::Huntsman => 60,
-                // Role::Damsel => 61,
-                // Role::Amnesiac => 62,
-                // Role::Farmer => 63,
-                // Role::Tinker => 64,
-                // Role::Moonchild => 65,
-                // Role::Grandmother => 66,
-                Roles::Ravenkeeper => 67,
-                Roles::Empath => 68,
-                Roles::Fortuneteller => 69,
-                Roles::Undertaker => 70,
-                // Role::Dreamer => 71,
-                // Role::Flowergirl => 72,
-                // Role::Towncrier => 73,
-                // Role::Oracle => 74,
-                // Role::Seamstress => 75,
-                // Role::Juggler => 76,
-                // Role::Balloonist => 77,
-                // Role::Villageidiot => 78,
-                // Role::King => 79,
-                // Role::Bountyhunter => 80,
-                // Role::Nightwatchman => 81,
-                // Role::Cultleader => 82,
-                Roles::Butler => 83,
-                Roles::Spy => 84,
-                // Role::Highpriestess => 85,
-                // Role::General => 86,
-                // Role::Chambermaid => 87,
-                // Role::Mathematician => 88,
-                // Role::DAWN => 89, //TODO: Figure this out
-                // Role::Leviathan => 90,
-                _ => 0,
-            };
-            if order != 0 {
-                order_map.insert(order, index);
-            }
-        }
-
-        return self.get_order_from_map(order_map);
-    }
+    // pub(crate) fn get_night_order(&self, player_indices: Vec<PlayerIndex>) -> Vec<PlayerIndex> {
+    //     // Go through all roles and assign each of them a number
+    //     // Maps night_order to player index
+    //     let mut order_map: HashMap<usize, PlayerIndex> = HashMap::new();
+    //     for index in player_indices {
+    //         let role = self.players[index].role;
+    //         let order: usize = match role {
+    //             // TODO: make this work
+    //
+    //             // Role::DUSK => 0,
+    //             // Role::Barista => 1,
+    //             // Role::Bureaucrat => 2,
+    //             // Role::Thief => 3,
+    //             // Role::Harlot => 4,
+    //             // Role::Bonecollector => 5,
+    //             // Role::Philosopher => 6,
+    //             // Role::Poppygrower => 7,
+    //             // Role::Sailor => 8,
+    //             // Role::Engineer => 9,
+    //             // Role::Preacher => 10,
+    //             // Role::Xaan => 11,
+    //             Roles::Poisoner => 12,
+    //             // Role::Courtier => 13,
+    //             Roles::Innkeeper => 14,
+    //             // Role::Wizard => 15,
+    //             // Role::Gambler => 16,
+    //             // Role::Acrobat => 17,
+    //             // Role::Snakecharmer => 18,
+    //             Roles::Monk => 19,
+    //             // Role::Organgrinder => 20,
+    //             // Role::Devilsadvocate => 21,
+    //             // Role::Witch => 22,
+    //             // Role::Cerenovus => 23,
+    //             // Role::Pithag => 24,
+    //             // Role::Fearmonger => 25,
+    //             // Role::Harpy => 26,
+    //             // Role::Mezepheles => 27,
+    //             Roles::Scarletwoman => 28,
+    //             // Role::Summoner => 29,
+    //             // Role::Lunatic => 30,
+    //             // Role::Exorcist => 31,
+    //             // Role::Lycanthrope => 32,
+    //             // Role::Legion => 33,
+    //             Roles::Imp => 34,
+    //             // Role::Zombuul => 35,
+    //             // Role::Pukka => 36,
+    //             // Role::Shabaloth => 37,
+    //             // Role::Po => 38,
+    //             // Role::Fanggu => 39,
+    //             // Role::Nodashii => 40,
+    //             // Role::Vortox => 41,
+    //             // Role::Lordoftyphon => 42,
+    //             // Role::Vigormortis => 43,
+    //             // Role::Ojo => 44,
+    //             // Role::Alhadikhia => 45,
+    //             // Role::Lleech => 46,
+    //             // Role::Lilmonsta => 47,
+    //             // Role::Yaggababble => 48,
+    //             // Role::Kazali => 49,
+    //             // Role::Assassin => 50,
+    //             // Role::Godfather => 51,
+    //             // Role::Gossip => 52,
+    //             // Role::Hatter => 53,
+    //             // Role::Barber => 54,
+    //             // Role::Sweetheart => 55,
+    //             // Role::Sage => 56,
+    //             // Role::Banshee => 57,
+    //             // Role::Professor => 58,
+    //             // Role::Choirboy => 59,
+    //             // Role::Huntsman => 60,
+    //             // Role::Damsel => 61,
+    //             // Role::Amnesiac => 62,
+    //             // Role::Farmer => 63,
+    //             // Role::Tinker => 64,
+    //             // Role::Moonchild => 65,
+    //             // Role::Grandmother => 66,
+    //             Roles::Ravenkeeper => 67,
+    //             Roles::Empath => 68,
+    //             Roles::Fortuneteller => 69,
+    //             Roles::Undertaker => 70,
+    //             // Role::Dreamer => 71,
+    //             // Role::Flowergirl => 72,
+    //             // Role::Towncrier => 73,
+    //             // Role::Oracle => 74,
+    //             // Role::Seamstress => 75,
+    //             // Role::Juggler => 76,
+    //             // Role::Balloonist => 77,
+    //             // Role::Villageidiot => 78,
+    //             // Role::King => 79,
+    //             // Role::Bountyhunter => 80,
+    //             // Role::Nightwatchman => 81,
+    //             // Role::Cultleader => 82,
+    //             Roles::Butler => 83,
+    //             Roles::Spy => 84,
+    //             // Role::Highpriestess => 85,
+    //             // Role::General => 86,
+    //             // Role::Chambermaid => 87,
+    //             // Role::Mathematician => 88,
+    //             // Role::DAWN => 89, //TODO: Figure this out
+    //             // Role::Leviathan => 90,
+    //             _ => 0,
+    //         };
+    //         if order != 0 {
+    //             order_map.insert(order, index);
+    //         }
+    //     }
+    //
+    //     return self.get_order_from_map(order_map);
+    // }
 }
 
+// TODO: Move this logic to separate files for every role
 impl Roles {
     pub(crate) fn resolve_night_1_ability(
         &self,
