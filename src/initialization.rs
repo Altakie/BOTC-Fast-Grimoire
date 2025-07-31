@@ -1,4 +1,4 @@
-use crate::engine::player::{CharacterType, Roles};
+use crate::engine::player::{CharacterType, roles::Roles};
 
 use serde_derive::{Deserialize, Serialize};
 

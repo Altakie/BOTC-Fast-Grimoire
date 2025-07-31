@@ -13,7 +13,7 @@ use initialization::{CharacterTypeCounts, Script, ScriptJson};
 mod engine;
 use engine::{
     change_request::{ChangeArgs, ChangeRequest, ChangeType},
-    player::{CharacterType, Player, Roles},
+    player::{CharacterType, Player, roles::Roles},
     state::{PlayerIndex, State, StateStoreFields, Step},
 };
 

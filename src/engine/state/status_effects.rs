@@ -1,22 +1,23 @@
 use std::fmt::{Debug, Display};
-use std::rc::Rc;
+use std::sync::Arc;
 
-use crate::engine::player::{Player, PlayerBehaviors};
-
-use super::{PlayerIndex, Roles, State};
+use crate::engine::{
+    player::PlayerBehaviors,
+    state::{PlayerIndex, State},
+};
 
 // TODO: Add status effect id
 #[derive(Clone)]
 pub(crate) struct StatusEffect {
     // pub(crate) status_type: StatusEffects,
-    pub(crate) status_type: Rc<dyn StatusType>,
+    pub(crate) status_type: Arc<dyn StatusType>,
     pub(crate) source_player_index: PlayerIndex,
     pub(crate) affected_player_index: PlayerIndex,
 }
 
 impl StatusEffect {
     pub(crate) fn new(
-        status_type: Rc<dyn StatusType>,
+        status_type: Arc<dyn StatusType>,
         source_player_index: PlayerIndex,
         affected_player_index: PlayerIndex,
     ) -> Self {
@@ -46,18 +47,23 @@ impl PartialEq for StatusEffect {
     }
 }
 
-pub(crate) StatusType {
+pub(crate) trait StatusType: Send + Sync {
     fn name(&self) -> String;
     // TODO: How to actually handle overwriting default player behaviors
     // Could check every effect manually to see if it affects any aspect of a player
     // Could have a function that defines which aspects of a player's behavior the status effect
     // modifies
     // The player then uses that function to figure out what function it should run from the trait?
-    
+
     fn behavior_type(&self) -> PlayerBehaviors;
 
     /// Should be overwritten if this status effect changes how a player dies
     fn kill(&self, attacking_player_index: PlayerIndex, state: &State) -> Option<bool> {
+        None
+    }
+
+    /// Should be overwritten if this status effect changes how a player is execute
+    fn execute(&self, state: &State) -> Option<bool> {
         None
     }
 }

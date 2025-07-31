@@ -1,5 +1,5 @@
 use super::{
-    player::Roles,
+    player::roles::Roles,
     state::{PlayerIndex, State},
 };
 use std::sync::Arc;
