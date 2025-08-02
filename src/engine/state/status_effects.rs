@@ -6,25 +6,18 @@ use crate::engine::{
     state::{PlayerIndex, State},
 };
 
-// TODO: Add status effect id
 #[derive(Clone)]
 pub(crate) struct StatusEffect {
     // pub(crate) status_type: StatusEffects,
     pub(crate) status_type: Arc<dyn StatusType>,
     pub(crate) source_player_index: PlayerIndex,
-    pub(crate) affected_player_index: PlayerIndex,
 }
 
 impl StatusEffect {
-    pub(crate) fn new(
-        status_type: Arc<dyn StatusType>,
-        source_player_index: PlayerIndex,
-        affected_player_index: PlayerIndex,
-    ) -> Self {
+    pub(crate) fn new(status_type: Arc<dyn StatusType>, source_player_index: PlayerIndex) -> Self {
         Self {
             status_type,
             source_player_index,
-            affected_player_index,
         }
     }
 }
@@ -34,7 +27,6 @@ impl Debug for StatusEffect {
         f.debug_struct("StatusEffect")
             .field("status_type", &self.status_type.name())
             .field("source_player_index", &self.source_player_index)
-            .field("affected_player_index", &self.affected_player_index)
             .finish()
     }
 }
@@ -43,27 +35,34 @@ impl PartialEq for StatusEffect {
     fn eq(&self, other: &Self) -> bool {
         self.status_type.name() == other.status_type.name()
             && self.source_player_index == other.source_player_index
-            && self.affected_player_index == other.affected_player_index
     }
 }
 
+/// Status Effects can either be visual (just for the storyteller) and do nothing or they can
+/// overwrite player behaviors
 pub(crate) trait StatusType: Send + Sync + Display {
-    fn name(&self) -> String;
+    fn name(&self) -> String {
+        self.to_string()
+    }
     // TODO: How to actually handle overwriting default player behaviors
     // Could check every effect manually to see if it affects any aspect of a player
     // Could have a function that defines which aspects of a player's behavior the status effect
     // modifies
     // The player then uses that function to figure out what function it should run from the trait?
 
-    fn behavior_type(&self) -> PlayerBehaviors;
+    /// This function indicates what type of player behavior this status effect affects. By
+    /// default, status effects will not affect player behavior
+    fn behavior_type(&self) -> Option<PlayerBehaviors> {
+        None
+    }
 
     /// Should be overwritten if this status effect changes how a player dies
-    fn kill(&self, attacking_player_index: PlayerIndex, state: &State) -> Option<bool> {
+    fn kill(&self, _attacking_player_index: PlayerIndex, _state: &State) -> Option<bool> {
         None
     }
 
     /// Should be overwritten if this status effect changes how a player is execute
-    fn execute(&self, state: &State) -> Option<bool> {
+    fn execute(&self, _state: &State) -> Option<bool> {
         None
     }
 }

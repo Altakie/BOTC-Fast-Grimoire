@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use crate::engine::{
     change_request::ChangeRequest,
-    player::*,
+    player::{roles::townsfolk::*, *},
     state::{PlayerIndex, State, Step},
 };
 
@@ -82,7 +82,7 @@ impl Roles {
             Roles::Innkeeper => todo!(),
             Roles::Washerwoman => todo!(),
             Roles::Librarian => todo!(),
-            Roles::Chef => todo!(),
+            Roles::Chef => Arc::new(Chef::default()),
             Roles::Fortuneteller => todo!(),
             Roles::Undertaker => todo!(),
             Roles::Virgin => todo!(),
@@ -104,12 +104,27 @@ impl Roles {
     }
 }
 
-pub(crate) trait Role: Sync + Send + Display {
-    fn name(&self) -> String;
+pub(crate) trait Role: Display + Send + Sync {
+    fn name(&self) -> String {
+        self.to_string()
+    }
 
     fn get_default_alignment(&self) -> Alignment;
 
-    fn get_type(&self) -> CharacterType;
+    /// If the role disguises their alignment, this method should be overwritten
+    fn get_alignment(&self) -> Option<Alignment> {
+        None
+    }
+
+    /// This gets the true character type of the player. This is what should be used by the state
+    /// for setup, logging, etc...
+    fn get_true_character_type(&self) -> CharacterType;
+
+    /// Should be overwritten when a role wants to mask their default character type as
+    /// another character. This is the method that should be used by role abilities
+    fn get_character_type(&self) -> CharacterType {
+        self.get_true_character_type()
+    }
 
     /// By default, most roles are not win conditions. This should only be overwritten if they are
     fn is_win_condition(&self) -> bool {
@@ -233,3 +248,31 @@ impl Roles {
         matches!(self.get_type(), CharacterType::Demon)
     }
 }
+
+// Role Modules
+// TODO: Make these dynamically loaded based off what files are available
+// Could be useful for custom roles
+
+pub(crate) mod demons;
+pub(crate) mod minions;
+pub(crate) mod outsiders;
+pub(crate) mod townsfolk;
+// pub(crate) mod empath;
+// pub(crate) mod fortuneteller;
+// pub(crate) mod undertaker;
+// pub(crate) mod monk;
+// pub(crate) mod ravenkeeper;
+// pub(crate) mod virgin;
+// pub(crate) mod slayer;
+// pub(crate) mod soldier;
+// pub(crate) mod mayor;
+// pub(crate) mod butler;
+// pub(crate) mod drunk;
+// pub(crate) mod recluse;
+// pub(crate) mod saint;
+// pub(crate) mod poisoner;
+// pub(crate) mod spy;
+// pub(crate) mod scarletwoman;
+// pub(crate) mod baron;
+// pub(crate) mod imp;
+//
