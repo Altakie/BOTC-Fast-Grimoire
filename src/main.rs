@@ -882,8 +882,7 @@ fn Player_Display() -> impl IntoView {
                                 // Status effects
                                 <div class="text-[0.5rem] flex flex-row flex-wrap justify-center items-start absolute w-fit border left-1/2 -translate-x-1/2 top-9/10 ">
                                     {move || {
-                                        let status_effects = game_state
-                                            .with(|gs| gs.get_afflicted_statuses(i));
+                                        let status_effects = game_state.with(|gs| gs.get_player(i).status_effects.clone());
                                         status_effects
                                             .iter()
                                             .map(|status_effect| {
