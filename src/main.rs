@@ -596,10 +596,7 @@ fn Info() -> impl IntoView {
                 <p>"Ghost Vote: "{if player.ghost_vote { "Yes" } else { "No" }}</p>
                 <p>
                     "Alignment: "
-                    {match player.alignment {
-                        engine::player::Alignment::Good => "Good",
-                        engine::player::Alignment::Evil => "Evil",
-                    }}
+                    {player.alignment.to_string()}
                 </p>
             </div>
         }
@@ -633,10 +630,7 @@ fn Info() -> impl IntoView {
                 <p>"Ghost Vote: "{if player.ghost_vote { "Yes" } else { "No" }}</p>
                 <p>
                     "Alignment: "
-                    {match player.alignment {
-                        engine::player::Alignment::Good => "Good",
-                        engine::player::Alignment::Evil => "Evil",
-                    }}
+                    {player.alignment.to_string()}
                 </p>
             </div>
         }
@@ -838,6 +832,7 @@ fn Player_Display() -> impl IntoView {
                                         match player.alignment {
                                             engine::player::Alignment::Good => "blue",
                                             engine::player::Alignment::Evil => "red",
+                                            engine::player::Alignment::Any => "purple"
                                         }
                                     }
                                     on:click=move |_| {

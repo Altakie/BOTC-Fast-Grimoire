@@ -145,12 +145,15 @@ pub(crate) trait Role: Display + Send + Sync {
 
     /// A execute condition for this role
     /// # Return
-    ///     * Returns a Option<bool> based on whether or not the role overwrites the default kill behavior of
+    ///     * Returns a Option<bool> based on whether or not the role overwrites the default execution behavior of
     ///     the player. By default, it does not do anything and returns None. A true indicates the
     ///     player should die.
-    fn execute(&self, _state: &State) -> Option<bool> {
+    fn execute(&self) -> Option<bool> {
         return None;
     }
+
+    /// An action the player performs on being nominated, if any
+    fn nominated(&self, _nominating_player_index: PlayerIndex, _state: &mut State) {}
 
     /// If the role being in the game affects character type counts, overwrite this method. The
     /// CharacterTypeCounts returned from this function will be added to the ones currently in the

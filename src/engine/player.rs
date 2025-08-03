@@ -1,5 +1,8 @@
 use reactive_stores::Store;
-use std::{fmt::Debug, sync::Arc};
+use std::{
+    fmt::{Debug, Display},
+    sync::Arc,
+};
 
 use crate::engine::{
     change_request::ChangeRequest,
@@ -14,6 +17,18 @@ pub(crate) enum Alignment {
     Good,
     Evil,
     Any,
+}
+
+impl Display for Alignment {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            Alignment::Good => "Good",
+            Alignment::Evil => "Evil",
+            Alignment::Any => "Any",
+        };
+
+        f.write_str(str)
+    }
 }
 
 #[derive(Clone, Copy, Hash, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -80,7 +95,7 @@ impl Player {
 
     /// Default behavior is that the player dies. If the player does not die, it should be because
     /// of their role or status effects
-    pub(crate) fn kill(&mut self, attacking_player_index: PlayerIndex, state: &State) {
+    pub(crate) fn kill(&mut self, attacking_player_index: PlayerIndex) {
         // Status Effects
         // Basically go through each status, see if any prevent the player from dying
         // If any do, prevent the player from dying
@@ -88,12 +103,9 @@ impl Player {
         for status_effect in self.status_effects.iter() {
             if matches!(
                 status_effect.status_type.behavior_type(),
-                Some(PlayerBehaviors::Kill)
+                Some(&[.., PlayerBehaviors::Kill])
             ) {
-                if let Some(false) = status_effect
-                    .status_type
-                    .kill(attacking_player_index, state)
-                {
+                if let Some(false) = status_effect.status_type.kill(attacking_player_index) {
                     dead = false;
                 }
             }
@@ -104,7 +116,7 @@ impl Player {
         }
 
         // Roles
-        if let Some(dead) = self.role.kill(attacking_player_index, state) {
+        if let Some(dead) = self.role.kill(attacking_player_index) {
             self.dead = dead;
             return;
         }
@@ -115,7 +127,7 @@ impl Player {
 
     /// Default behavior is that the player dies. If the player does not die, it should be because
     /// of their role or status effects
-    pub(crate) fn execute(&mut self, state: &State) {
+    pub(crate) fn execute(&mut self) {
         // Status Effects
         // Basically go through each status, see if any prevent the player from dying
         // If any do, prevent the player from dying
@@ -123,9 +135,9 @@ impl Player {
         for status_effect in self.status_effects.iter() {
             if matches!(
                 status_effect.status_type.behavior_type(),
-                Some(PlayerBehaviors::Execute)
+                Some(&[.., PlayerBehaviors::Execute])
             ) {
-                if let Some(false) = status_effect.status_type.execute(state) {
+                if let Some(false) = status_effect.status_type.execute() {
                     dead = false;
                 }
             }
@@ -135,7 +147,7 @@ impl Player {
             return;
         }
 
-        if let Some(dead) = self.role.execute(state) {
+        if let Some(dead) = self.role.execute() {
             self.dead = dead;
             return;
         }
@@ -178,7 +190,23 @@ impl Player {
         player_index: PlayerIndex,
         state: &State,
     ) -> Option<Vec<ChangeRequest>> {
-        self.role.night_one_ability(player_index, state)
+        let mut res = self.role.night_one_ability(player_index, state)?;
+        // Check for poison or drunk effects
+        let status_effect = self.get_statuses().iter().find(|se| {
+            matches!(
+                se.status_type.behavior_type(),
+                Some(&[.., PlayerBehaviors::NightOneAbility])
+            )
+        });
+
+        if let Some(status_effect) = status_effect {
+            for cr in res.iter_mut() {
+                cr.state_change_func = None;
+                cr.description = format!("(*{}*) ", status_effect) + cr.description.as_str();
+            }
+        }
+
+        return Some(res);
     }
 
     /// If the role has an ability that acts during the night (not including night one), this method should be overwritten and return
@@ -192,7 +220,22 @@ impl Player {
         player_index: PlayerIndex,
         state: &State,
     ) -> Option<Vec<ChangeRequest>> {
-        self.role.night_ability(player_index, state)
+        let mut res = self.role.night_ability(player_index, state)?;
+        let status_effect = self.get_statuses().iter().find(|se| {
+            matches!(
+                se.status_type.behavior_type(),
+                Some(&[.., PlayerBehaviors::NightAbility])
+            )
+        });
+
+        if let Some(status_effect) = status_effect {
+            for cr in res.iter_mut() {
+                cr.state_change_func = None;
+                cr.description = format!("(*{}*) ", status_effect) + cr.description.as_str();
+            }
+        }
+
+        return Some(res);
     }
 
     /// If the role has an ability that acts during the day (not including night one), this method should be overwritten and indicate which part(s) of the day this ability can be triggered during

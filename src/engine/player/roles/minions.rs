@@ -74,11 +74,14 @@ struct Poisoner {}
 struct Poisoned {}
 
 impl StatusType for Poisoned {
-    fn behavior_type(&self) -> Option<Vec<crate::engine::player::PlayerBehaviors>> {
-        Some(vec![
-            PlayerBehaviors::NightOneAbility,
-            PlayerBehaviors::NightAbility,
-        ])
+    fn behavior_type(&self) -> Option<&[crate::engine::player::PlayerBehaviors]> {
+        Some(
+            [
+                PlayerBehaviors::NightOneAbility,
+                PlayerBehaviors::NightAbility,
+            ]
+            .as_ref(),
+        )
     }
 }
 
@@ -120,7 +123,7 @@ impl Poisoner {
 
         Some(vec![new_change_request!(
             change_type,
-            message,
+            message.to_string(),
             check_func,
             state_change_func
         )])

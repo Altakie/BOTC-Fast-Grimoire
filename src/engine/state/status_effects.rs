@@ -31,6 +31,12 @@ impl Debug for StatusEffect {
     }
 }
 
+impl Display for StatusEffect {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.status_type)
+    }
+}
+
 impl PartialEq for StatusEffect {
     fn eq(&self, other: &Self) -> bool {
         self.status_type.name() == other.status_type.name()
@@ -52,17 +58,17 @@ pub(crate) trait StatusType: Send + Sync + Display {
 
     /// This function indicates what type of player behavior this status effect affects. By
     /// default, status effects will not affect player behavior
-    fn behavior_type(&self) -> Option<PlayerBehaviors> {
+    fn behavior_type(&self) -> Option<&[PlayerBehaviors]> {
         None
     }
 
     /// Should be overwritten if this status effect changes how a player dies
-    fn kill(&self, _attacking_player_index: PlayerIndex, _state: &State) -> Option<bool> {
+    fn kill(&self, _attacking_player_index: PlayerIndex) -> Option<bool> {
         None
     }
 
     /// Should be overwritten if this status effect changes how a player is execute
-    fn execute(&self, _state: &State) -> Option<bool> {
+    fn execute(&self) -> Option<bool> {
         None
     }
 }

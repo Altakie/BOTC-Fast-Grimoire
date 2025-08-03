@@ -337,3 +337,45 @@ impl Display for Empath {
         f.write_str("Empath")
     }
 }
+
+// TODO:
+// Fortuneteller
+// Undertaker
+// Monk
+// Ravenkeeper
+pub(crate) struct Virgin {
+    ability_used: bool,
+}
+
+impl Default for Virgin {
+    fn default() -> Self {
+        Self {
+            ability_used: false,
+        }
+    }
+}
+
+impl Role for Virgin {
+    fn get_default_alignment(&self) -> Alignment {
+        Alignment::Good
+    }
+
+    fn get_true_character_type(&self) -> CharacterType {
+        CharacterType::Townsfolk
+    }
+
+    fn nominated(&self, nominating_player_index: PlayerIndex, state: &mut State) {
+        let nominator = state.get_player_mut(nominating_player_index);
+        nominator.execute();
+    }
+}
+
+impl Display for Virgin {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Virgin")
+    }
+}
+// TODO:
+// Slayer
+// Soldier
+// Mayor

@@ -1,4 +1,5 @@
-use super::{PlayerIndex, State, status_effects::StatusEffect};
+use super::{PlayerIndex, status_effects::StatusEffect};
+use crate::Player;
 // -- Logging --
 // TODO: Implement all events
 #[derive(Clone, Debug)]
@@ -110,6 +111,7 @@ impl Log {
     }
 
     // TODO: Write search macro that takes in optional params (think like a python function)
+    // Use opt args crate
 
     pub fn next_phase(&mut self) {
         // Check the latest day_phase
