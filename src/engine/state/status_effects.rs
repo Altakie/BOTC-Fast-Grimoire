@@ -67,6 +67,14 @@ pub(crate) trait StatusType: Send + Sync + Display {
     }
 }
 
+impl State {
+    pub(crate) fn cleanup_statuses(&mut self, source_player_index: PlayerIndex) {
+        for player in self.players.iter_mut() {
+            player.remove_players_statuses(source_player_index);
+        }
+    }
+}
+
 // #[derive(Clone, Copy, Hash, Debug, PartialEq, Eq, PartialOrd, Ord)]
 // pub(crate) enum StatusType {
 //     // General
