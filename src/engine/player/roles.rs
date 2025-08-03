@@ -2,10 +2,13 @@ use serde_derive::{Deserialize, Serialize};
 use std::fmt::{Debug, Display};
 use std::sync::Arc;
 
-use crate::engine::{
-    change_request::ChangeRequest,
-    player::{roles::townsfolk::*, *},
-    state::{PlayerIndex, State, Step},
+use crate::{
+    engine::{
+        change_request::ChangeRequest,
+        player::{roles::townsfolk::*, *},
+        state::{PlayerIndex, State, Step},
+    },
+    initialization::CharacterTypeCounts,
 };
 
 #[derive(Clone, Copy, Hash, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -112,8 +115,8 @@ pub(crate) trait Role: Display + Send + Sync {
     fn get_default_alignment(&self) -> Alignment;
 
     /// If the role disguises their alignment, this method should be overwritten
-    fn get_alignment(&self) -> Option<Alignment> {
-        None
+    fn get_alignment(&self) -> Alignment {
+        self.get_default_alignment()
     }
 
     /// This gets the true character type of the player. This is what should be used by the state
@@ -147,6 +150,13 @@ pub(crate) trait Role: Display + Send + Sync {
     ///     player should die.
     fn execute(&self, _state: &State) -> Option<bool> {
         return None;
+    }
+
+    /// If the role being in the game affects character type counts, overwrite this method. The
+    /// CharacterTypeCounts returned from this function will be added to the ones currently in the
+    /// game
+    fn initialization_effect(&self) -> Option<CharacterTypeCounts> {
+        None
     }
 
     // TODO: These has blah blah blah ability may not be necessary
