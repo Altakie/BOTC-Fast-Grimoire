@@ -1,6 +1,8 @@
 use std::fmt::Display;
 use std::sync::Arc;
 
+use macros::washerwoman_librarian_investigator;
+
 use crate::{
     engine::{
         change_request::{ChangeArgs, ChangeRequest, ChangeType},
@@ -50,91 +52,12 @@ impl Role for Washerwoman {
         player_index: crate::engine::state::PlayerIndex,
         _state: &State,
     ) -> Option<Vec<ChangeRequest>> {
-        let right_description = format!("Select a Townsfolk");
-        let wrong_description = "Select a different player".to_string();
-
-        let right_status =
-            move || StatusEffect::new(Arc::new(WasherwomanTownsfolk {}), player_index);
-        let wrong_status = move || StatusEffect::new(Arc::new(WasherwomanWrong {}), player_index);
-
-        let change_type = ChangeType::ChoosePlayers(1);
-        let right_check_func = move |state: &State, args: &ChangeArgs| -> Result<bool, ()> {
-            let target_player_indices = unwrap_args_err!(args, ChangeArgs::PlayerIndices(v) => v);
-
-            if target_player_indices.len() != 1 {
-                return Err(());
-            }
-
-            for target_player_index in target_player_indices {
-                if *target_player_index == player_index {
-                    return Ok(false);
-                }
-
-                let player = state.get_player(*target_player_index);
-                if matches!(
-                    player.get_character_type(),
-                    CharacterType::Townsfolk | CharacterType::Any
-                ) {
-                    return Ok(true);
-                }
-            }
-
-            return Ok(false);
-        };
-
-        let right_state_change = move |state: &mut State, args: ChangeArgs| {
-            let target_player_indices = unwrap_args_panic!(args, ChangeArgs::PlayerIndices(v) => v);
-
-            let target_player = state.get_player_mut(target_player_indices[0]);
-            target_player.add_status(right_status());
-        };
-
-        let wrong_check_func = move |state: &State, args: &ChangeArgs| -> Result<bool, ()> {
-            let target_player_indices = unwrap_args_err!(args, ChangeArgs::PlayerIndices(v) => v);
-
-            if target_player_indices.len() != 1 {
-                return Err(());
-            }
-
-            let target_player_index = target_player_indices[0];
-
-            if target_player_index == player_index {
-                return Ok(false);
-            }
-
-            let target_player = state.get_player(target_player_index);
-            if target_player
-                .get_statuses()
-                .iter()
-                .any(|se| *se == right_status())
-            {
-                return Ok(false);
-            }
-            return Ok(true);
-        };
-
-        let wrong_state_change = move |state: &mut State, args: ChangeArgs| {
-            let target_player_indices = unwrap_args_panic!(args, ChangeArgs::PlayerIndices(v) => v);
-
-            // Assign the chosen player the wrong status effect
-            let target_player = state.get_player_mut(target_player_indices[0]);
-            target_player.add_status(wrong_status());
-        };
-
-        Some(vec![
-            new_change_request!(
-                change_type,
-                right_description,
-                right_check_func,
-                right_state_change
-            ),
-            new_change_request!(
-                change_type,
-                wrong_description,
-                wrong_check_func,
-                wrong_state_change
-            ),
-        ])
+        washerwoman_librarian_investigator!(
+            player_index,
+            WasherwomanTownsfolk,
+            WasherwomanWrong,
+            "Townsfolk"
+        )
     }
 
     fn night_one_order(&self) -> Option<usize> {
@@ -160,98 +83,140 @@ impl Display for Washerwoman {
     }
 }
 
-fn washerwoman_librarian_investigator<R, W>(
-    player_index: PlayerIndex,
-    target: &str,
-) -> Option<Vec<ChangeRequest>>
-where
-    R: StatusType,
-    W: StatusType,
-{
-    let right_description = format!("Select a {target}");
-    let wrong_description = "Select a different player".to_string();
+#[derive(Default)]
+pub(crate) struct Librarian {}
 
-    let right_status = move || StatusEffect::new(Arc::new(R {}), player_index);
-    let wrong_status = move || StatusEffect::new(Arc::new(W {}), player_index);
+pub(crate) struct LibrarianOutsider {}
+impl StatusType for LibrarianOutsider {}
+impl Display for LibrarianOutsider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Librarian Outsider")
+    }
+}
 
-    let change_type = ChangeType::ChoosePlayers(1);
-    let right_check_func = move |state: &State, args: &ChangeArgs| -> Result<bool, ()> {
-        let target_player_indices = unwrap_args_err!(args, ChangeArgs::PlayerIndices(v) => v);
+pub(crate) struct LibrarianWrong {}
+impl StatusType for LibrarianWrong {}
+impl Display for LibrarianWrong {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Librarian Wrong")
+    }
+}
 
-        if target_player_indices.len() != 1 {
-            return Err(());
-        }
+impl Role for Librarian {
+    fn get_default_alignment(&self) -> Alignment {
+        Alignment::Good
+    }
 
-        for target_player_index in target_player_indices {
-            if *target_player_index == player_index {
-                return Ok(false);
-            }
+    fn get_true_character_type(&self) -> CharacterType {
+        CharacterType::Outsider
+    }
 
-            let player = state.get_player(*target_player_index);
-            if matches!(
-                player.get_character_type(),
-                CharacterType::Townsfolk | CharacterType::Any
-            ) {
-                return Ok(true);
-            }
-        }
+    fn setup_order(&self) -> Option<usize> {
+        Some(46)
+    }
 
-        return Ok(false);
-    };
+    fn setup_ability(
+        &self,
+        player_index: crate::engine::state::PlayerIndex,
+        _state: &State,
+    ) -> Option<Vec<ChangeRequest>> {
+        washerwoman_librarian_investigator!(
+            player_index,
+            LibrarianOutsider,
+            LibrarianWrong,
+            "Outsider"
+        )
+    }
 
-    let right_state_change = move |state: &mut State, args: ChangeArgs| {
-        let target_player_indices = unwrap_args_panic!(args, ChangeArgs::PlayerIndices(v) => v);
+    fn night_one_order(&self) -> Option<usize> {
+        Some(46)
+    }
 
-        let target_player = state.get_player_mut(target_player_indices[0]);
-        target_player.add_status(right_status());
-    };
+    fn night_one_ability(
+        &self,
+        player_index: crate::engine::state::PlayerIndex,
+        state: &State,
+    ) -> Option<Vec<ChangeRequest>> {
+        let player = state.get_player(player_index);
+        let message = format!("Show the {} the correct roles", player.role);
+        let change_type = ChangeType::Display;
 
-    let wrong_check_func = move |state: &State, args: &ChangeArgs| -> Result<bool, ()> {
-        let target_player_indices = unwrap_args_err!(args, ChangeArgs::PlayerIndices(v) => v);
+        Some(vec![new_change_request!(change_type, message)])
+    }
+}
 
-        if target_player_indices.len() != 1 {
-            return Err(());
-        }
+impl Display for Librarian {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Librarian")
+    }
+}
 
-        let target_player_index = target_player_indices[0];
+#[derive(Default)]
+pub(crate) struct Investigator {}
 
-        if target_player_index == player_index {
-            return Ok(false);
-        }
+pub(crate) struct InvestigatorMinion {}
+impl StatusType for InvestigatorMinion {}
+impl Display for InvestigatorMinion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Investigator Minion")
+    }
+}
 
-        let target_player = state.get_player(target_player_index);
-        if target_player
-            .get_statuses()
-            .iter()
-            .any(|se| *se == right_status())
-        {
-            return Ok(false);
-        }
-        return Ok(true);
-    };
+pub(crate) struct InvestigatorWrong {}
+impl StatusType for InvestigatorWrong {}
+impl Display for InvestigatorWrong {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Investigator Wrong")
+    }
+}
 
-    let wrong_state_change = move |state: &mut State, args: ChangeArgs| {
-        let target_player_indices = unwrap_args_panic!(args, ChangeArgs::PlayerIndices(v) => v);
+impl Role for Investigator {
+    fn get_default_alignment(&self) -> Alignment {
+        Alignment::Good
+    }
 
-        // Assign the chosen player the wrong status effect
-        let target_player = state.get_player_mut(target_player_indices[0]);
-        target_player.add_status(wrong_status());
-    };
+    fn get_true_character_type(&self) -> CharacterType {
+        CharacterType::Minion
+    }
 
-    Some(vec![
-        new_change_request!(
-            change_type,
-            right_description,
-            right_check_func,
-            right_state_change
-        ),
-        new_change_request!(
-            change_type,
-            wrong_description,
-            wrong_check_func,
-            wrong_state_change
-        ),
-    ])
+    fn setup_order(&self) -> Option<usize> {
+        Some(47)
+    }
+
+    fn setup_ability(
+        &self,
+        player_index: crate::engine::state::PlayerIndex,
+        _state: &State,
+    ) -> Option<Vec<ChangeRequest>> {
+        washerwoman_librarian_investigator!(
+            player_index,
+            InvestigatorMinion,
+            InvestigatorWrong,
+            "Minion"
+        )
+    }
+
+    fn night_one_order(&self) -> Option<usize> {
+        Some(47)
+    }
+
+    fn night_one_ability(
+        &self,
+        player_index: crate::engine::state::PlayerIndex,
+        state: &State,
+    ) -> Option<Vec<ChangeRequest>> {
+        let player = state.get_player(player_index);
+        let message = format!("Show the {} the correct roles", player.role);
+        let change_type = ChangeType::Display;
+
+        Some(vec![new_change_request!(change_type, message)])
+    }
+}
+
+impl Display for Investigator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Investigator")
+    }
 }
 
 #[derive(Default)]
@@ -304,5 +269,71 @@ impl Role for Chef {
 impl Display for Chef {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("Chef")
+    }
+}
+
+struct Empath {}
+
+impl Empath {
+    fn ability(&self, player_index: PlayerIndex, state: &State) -> Option<Vec<ChangeRequest>> {
+        // Check how many players next to the empath are evil
+        let mut count = 0;
+        {
+            let left_player = state.get_player(state.left_player(player_index));
+            if left_player.alignment == Alignment::Evil {
+                count += 1;
+            }
+        }
+        {
+            let right_player = state.get_player(state.right_player(player_index));
+            if right_player.alignment == Alignment::Evil {
+                count += 1;
+            }
+        }
+        let message = format!("Empath has {} evil neighbors", count);
+
+        let change_type = ChangeType::Display;
+
+        Some(vec![new_change_request!(change_type, message)])
+    }
+}
+
+impl Role for Empath {
+    fn get_default_alignment(&self) -> Alignment {
+        Alignment::Good
+    }
+
+    fn get_true_character_type(&self) -> CharacterType {
+        CharacterType::Townsfolk
+    }
+
+    fn night_one_order(&self) -> Option<usize> {
+        Some(49)
+    }
+
+    fn night_order(&self) -> Option<usize> {
+        Some(68)
+    }
+
+    fn night_one_ability(
+        &self,
+        player_index: PlayerIndex,
+        state: &State,
+    ) -> Option<Vec<ChangeRequest>> {
+        self.ability(player_index, state)
+    }
+
+    fn night_ability(
+        &self,
+        player_index: PlayerIndex,
+        state: &State,
+    ) -> Option<Vec<ChangeRequest>> {
+        self.ability(player_index, state)
+    }
+}
+
+impl Display for Empath {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Empath")
     }
 }

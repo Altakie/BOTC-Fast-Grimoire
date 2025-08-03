@@ -1,3 +1,5 @@
+use std::ops::{Add, AddAssign, Sub, SubAssign};
+
 use crate::engine::player::{CharacterType, roles::Roles};
 
 use serde_derive::{Deserialize, Serialize};
@@ -38,14 +40,13 @@ impl Script {
         Self { roles }
     }
 }
-
 // -- Setup Structures --
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct CharacterTypeCounts {
-    pub(crate) townsfolk: isize,
-    pub(crate) outsiders: isize,
-    pub(crate) minions: isize,
-    pub(crate) demons: isize,
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
+pub struct CharacterTypeCounts {
+    pub townsfolk: isize,
+    pub outsiders: isize,
+    pub minions: isize,
+    pub demons: isize,
 }
 
 impl CharacterTypeCounts {
@@ -123,43 +124,24 @@ impl CharacterTypeCounts {
     }
 
     pub(crate) fn new_empty() -> Self {
-        Self {
-            townsfolk: 0,
-            outsiders: 0,
-            minions: 0,
-            demons: 0,
-        }
+        Self::default()
     }
 
     pub(crate) fn is_empty(&self) -> bool {
         self.townsfolk == 0 && self.outsiders == 0 && self.minions == 0 && self.demons == 0
     }
 
-    pub(crate) fn diff(&self, other: &Self) -> Self {
-        Self {
-            townsfolk: self.townsfolk - other.townsfolk,
-            outsiders: self.outsiders - other.outsiders,
-            minions: self.minions - other.minions,
-            demons: self.demons - other.demons,
+    pub(crate) fn on_choose(&mut self, role: Roles) {
+        let delta = role.convert().initialization_effect();
+        if let Some(delta) = delta {
+            *self += delta
         }
     }
 
-    pub(crate) fn on_choose(&mut self, role: Roles) {
-        self.role_effects(role, 1);
-    }
-
     pub(crate) fn on_remove(&mut self, role: Roles) {
-        self.role_effects(role, -1);
-    }
-
-    fn role_effects(&mut self, role: Roles, multiplier: isize) {
-        match role {
-            Roles::Baron => {
-                let num = 2 * multiplier;
-                self.outsiders += num;
-                self.townsfolk -= num;
-            }
-            _ => (),
+        let delta = role.convert().initialization_effect();
+        if let Some(delta) = delta {
+            *self -= delta
         }
     }
 
@@ -169,6 +151,7 @@ impl CharacterTypeCounts {
             CharacterType::Outsider => self.outsiders = count,
             CharacterType::Minion => self.minions = count,
             CharacterType::Demon => self.demons = count,
+            CharacterType::Any => (),
         }
     }
 
@@ -178,7 +161,52 @@ impl CharacterTypeCounts {
             CharacterType::Outsider => self.outsiders,
             CharacterType::Minion => self.minions,
             CharacterType::Demon => self.demons,
+            CharacterType::Any => 0,
         }
+    }
+}
+
+impl Add for CharacterTypeCounts {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Self::Output {
+            townsfolk: self.townsfolk + rhs.townsfolk,
+            outsiders: self.outsiders + rhs.outsiders,
+            minions: self.minions + rhs.minions,
+            demons: self.demons + rhs.demons,
+        }
+    }
+}
+
+impl AddAssign for CharacterTypeCounts {
+    fn add_assign(&mut self, rhs: Self) {
+        self.townsfolk += rhs.townsfolk;
+        self.outsiders += rhs.outsiders;
+        self.minions += rhs.minions;
+        self.demons += rhs.demons;
+    }
+}
+
+impl Sub for CharacterTypeCounts {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self::Output {
+            townsfolk: self.townsfolk - rhs.townsfolk,
+            outsiders: self.outsiders - rhs.outsiders,
+            minions: self.minions - rhs.minions,
+            demons: self.demons - rhs.demons,
+        }
+    }
+}
+
+impl SubAssign for CharacterTypeCounts {
+    fn sub_assign(&mut self, rhs: Self) {
+        self.townsfolk -= rhs.townsfolk;
+        self.outsiders -= rhs.outsiders;
+        self.minions -= rhs.minions;
+        self.demons -= rhs.demons;
     }
 }
 
