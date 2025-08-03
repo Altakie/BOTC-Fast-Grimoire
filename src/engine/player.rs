@@ -71,6 +71,11 @@ impl Player {
         return None;
     }
 
+    pub(crate) fn remove_players_statuses(&mut self, source_player_index: PlayerIndex) {
+        self.status_effects
+            .retain(|s| s.source_player_index != source_player_index);
+    }
+
     // Player Behaviors
 
     /// Default behavior is that the player dies. If the player does not die, it should be because
@@ -139,12 +144,7 @@ impl Player {
     }
 
     pub(crate) fn get_alignment(&self) -> Alignment {
-        // Roles
-        if let Some(alignment) = self.role.get_alignment() {
-            return alignment;
-        }
-
-        return self.alignment;
+        self.role.get_alignment()
     }
 
     pub(crate) fn get_character_type(&self) -> CharacterType {
