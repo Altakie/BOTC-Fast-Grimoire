@@ -17,7 +17,6 @@ use crate::{
     },
     new_change_request, unwrap_args_err, unwrap_args_panic,
 };
-use std::collections::HashMap;
 
 fn get_role_order_night1(role: Roles) -> usize {
     match role {
@@ -99,7 +98,7 @@ fn get_role_order_night1(role: Roles) -> usize {
     }
 }
 impl State {
-    pub(crate) fn get_next_active_night1(
+    pub(crate) fn get_next_active_night1(StatusType
         &self,
         previous_player: Option<PlayerIndex>,
     ) -> Option<PlayerIndex> {
@@ -160,184 +159,6 @@ impl State {
             None => return None,
         }
     }
-
-    // pub(crate) fn get_night_1_order(
-    //     &self,
-    //     player_index: Option<PlayerIndex>,
-    // ) -> Option<PlayerIndex> {
-    //     let player_index = player_index?;
-    //     let role = self.get_acting_role(player_index);
-    //     let order = match role {
-    //         // Role::DUSK => 0,
-    //         // Role::Lordoftyphon => 1,
-    //         // Role::Kazali => 2,
-    //         // Role::Apprentice => 3,
-    //         // Role::Barista => 4,
-    //         // Role::Bureaucrat => 5,
-    //         // Role::Thief => 6,
-    //         // Role::Boffin => 7,
-    //         // Role::Philosopher => 8,
-    //         // Role::Alchemist => 9,
-    //         // Role::Poppygrower => 10,
-    //         // Role::Yaggababble => 11,
-    //         // Role::Magician => 12,
-    //         // Role::MINION => 13, TODO: Need to implement this shit
-    //         // Role::Snitch => 14,
-    //         // Role::Lunatic => 15,
-    //         // Role::Summoner => 16,
-    //         // Role::DEMON => 17, TODO: Need to implement this shit
-    //         // Role::King => 18,
-    //         // Role::Sailor => 19,
-    //         // Role::Marionette => 20,
-    //         // Role::Engineer => 21,
-    //         // Role::Preacher => 22,
-    //         // Role::Lilmonsta => 23,
-    //         // Role::Lleech => 24,
-    //         // Role::Xaan => 25,
-    //         Roles::Poisoner => 26,
-    //         // Role::Widow => 27,
-    //         // Role::Courtier => 28,
-    //         // Role::Wizard => 29,
-    //         // Role::Snakecharmer => 30,
-    //         // Role::Godfather => 31,
-    //         // Role::Organgrinder => 32,
-    //         // Role::Devilsadvocate => 33,
-    //         // Role::Eviltwin => 34,
-    //         // Role::Witch => 35,
-    //         // Role::Cerenovus => 36,
-    //         // Role::Fearmonger => 37,
-    //         // Role::Harpy => 38,
-    //         // Role::Mezepheles => 39,
-    //         // Role::Pukka => 40,
-    //         // Role::Pixie => 41,
-    //         // Role::Huntsman => 42,
-    //         // Role::Damsel => 43,
-    //         // Role::Amnesiac => 44,
-    //         Roles::Washerwoman => 45,
-    //         Roles::Librarian => 46,
-    //         Roles::Investigator => 47,
-    //         Roles::Chef => 48,
-    //         Roles::Empath => 49,
-    //         Roles::Fortuneteller => 50,
-    //         Roles::Butler => 51,
-    //         // Role::Grandmother => 52,
-    //         // Role::Clockmaker => 53,
-    //         // Role::Dreamer => 54,
-    //         // Role::Seamstress => 55,
-    //         // Role::Steward => 56,
-    //         // Role::Knight => 57,
-    //         // Role::Noble => 58,
-    //         // Role::Balloonist => 59,
-    //         // Role::Shugenja => 60,
-    //         // Role::Villageidiot => 61,
-    //         // Role::Bountyhunter => 62,
-    //         // Role::Nightwatchman => 63,
-    //         // Role::Cultleader => 64,
-    //         Roles::Spy => 65,
-    //         // Role::Ogre => 66,
-    //         // Role::Highpriestess => 67,
-    //         // Role::General => 68,
-    //         // Role::Chambermaid => 69,
-    //         // Role::Mathematician => 70,
-    //         // Role::DAWN => 71, TODO: Figure out wtf this means
-    //         // Role::Leviathan => 72,
-    //         // Role::Vizier => 73
-    //         _ => return None,
-    //     };
-    //
-    //     return Some(order);
-    // }
-
-    // pub(crate) fn get_night_1_order(&self, player_indices: Vec<PlayerIndex>) -> Vec<PlayerIndex> {
-    //     // Go through all roles and assign each of them a number
-    //     // Maps night_order to player index
-    //     let mut order_map: HashMap<usize, PlayerIndex> = HashMap::new();
-    //     for index in player_indices {
-    //         let role = self.players[index].role;
-    //         let order: usize = match role {
-    //             // Role::DUSK => 0,
-    //             // Role::Lordoftyphon => 1,
-    //             // Role::Kazali => 2,
-    //             // Role::Apprentice => 3,
-    //             // Role::Barista => 4,
-    //             // Role::Bureaucrat => 5,
-    //             // Role::Thief => 6,
-    //             // Role::Boffin => 7,
-    //             // Role::Philosopher => 8,
-    //             // Role::Alchemist => 9,
-    //             // Role::Poppygrower => 10,
-    //             // Role::Yaggababble => 11,
-    //             // Role::Magician => 12,
-    //             // Role::MINION => 13, TODO: Need to implement this shit
-    //             // Role::Snitch => 14,
-    //             // Role::Lunatic => 15,
-    //             // Role::Summoner => 16,
-    //             // Role::DEMON => 17, TODO: Need to implement this shit
-    //             // Role::King => 18,
-    //             // Role::Sailor => 19,
-    //             // Role::Marionette => 20,
-    //             // Role::Engineer => 21,
-    //             // Role::Preacher => 22,
-    //             // Role::Lilmonsta => 23,
-    //             // Role::Lleech => 24,
-    //             // Role::Xaan => 25,
-    //             Role::Poisoner => 26,
-    //             // Role::Widow => 27,
-    //             // Role::Courtier => 28,
-    //             // Role::Wizard => 29,
-    //             // Role::Snakecharmer => 30,
-    //             // Role::Godfather => 31,
-    //             // Role::Organgrinder => 32,
-    //             // Role::Devilsadvocate => 33,
-    //             // Role::Eviltwin => 34,
-    //             // Role::Witch => 35,
-    //             // Role::Cerenovus => 36,
-    //             // Role::Fearmonger => 37,
-    //             // Role::Harpy => 38,
-    //             // Role::Mezepheles => 39,
-    //             // Role::Pukka => 40,
-    //             // Role::Pixie => 41,
-    //             // Role::Huntsman => 42,
-    //             // Role::Damsel => 43,
-    //             // Role::Amnesiac => 44,
-    //             Role::Washerwoman => 45,
-    //             Role::Librarian => 46,
-    //             Role::Investigator => 47,
-    //             Role::Chef => 48,
-    //             Role::Empath => 49,
-    //             Role::Fortuneteller => 50,
-    //             Role::Butler => 51,
-    //             // Role::Grandmother => 52,
-    //             // Role::Clockmaker => 53,
-    //             // Role::Dreamer => 54,
-    //             // Role::Seamstress => 55,
-    //             // Role::Steward => 56,
-    //             // Role::Knight => 57,
-    //             // Role::Noble => 58,
-    //             // Role::Balloonist => 59,
-    //             // Role::Shugenja => 60,
-    //             // Role::Villageidiot => 61,
-    //             // Role::Bountyhunter => 62,
-    //             // Role::Nightwatchman => 63,
-    //             // Role::Cultleader => 64,
-    //             Role::Spy => 65,
-    //             // Role::Ogre => 66,
-    //             // Role::Highpriestess => 67,
-    //             // Role::General => 68,
-    //             // Role::Chambermaid => 69,
-    //             // Role::Mathematician => 70,
-    //             // Role::DAWN => 71, TODO: Figure out wtf this means
-    //             // Role::Leviathan => 72,
-    //             // Role::Vizier => 73
-    //             _ => 0,
-    //         };
-    //         if order != 0 {
-    //             order_map.insert(order, index);
-    //         }
-    //     }
-    //
-    //     return self.get_order_from_map(order_map);
-    // }
 
     // pub(crate) fn get_night_order(&self, player_indices: Vec<PlayerIndex>) -> Vec<PlayerIndex> {
     //     // Go through all roles and assign each of them a number
@@ -465,24 +286,14 @@ impl Roles {
         // letting the storyteller decide what number they should give
         // TODO: Implement abilities for every role
         match self {
-            Roles::Investigator => Some(washerwoman_librarian_investigator_ability(*self)),
-            Roles::Empath => Some(empath_ability(state, player_index)),
             // Role::Gossip => todo!(),      // Should wait till v2
             // Role::Innkeeper => todo!(),   // Should wait till v2
-            Roles::Washerwoman => Some(washerwoman_librarian_investigator_ability(*self)),
-            Roles::Librarian => Some(washerwoman_librarian_investigator_ability(*self)),
-            Roles::Chef => Some(chef_ability(state)),
             Roles::Fortuneteller => Some(fortuneteller_ability(state)),
             Roles::Drunk => {
                 let role = state.get_acting_role(player_index);
                 role.resolve_night_1_ability(player_index, state)
             }
             Roles::Butler => Some(butler_ability(player_index)),
-            Roles::Spy => {
-                // Just tell the storyteller to let the spy look at the grimoire
-                Some(spy_ability())
-            }
-            Roles::Poisoner => Some(poisoner_ability(player_index)), // Add poison to someone until next night, same as
             // normal ability
             _ => None,
         }
@@ -531,7 +342,7 @@ impl Roles {
 //     let player = &mut self.players[player_index];
 //     let role = player.role;
 //     match role {
-//         Role::Empath => {
+//         Role::Empath => {StatusType
 //             let count = self.empath_ability(player_index);
 //             // For now, just print output
 //             println!("Empath count: {}", count);
@@ -598,60 +409,6 @@ impl Roles {
 // }
 
 // NOTE: Role Specific Abilities
-fn empath_ability(state: &State, player_index: PlayerIndex) -> Vec<ChangeRequest> {
-    // Check how many players next to the empath are evil
-    let mut count = 0;
-    {
-        let left_player = &state.players[state.left_player(player_index)];
-        if left_player.alignment == Alignment::Evil {
-            count += 1;
-        }
-    }
-    {
-        let right_player = &state.players[state.right_player(player_index)];
-        if right_player.alignment == Alignment::Evil {
-            count += 1;
-        }
-    }
-    let message = format!("Empath has {} evil neighbors", count);
-
-    let change_type = ChangeType::Display;
-
-    vec![new_change_request!(change_type, message)]
-}
-
-fn washerwoman_librarian_investigator_ability(role: Roles) -> Vec<ChangeRequest> {
-    // TODO: Perhaps need find status method, or highlight the players with these statuses
-    let message = format!("Show {} the correct roles", role);
-    let change_type = ChangeType::Display;
-
-    vec![new_change_request!(change_type, message)]
-}
-
-fn chef_ability(state: &State) -> Vec<ChangeRequest> {
-    // Count pairs of evil players
-    // For each evil, player, check if the right player is evil, if yes, increment the
-    // pair count
-    let change_type = ChangeType::Display;
-    let mut pair_count = 0;
-
-    for player_index in 0..state.players.len() {
-        let player = &state.players[player_index];
-        if player.alignment != Alignment::Evil {
-            continue;
-        }
-        let right_player = &state.players[state.right_player(player_index)];
-        if right_player.alignment == Alignment::Evil {
-            pair_count += 1;
-        }
-    }
-    let message = format!(
-        "Show the chef that there are {} pairs of evil players",
-        pair_count
-    );
-
-    vec![new_change_request!(change_type, message)]
-}
 
 fn fortuneteller_ability(state: &State) -> Vec<ChangeRequest> {
     // TODO: Prompt for a choice of two players
@@ -674,111 +431,8 @@ fn fortuneteller_ability(state: &State) -> Vec<ChangeRequest> {
     todo!()
 }
 
-fn butler_ability(player_index: PlayerIndex) -> Vec<ChangeRequest> {
-    // Clean up the old butler master status effect (if there is one), prompt for another
-    // player, and give them the butler master status effect
-
-    let message = "Prompt the butler to pick a player to be their master".to_string();
-    let change_type = ChangeType::ChoosePlayers(1);
-
-    let check_func = move |_: &State, args: &ChangeArgs| -> Result<bool, ()> {
-        let target_players = unwrap_args_err!(args, ChangeArgs::PlayerIndices(v) => v);
-
-        if target_players.len() != 1 {
-            return Err(());
-        }
-
-        // Check that the butler is not picking themselves
-        if target_players[0] == player_index {
-            return Ok(false);
-        }
-
-        return Ok(true);
-    };
-
-    let state_change_func = move |state: &mut State, args: ChangeArgs| {
-        // Check if there are any butler master status effects inflicted by this player and clear
-        // them
-        let prev_effects = state.get_inflicted_statuses(player_index);
-
-        let prev_effect = prev_effects
-            .iter()
-            .find(|se| se.status_type == StatusType::ButlerMaster);
-
-        if let Some(prev_effect) = prev_effect {
-            state.remove_status(
-                prev_effect.status_type,
-                prev_effect.source_player_index,
-                prev_effect.affected_player_index,
-            );
-        }
-
-        let target_player_index = unwrap_args_panic!(args, ChangeArgs::PlayerIndices(pv) => pv)[0];
-        state.add_status(StatusType::ButlerMaster, player_index, target_player_index);
-    };
-
-    vec![new_change_request!(
-        change_type,
-        message,
-        check_func,
-        state_change_func
-    )]
-}
-
-fn spy_ability() -> Vec<ChangeRequest> {
-    let change_type = ChangeType::Display;
-    let message = "Show the Spy the grimoire".to_string();
-
-    vec![new_change_request!(change_type, message)]
-}
 
 // TODO: Merge abilities that add a new status every night (monk, poisoner, )
-fn poisoner_ability(player_index: PlayerIndex) -> Vec<ChangeRequest> {
-    // Clean up the old poisoned effect, prompt for another
-    // player, and give them the poisoned effect
-
-    let message = "Prompt the poisoner to pick a player to poison".to_string();
-    let change_type = ChangeType::ChoosePlayers(1);
-
-    let check_func = move |_: &State, args: &ChangeArgs| -> Result<bool, ()> {
-        let target_players = unwrap_args_err!(args, ChangeArgs::PlayerIndices(v) => v);
-
-        if target_players.len() != 1 {
-            return Err(());
-        }
-
-        return Ok(true);
-    };
-
-    let state_change_func = move |state: &mut State, args: ChangeArgs| {
-        // Check if there are any poisoned status effects inflicted by this player and clear
-        // them
-        let prev_effects = state.get_inflicted_statuses(player_index);
-
-        let prev_effect = prev_effects
-            .iter()
-            .find(|se| se.status_type == StatusType::Poisoned);
-
-        if let Some(prev_effect) = prev_effect {
-            state.remove_status(
-                prev_effect.status_type,
-                prev_effect.source_player_index,
-                prev_effect.affected_player_index,
-            );
-        }
-
-        let target_player_index = unwrap_args_panic!(args, ChangeArgs::PlayerIndices(pv) => pv)[0];
-        state.add_status(StatusType::Poisoned, player_index, target_player_index);
-    };
-
-    vec![new_change_request!(
-        change_type,
-        message,
-        check_func,
-        state_change_func
-    )]
-}
-
 fn monk_ability(player_index: PlayerIndex) -> Vec<ChangeRequest> {
     let change_type = ChangeType::ChoosePlayers(1);
     let message = "Have the monk select a player to protect".to_string();

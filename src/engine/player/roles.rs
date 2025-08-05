@@ -1,7 +1,11 @@
+use leptos::prelude::StorageAccess;
+use macros::roleptr;
 use serde_derive::{Deserialize, Serialize};
 use std::fmt::{Debug, Display};
-use std::sync::Arc;
+use std::ops::Deref;
+use std::sync::{Arc, RwLock, RwLockReadGuard};
 
+use crate::engine::change_request::ChangeArgs;
 use crate::{
     engine::{
         change_request::ChangeRequest,
@@ -75,35 +79,27 @@ impl Display for Roles {
     }
 }
 
-impl Roles {
-    pub(crate) fn convert(&self) -> Arc<dyn Role> {
-        // TODO: Make classes to roles and resolve them here
-        match self {
-            Roles::Investigator => todo!(),
-            Roles::Empath => todo!(),
-            Roles::Gossip => todo!(),
-            Roles::Innkeeper => todo!(),
-            Roles::Washerwoman => todo!(),
-            Roles::Librarian => todo!(),
-            Roles::Chef => Arc::new(Chef::default()),
-            Roles::Fortuneteller => todo!(),
-            Roles::Undertaker => todo!(),
-            Roles::Virgin => todo!(),
-            Roles::Soldier => todo!(),
-            Roles::Slayer => todo!(),
-            Roles::Mayor => todo!(),
-            Roles::Monk => todo!(),
-            Roles::Ravenkeeper => todo!(),
-            Roles::Drunk => todo!(),
-            Roles::Saint => todo!(),
-            Roles::Butler => todo!(),
-            Roles::Recluse => todo!(),
-            Roles::Spy => todo!(),
-            Roles::Baron => todo!(),
-            Roles::Scarletwoman => todo!(),
-            Roles::Poisoner => todo!(),
-            Roles::Imp => todo!(),
-        }
+impl Roles {}
+
+pub struct RolePtr(Arc<dyn Role>);
+
+impl RolePtr {
+    pub fn reassign(&mut self, other: RolePtr) {
+        self.0 = other.0
+    }
+}
+
+impl Deref for RolePtr {
+    type Target = dyn Role;
+
+    fn deref(&self) -> &Self::Target {
+        self.0.deref()
+    }
+}
+
+impl Clone for RolePtr {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
     }
 }
 
@@ -139,7 +135,7 @@ pub(crate) trait Role: Display + Send + Sync {
     ///     * Returns a Option<bool> based on whether or not the role overwrites the default kill behavior of
     ///     the player. By default, it does not do anything and returns None. A true indicates the
     ///     player should die.
-    fn kill(&self, _attacking_player_index: PlayerIndex, _state: &State) -> Option<bool> {
+    fn kill(&self, _attacking_player_index: PlayerIndex) -> Option<bool> {
         return None;
     }
 
@@ -222,9 +218,46 @@ pub(crate) trait Role: Display + Send + Sync {
     ) -> Option<Vec<ChangeRequest>> {
         None
     }
+
+    /// Does nothing by default, used, by the game engine to pass args back to the role if needed.
+    /// Since roles are immutable, if this notification changes the role in any way, this will
+    /// return Some(RolePtr) with the new role data
+    fn notify(&self, _args: &ChangeArgs) -> Option<RolePtr> {
+        None
+    }
 }
 
 impl Roles {
+    pub(crate) fn convert(&self) -> RolePtr {
+        // TODO: Make classes to roles and resolve them here
+        match self {
+            Roles::Investigator => todo!(),
+            Roles::Empath => todo!(),
+            Roles::Gossip => todo!(),
+            Roles::Innkeeper => todo!(),
+            Roles::Washerwoman => todo!(),
+            Roles::Librarian => todo!(),
+            Roles::Chef => roleptr!(Chef),
+            Roles::Fortuneteller => todo!(),
+            Roles::Undertaker => todo!(),
+            Roles::Virgin => todo!(),
+            Roles::Soldier => todo!(),
+            Roles::Slayer => todo!(),
+            Roles::Mayor => todo!(),
+            Roles::Monk => todo!(),
+            Roles::Ravenkeeper => todo!(),
+            Roles::Drunk => todo!(),
+            Roles::Saint => todo!(),
+            Roles::Butler => todo!(),
+            Roles::Recluse => todo!(),
+            Roles::Spy => todo!(),
+            Roles::Baron => todo!(),
+            Roles::Scarletwoman => todo!(),
+            Roles::Poisoner => todo!(),
+            Roles::Imp => todo!(),
+        }
+    }
+
     pub(crate) fn get_default_alignment(&self) -> Alignment {
         match self.get_type() {
             CharacterType::Minion | CharacterType::Demon => Alignment::Evil,

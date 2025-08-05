@@ -66,7 +66,7 @@ macro_rules! new_change_request {
     ($ct:expr, $desc:expr, $cf:expr, $scf:expr) => {
         ChangeRequest {
             change_type: $ct,
-            description: $desc,
+            description: $desc.into(),
             check_func: Some(std::sync::Arc::new($cf)),
             state_change_func: Some(std::sync::Arc::new($scf)),
             clear: true,
@@ -77,14 +77,14 @@ macro_rules! new_change_request {
             change_type: $ct,
             check_func: None,
             state_change_func: None,
-            description: $desc,
+            description: $desc.into(),
             clear: true,
         }
     };
     (noclear: $ct:expr, $desc:expr, $cf:expr, $scf:expr) => {
         ChangeRequest {
             change_type: $ct,
-            description: $desc,
+            description: $desc.into(),
             check_func: Some(std::sync::Arc::new($cf)),
             state_change_func: Some(std::sync::Arc::new($scf)),
             clear: false,

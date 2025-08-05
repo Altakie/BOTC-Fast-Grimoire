@@ -5,8 +5,8 @@ use std::{
 };
 
 use crate::engine::{
-    change_request::ChangeRequest,
-    player::roles::Role,
+    change_request::{ChangeArgs, ChangeRequest},
+    player::roles::{Role, RolePtr},
     state::{PlayerIndex, State, Step, status_effects::StatusEffect},
 };
 
@@ -44,7 +44,7 @@ pub(crate) enum CharacterType {
 pub(crate) struct Player {
     pub(crate) name: String,
     // TODO: Might need to be Arc instead of rc
-    pub(crate) role: Arc<dyn Role>,
+    pub(crate) role: RolePtr,
     // Order should be implemented through external array
     pub(crate) dead: bool,
     pub(crate) ghost_vote: bool,
@@ -54,7 +54,7 @@ pub(crate) struct Player {
 }
 
 impl Player {
-    pub(crate) fn new(name: String, role: Arc<dyn Role>) -> Self {
+    pub(crate) fn new(name: String, role: RolePtr) -> Self {
         let alignment = role.get_default_alignment();
         Self {
             name,
@@ -211,11 +211,11 @@ impl Player {
 
     /// If the role has an ability that acts during the night (not including night one), this method should be overwritten and return
     /// Some(order) in which the ability acts
-    fn night_order(&self) -> Option<usize> {
+    pub fn night_order(&self) -> Option<usize> {
         self.role.night_order()
     }
     /// If the role has an ability that acts during the night (not including night one), this method should be overwritten and resolve the night ability
-    fn night_ability(
+    pub fn night_ability(
         &self,
         player_index: PlayerIndex,
         state: &State,
@@ -239,12 +239,23 @@ impl Player {
     }
 
     /// If the role has an ability that acts during the day (not including night one), this method should be overwritten and indicate which part(s) of the day this ability can be triggered during
-    fn has_day_ability(&self) -> Option<Step> {
+    pub fn has_day_ability(&self) -> Option<Step> {
         self.role.has_day_ability()
     }
     /// If the role has an ability that acts during the day (not including night one), this method should be overwritten and resolve the day ability
-    fn day_ability(&self, player_index: PlayerIndex, state: &State) -> Option<Vec<ChangeRequest>> {
+    pub fn day_ability(
+        &self,
+        player_index: PlayerIndex,
+        state: &State,
+    ) -> Option<Vec<ChangeRequest>> {
         self.role.day_ability(player_index, state)
+    }
+
+    pub fn notify(&mut self, args: &ChangeArgs) {
+        let role_change = self.role.notify(args);
+        if let Some(role_change) = role_change {
+            self.role.reassign(role_change);
+        }
     }
 }
 

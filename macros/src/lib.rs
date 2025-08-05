@@ -1,13 +1,87 @@
-use quote::quote;
+use quote::{ToTokens, quote};
 use syn::{parse::Parse, token::Token, *};
-struct Comp {
+
+struct RolePtrArgs {
+    role: RoleType,
+}
+
+impl Parse for RolePtrArgs {
+    fn parse(input: parse::ParseStream) -> Result<Self> {
+        Ok(Self {
+            role: RoleType::parse(input)?,
+        })
+    }
+}
+
+impl ToTokens for RolePtrArgs {
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        let RoleType(role) = &self.role;
+        tokens.extend(quote! {
+            {
+                let role = #role::default();
+                RolePtr(std::sync::Arc::new(role))
+            }
+        })
+    }
+}
+
+struct RoleType(syn::Type);
+
+impl Parse for RoleType {
+    fn parse(input: parse::ParseStream) -> Result<Self> {
+        syn::Type::parse(input).map(Self)
+    }
+}
+
+#[proc_macro]
+pub fn roleptr(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let parsed = parse_macro_input!(input as RolePtrArgs);
+    quote! {#parsed}.into()
+}
+
+struct RolePtrFromArgs {
+    role: RoleStruct,
+}
+
+impl Parse for RolePtrFromArgs {
+    fn parse(input: parse::ParseStream) -> Result<Self> {
+        Ok(Self {
+            role: RoleStruct::parse(input)?,
+        })
+    }
+}
+
+impl ToTokens for RolePtrFromArgs {
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        let RoleStruct(role_struct) = &self.role;
+        tokens.extend(quote! {
+            RolePtr(std::sync::Arc::new(#role_struct))
+        });
+    }
+}
+
+struct RoleStruct(syn::ExprStruct);
+
+impl Parse for RoleStruct {
+    fn parse(input: parse::ParseStream) -> Result<Self> {
+        syn::ExprStruct::parse(input).map(Self)
+    }
+}
+
+#[proc_macro]
+pub fn roleptr_from(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let p = parse_macro_input!(input as RolePtrFromArgs);
+    quote! {#p}.into()
+}
+
+struct WasherwomanLibrarianInvestigator {
     player_index: PlayerIndex,
     right_effect: StatusEffectType,
     wrong_effect: StatusEffectType,
     target: TargetString,
 }
 
-impl Parse for Comp {
+impl Parse for WasherwomanLibrarianInvestigator {
     fn parse(input: parse::ParseStream) -> Result<Self> {
         // Input should look like function arguments
         let player_index = PlayerIndex::parse(input)?;
@@ -27,7 +101,7 @@ impl Parse for Comp {
     }
 }
 
-impl quote::ToTokens for Comp {
+impl quote::ToTokens for WasherwomanLibrarianInvestigator {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let PlayerIndex(player_index) = &self.player_index;
         let StatusEffectType(right_effect) = &self.right_effect;
@@ -39,8 +113,8 @@ impl quote::ToTokens for Comp {
                 let right_description = format!("Select a {}", #target_string);
                 let wrong_description = "Select a different player".to_string();
 
-                let right_status = move || StatusEffect::new(Arc::new(#right_effect {}), #player_index);
-                let wrong_status = move || StatusEffect::new(Arc::new(#wrong_effect {}), #player_index);
+                let right_status = move || StatusEffect::new(std::sync::Arc::new(#right_effect {}), #player_index);
+                let wrong_status = move || StatusEffect::new(std::sync::Arc::new(#wrong_effect {}), #player_index);
 
                 let change_type = ChangeType::ChoosePlayers(1);
                 let right_check_func = move |state: &State, args: &ChangeArgs| -> Result<bool, ()> {
@@ -153,6 +227,6 @@ impl Parse for TargetString {
 pub fn washerwoman_librarian_investigator(
     input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-    let c = parse_macro_input!(input as Comp);
+    let c = parse_macro_input!(input as WasherwomanLibrarianInvestigator);
     quote! {#c}.into()
 }

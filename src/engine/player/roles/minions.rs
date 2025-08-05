@@ -6,7 +6,7 @@ use crate::{
         player::{Alignment, CharacterType, PlayerBehaviors, roles::Role},
         state::{
             PlayerIndex, State,
-            status_effects::{StatusEffect, StatusType},
+            status_effects::{Poisoned, StatusEffect, StatusType},
         },
     },
     initialization::CharacterTypeCounts,
@@ -15,6 +15,14 @@ use crate::{
 
 #[derive(Default)]
 struct Spy {}
+impl Spy {
+    fn ability(&self) -> Option<Vec<ChangeRequest>> {
+        let change_type = ChangeType::Display;
+        let message = "Show the Spy the grimoire".to_string();
+
+        Some(vec![new_change_request!(change_type, message)])
+    }
+}
 
 impl Role for Spy {
     fn get_default_alignment(&self) -> Alignment {
@@ -31,6 +39,30 @@ impl Role for Spy {
 
     fn get_character_type(&self) -> CharacterType {
         CharacterType::Any
+    }
+
+    fn night_one_order(&self) -> Option<usize> {
+        Some(65)
+    }
+
+    fn night_one_ability(
+        &self,
+        _player_index: PlayerIndex,
+        _state: &State,
+    ) -> Option<Vec<ChangeRequest>> {
+        self.ability()
+    }
+
+    fn night_order(&self) -> Option<usize> {
+        Some(84)
+    }
+
+    fn night_ability(
+        &self,
+        _player_index: PlayerIndex,
+        _state: &State,
+    ) -> Option<Vec<ChangeRequest>> {
+        self.ability()
     }
 }
 
@@ -70,26 +102,6 @@ impl Display for Baron {
 
 #[derive(Default)]
 struct Poisoner {}
-
-struct Poisoned {}
-
-impl StatusType for Poisoned {
-    fn behavior_type(&self) -> Option<&[crate::engine::player::PlayerBehaviors]> {
-        Some(
-            [
-                PlayerBehaviors::NightOneAbility,
-                PlayerBehaviors::NightAbility,
-            ]
-            .as_ref(),
-        )
-    }
-}
-
-impl Display for Poisoned {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("Posioned")
-    }
-}
 
 impl Poisoner {
     fn ability(&self, player_index: PlayerIndex) -> Option<Vec<ChangeRequest>> {

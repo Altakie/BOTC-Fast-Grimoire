@@ -50,6 +50,7 @@ pub(crate) trait StatusType: Send + Sync + Display {
     fn name(&self) -> String {
         self.to_string()
     }
+
     // TODO: How to actually handle overwriting default player behaviors
     // Could check every effect manually to see if it affects any aspect of a player
     // Could have a function that defines which aspects of a player's behavior the status effect
@@ -81,6 +82,45 @@ impl State {
     }
 }
 
+pub struct Poisoned {}
+
+impl StatusType for Poisoned {
+    fn behavior_type(&self) -> Option<&[crate::engine::player::PlayerBehaviors]> {
+        Some(
+            [
+                PlayerBehaviors::NightOneAbility,
+                PlayerBehaviors::NightAbility,
+            ]
+            .as_ref(),
+        )
+    }
+}
+
+impl Display for Poisoned {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Posioned")
+    }
+}
+
+pub struct Drunk {}
+
+impl StatusType for Drunk {
+    fn behavior_type(&self) -> Option<&[crate::engine::player::PlayerBehaviors]> {
+        Some(
+            [
+                PlayerBehaviors::NightOneAbility,
+                PlayerBehaviors::NightAbility,
+            ]
+            .as_ref(),
+        )
+    }
+}
+
+impl Display for Drunk {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Drunk")
+    }
+}
 // #[derive(Clone, Copy, Hash, Debug, PartialEq, Eq, PartialOrd, Ord)]
 // pub(crate) enum StatusType {
 //     // General
