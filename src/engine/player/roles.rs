@@ -103,6 +103,12 @@ impl Clone for RolePtr {
     }
 }
 
+impl Display for RolePtr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0.to_string())
+    }
+}
+
 pub(crate) trait Role: Display + Send + Sync {
     fn name(&self) -> String {
         self.to_string()

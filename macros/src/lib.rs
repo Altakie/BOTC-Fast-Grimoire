@@ -1,5 +1,5 @@
 use quote::{ToTokens, quote};
-use syn::{parse::Parse, token::Token, *};
+use syn::{parse::Parse, *};
 
 struct RolePtrArgs {
     role: RoleType,

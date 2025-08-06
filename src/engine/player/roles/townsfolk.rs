@@ -1,7 +1,8 @@
 use std::fmt::Display;
 use std::sync::Arc;
 
-use macros::washerwoman_librarian_investigator;
+use leptos::attr::Align;
+use macros::washerwoman_librarian_investigator::washerwoman_librarian_investigator;
 
 use crate::{
     engine::{
@@ -16,9 +17,9 @@ use crate::{
 };
 
 #[derive(Default)]
-pub(crate) struct Washerwoman {}
+pub(crate) struct Washerwoman();
 
-pub(crate) struct WasherwomanTownsfolk {}
+struct WasherwomanTownsfolk();
 impl StatusType for WasherwomanTownsfolk {}
 impl Display for WasherwomanTownsfolk {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -26,7 +27,7 @@ impl Display for WasherwomanTownsfolk {
     }
 }
 
-pub(crate) struct WasherwomanWrong {}
+struct WasherwomanWrong();
 impl StatusType for WasherwomanWrong {}
 impl Display for WasherwomanWrong {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -84,9 +85,9 @@ impl Display for Washerwoman {
 }
 
 #[derive(Default)]
-pub(crate) struct Librarian {}
+pub(crate) struct Librarian();
 
-pub(crate) struct LibrarianOutsider {}
+struct LibrarianOutsider();
 impl StatusType for LibrarianOutsider {}
 impl Display for LibrarianOutsider {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -94,7 +95,7 @@ impl Display for LibrarianOutsider {
     }
 }
 
-pub(crate) struct LibrarianWrong {}
+struct LibrarianWrong();
 impl StatusType for LibrarianWrong {}
 impl Display for LibrarianWrong {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -152,9 +153,9 @@ impl Display for Librarian {
 }
 
 #[derive(Default)]
-pub(crate) struct Investigator {}
+pub(crate) struct Investigator();
 
-pub(crate) struct InvestigatorMinion {}
+struct InvestigatorMinion();
 impl StatusType for InvestigatorMinion {}
 impl Display for InvestigatorMinion {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -162,7 +163,7 @@ impl Display for InvestigatorMinion {
     }
 }
 
-pub(crate) struct InvestigatorWrong {}
+struct InvestigatorWrong();
 impl StatusType for InvestigatorWrong {}
 impl Display for InvestigatorWrong {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -220,7 +221,7 @@ impl Display for Investigator {
 }
 
 #[derive(Default)]
-pub(crate) struct Chef {}
+pub(crate) struct Chef();
 
 impl Role for Chef {
     fn get_default_alignment(&self) -> crate::engine::player::Alignment {
@@ -338,8 +339,123 @@ impl Display for Empath {
     }
 }
 
+pub(crate) struct Fortuneteller();
+
+struct FortunetellerRedHerring();
+impl StatusType for FortunetellerRedHerring {}
+impl Display for FortunetellerRedHerring {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Fortuneteller Red Herring")
+    }
+}
+
+impl Fortuneteller {
+    fn ability(&self, _player_index: PlayerIndex, _state: &State) -> Option<Vec<ChangeRequest>> {
+        // TODO: Prompt for a choice of two players
+        // Should yield True or false based on whether at least one of those players is a demon or has the red
+        // herring status effect
+        // Chained change effects, but also need a way to communicate between them?
+        // Maybe don't clear selected players between change effects unless specified?
+        // Could add bool for this
+        // Not exactly actually, message should switch when two players are selected?
+
+        let message1 = "Prompt the FortuneTeller to point to two players";
+
+        let change_type1 = ChangeType::ChoosePlayers(2);
+        let change_type2 = ChangeType::Display;
+
+        // let check_func = move |state, args| {};
+
+        // let state_change_func = move |state, args| {};
+
+        todo!()
+    }
+}
+
+impl Role for Fortuneteller {
+    fn get_default_alignment(&self) -> Alignment {
+        Alignment::Good
+    }
+
+    fn get_true_character_type(&self) -> CharacterType {
+        CharacterType::Townsfolk
+    }
+
+    fn setup_order(&self) -> Option<usize> {
+        Some(50)
+    }
+
+    fn setup_ability(
+        &self,
+        player_index: PlayerIndex,
+        state: &State,
+    ) -> Option<Vec<ChangeRequest>> {
+        let description = "Select a red-herring for the Fortune Teller".to_string();
+
+        let change_type = ChangeType::ChoosePlayers(1);
+        let check_func = move |_: &State, args: &ChangeArgs| -> Result<bool, ()> {
+            let target_players = unwrap_args_err!(args, ChangeArgs::PlayerIndices(v) => v);
+
+            if target_players.len() != 1 {
+                return Err(());
+            }
+
+            if target_players[0] == player_index {
+                return Ok(false);
+            }
+
+            return Ok(true);
+        };
+        // Get storyteller input on who red-herring is
+        // Add a red-herring through status effects
+        let state_change = move |state: &mut State, args: ChangeArgs| {
+            let target_players = unwrap_args_panic!(args, ChangeArgs::PlayerIndices(v) => v);
+            let target_player_index = target_players[0];
+            let target_player = state.get_player_mut(player_index);
+            let status = StatusEffect::new(Arc::new(FortunetellerRedHerring()), player_index);
+            target_player.add_status(status);
+        };
+
+        Some(vec![new_change_request!(
+            change_type,
+            description,
+            check_func,
+            state_change
+        )])
+    }
+
+    fn night_one_order(&self) -> Option<usize> {
+        Some(50)
+    }
+
+    fn night_one_ability(
+        &self,
+        player_index: PlayerIndex,
+        state: &State,
+    ) -> Option<Vec<ChangeRequest>> {
+        self.ability(player_index, state)
+    }
+
+    fn night_order(&self) -> Option<usize> {
+        Some(69)
+    }
+
+    fn night_ability(
+        &self,
+        player_index: PlayerIndex,
+        state: &State,
+    ) -> Option<Vec<ChangeRequest>> {
+        self.ability(player_index, state)
+    }
+}
+
+impl Display for Fortuneteller {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Fortuneteller")
+    }
+}
+
 // TODO:
-// Fortuneteller
 // Undertaker
 // Monk
 // Ravenkeeper

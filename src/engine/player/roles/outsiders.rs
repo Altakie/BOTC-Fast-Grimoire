@@ -1,8 +1,7 @@
+use std::fmt::Display;
 use std::sync::Arc;
-use std::{fmt::Display, ops::Deref};
 
-use leptos::attr::Align;
-use macros::{roleptr, roleptr_from, washerwoman_librarian_investigator};
+use macros::roleptr_from;
 
 use crate::engine::player::roles::RolePtr;
 use crate::{
