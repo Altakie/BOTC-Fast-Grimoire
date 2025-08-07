@@ -1,8 +1,7 @@
 use std::fmt::Display;
 use std::sync::Arc;
 
-use leptos::attr::Align;
-use macros::washerwoman_librarian_investigator::washerwoman_librarian_investigator;
+use macros::washerwoman_librarian_investigator;
 
 use crate::{
     engine::{
@@ -388,7 +387,7 @@ impl Role for Fortuneteller {
     fn setup_ability(
         &self,
         player_index: PlayerIndex,
-        state: &State,
+        _state: &State,
     ) -> Option<Vec<ChangeRequest>> {
         let description = "Select a red-herring for the Fortune Teller".to_string();
 
@@ -411,7 +410,7 @@ impl Role for Fortuneteller {
         let state_change = move |state: &mut State, args: ChangeArgs| {
             let target_players = unwrap_args_panic!(args, ChangeArgs::PlayerIndices(v) => v);
             let target_player_index = target_players[0];
-            let target_player = state.get_player_mut(player_index);
+            let target_player = state.get_player_mut(target_player_index);
             let status = StatusEffect::new(Arc::new(FortunetellerRedHerring()), player_index);
             target_player.add_status(status);
         };
@@ -457,7 +456,82 @@ impl Display for Fortuneteller {
 
 // TODO:
 // Undertaker
-// Monk
+
+#[derive(Default)]
+pub(crate) struct Monk();
+
+impl Role for Monk {
+    fn get_default_alignment(&self) -> Alignment {
+        Alignment::Good
+    }
+
+    fn get_true_character_type(&self) -> CharacterType {
+        CharacterType::Townsfolk
+    }
+
+    fn night_order(&self) -> Option<usize> {
+        Some(19)
+    }
+
+    fn night_ability(
+        &self,
+        _player_index: PlayerIndex,
+        _state: &State,
+    ) -> Option<Vec<ChangeRequest>> {
+        let change_type = ChangeType::ChoosePlayers(1);
+        let message = "Have the monk select a player to protect";
+
+        let check_func = move |_: &State, args: &ChangeArgs| -> Result<bool, ()> {
+            let target_players = unwrap_args_err!(args, ChangeArgs::PlayerIndices(v) => v);
+
+            if target_players.len() != 1 {
+                return Err(());
+            }
+
+            // Make sure the monk can't protect themselves
+            if target_players[0] == player_index {
+                return Ok(false);
+            }
+
+            return Ok(true);
+        };
+
+        let state_change_func = move |state: &mut State, args: ChangeArgs| {
+            // Check if there are any poisoned status effects inflicted by this player and clear
+            // them
+            let prev_effects = state.get_inflicted_statuses(player_index);
+
+            let prev_effect = prev_effects
+                .iter()
+                .find(|se| se.status_type == StatusType::DemonProtected);
+
+            if let Some(prev_effect) = prev_effect {
+                state.remove_status(
+                    prev_effect.status_type,
+                    prev_effect.source_player_index,
+                    prev_effect.affected_player_index,
+                );
+            }
+
+            let target_player_index =
+                unwrap_args_panic!(args, ChangeArgs::PlayerIndices(pv) => pv)[0];
+            state.add_status(
+                StatusType::DemonProtected,
+                player_index,
+                target_player_index,
+            );
+        };
+
+        Some(vec![new_change_request!(
+            change_type,
+            message,
+            check_func,
+            state_change_func
+        )])
+    }
+}
+
+// TODO:
 // Ravenkeeper
 pub(crate) struct Virgin {
     ability_used: bool,
@@ -493,5 +567,52 @@ impl Display for Virgin {
 }
 // TODO:
 // Slayer
-// Soldier
-// Mayor
+
+#[derive(Default)]
+struct Soldier();
+
+impl Role for Soldier {
+    fn get_default_alignment(&self) -> Alignment {
+        Alignment::Good
+    }
+
+    fn get_true_character_type(&self) -> CharacterType {
+        CharacterType::Townsfolk
+    }
+
+    // TODO: Overwrite kill method for Soldier so they can't be killed by a demon
+    fn kill(&self, _attacking_player_index: PlayerIndex) -> Option<bool> {
+        todo!()
+    }
+}
+
+impl Display for Soldier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Soldier")
+    }
+}
+
+#[derive(Default)]
+struct Mayor();
+
+impl Role for Mayor {
+    fn get_default_alignment(&self) -> Alignment {
+        Alignment::Good
+    }
+
+    fn get_true_character_type(&self) -> CharacterType {
+        CharacterType::Townsfolk
+    }
+
+    // TODO: Overwrite kill for mayor. Perhaps kill should also trigger a change request or
+    // something like that.
+    fn kill(&self, _attacking_player_index: PlayerIndex) -> Option<bool> {
+        todo!()
+    }
+}
+
+impl Display for Mayor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Soldier")
+    }
+}

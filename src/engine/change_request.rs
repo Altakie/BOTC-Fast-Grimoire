@@ -54,8 +54,16 @@ macro_rules! unwrap_args_panic {
 #[derive(Clone)]
 pub(crate) struct ChangeRequest {
     pub(crate) change_type: ChangeType,
+    // TODO: This should return a Result<Option<bool>> unless we want to return some sort of error
+    // message as to why the result is invalid. Then we should make the result type a string or
+    // some sort of error type enum
+    // Types of errors:
+    // Invalid Player(s) selected (reason)
+    // Wrong Number of players selected(required, current)
     pub(crate) check_func:
         Option<Arc<dyn Fn(&State, &ChangeArgs) -> Result<bool, ()> + Send + Sync>>,
+    // TODO: Want state_change_func to return a Option<ChangeRequest>, that way change requests are
+    // properly chainable, especially based on conditionals
     pub(crate) state_change_func: Option<Arc<dyn Fn(&mut State, ChangeArgs) + Send + Sync>>,
     pub(crate) description: String,
     pub(crate) clear: bool,

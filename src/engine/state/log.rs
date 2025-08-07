@@ -140,6 +140,15 @@ impl Log {
         let latest_phase = self.latest_phase();
         latest_phase.log(event);
     }
+
+    // fn search(&self, day_num: usize, event_type: EventType) -> Result<Event, SearchError> {
+    //     self.day_phases.get(day_num)
+    // }
+}
+
+enum SearchError {
+    InvalidDayNum,
+    EventNotFound,
 }
 
 impl DayPhaseLog {

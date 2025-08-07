@@ -37,7 +37,6 @@ impl State {
 impl Roles {
     pub(super) fn setup_action(&self, player_index: PlayerIndex) -> Option<Vec<ChangeRequest>> {
         match self {
-            Roles::Fortuneteller => Some(fortune_teller(player_index)),
             Roles::Soldier => {
                 // Just add protected status effect and only remove upon death
                 Some(add_status_to_self(

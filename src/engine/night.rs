@@ -303,57 +303,6 @@ impl State {
 // NOTE: Role Specific Abilities
 
 // TODO: Merge abilities that add a new status every night (monk, poisoner, )
-fn monk_ability(player_index: PlayerIndex) -> Vec<ChangeRequest> {
-    let change_type = ChangeType::ChoosePlayers(1);
-    let message = "Have the monk select a player to protect".to_string();
-
-    let check_func = move |_: &State, args: &ChangeArgs| -> Result<bool, ()> {
-        let target_players = unwrap_args_err!(args, ChangeArgs::PlayerIndices(v) => v);
-
-        if target_players.len() != 1 {
-            return Err(());
-        }
-
-        // Make sure the monk can't protect themselves
-        if target_players[0] == player_index {
-            return Ok(false);
-        }
-
-        return Ok(true);
-    };
-
-    let state_change_func = move |state: &mut State, args: ChangeArgs| {
-        // Check if there are any protected status effects inflicted by this player and clear
-        // them
-        let prev_effects = state.get_inflicted_statuses(player_index);
-
-        let prev_effect = prev_effects
-            .iter()
-            .find(|se| se.status_type == StatusType::DemonProtected);
-
-        if let Some(prev_effect) = prev_effect {
-            state.remove_status(
-                prev_effect.status_type,
-                prev_effect.source_player_index,
-                prev_effect.affected_player_index,
-            );
-        }
-
-        let target_player_index = unwrap_args_panic!(args, ChangeArgs::PlayerIndices(pv) => pv)[0];
-        state.add_status(
-            StatusType::DemonProtected,
-            player_index,
-            target_player_index,
-        );
-    };
-
-    vec![new_change_request!(
-        change_type,
-        message,
-        check_func,
-        state_change_func
-    )]
-}
 
 // TODO: Most demons kill, so maybe add a generic demon kill ability at some point
 fn imp_ability(player_index: PlayerIndex) -> Vec<ChangeRequest> {
