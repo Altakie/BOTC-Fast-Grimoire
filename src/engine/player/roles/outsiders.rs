@@ -137,6 +137,11 @@ impl Role for Drunk {
     }
 
     fn setup_ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
+        // If the drunk has a role assigned, call its setup ability instead
+        if let Some(role) = &self.role {
+            return role.setup_ability(player_index, state);
+        };
+
         let description = "Select a not in play Townfolk role";
         let change_type = ChangeType::ChooseRoles(1);
         let check_func = move |_: &State, args: &ChangeArgs| -> Result<bool, ChangeError> {
@@ -168,9 +173,6 @@ impl Role for Drunk {
 
             let drunk = state.get_player_mut(player_index);
             drunk.notify(&args);
-            // TODO: For now just instantly trigger the chnage effect for the townsfolk role that is
-            // picked after it is picked
-            // This should chain into another change effect and return it
             drunk.setup_ability(player_index, &state_snapshot)
         };
 

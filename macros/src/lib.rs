@@ -78,7 +78,7 @@ struct WasherwomanLibrarianInvestigator {
     player_index: PlayerIndex,
     right_effect: StatusEffectType,
     wrong_effect: StatusEffectType,
-    target: TargetString,
+    character_type: CharacterType,
 }
 
 impl Parse for WasherwomanLibrarianInvestigator {
@@ -90,13 +90,13 @@ impl Parse for WasherwomanLibrarianInvestigator {
         _ = input.parse::<Token![,]>()?;
         let wrong_effect = StatusEffectType::parse(input)?;
         _ = input.parse::<Token![,]>()?;
-        let target = TargetString::parse(input)?;
+        let target = CharacterType::parse(input)?;
 
         Ok(Self {
             player_index,
             right_effect,
             wrong_effect,
-            target,
+            character_type: target,
         })
     }
 }
@@ -106,51 +106,15 @@ impl quote::ToTokens for WasherwomanLibrarianInvestigator {
         let PlayerIndex(player_index) = &self.player_index;
         let StatusEffectType(right_effect) = &self.right_effect;
         let StatusEffectType(wrong_effect) = &self.wrong_effect;
-        let TargetString(target_string) = &self.target;
+        let CharacterType(character_type) = &self.character_type;
 
         tokens.extend(quote! {
             {
-                let right_description = format!("Select a {}", #target_string);
+                let right_description = format!("Select a {}", #character_type.to_string());
 
                 let right_status = move || StatusEffect::new(std::sync::Arc::new(#right_effect {}), #player_index);
-                let wrong_status = move || StatusEffect::new(std::sync::Arc::new(#wrong_effect {}), #player_index);
 
                 let change_type = ChangeType::ChoosePlayers(1);
-
-                let wrong_check_func = move |state: &State, args: &ChangeArgs| -> Result<bool, ChangeError> {
-                    let target_player_indices = unwrap_args_err!(args, ChangeArgs::PlayerIndices(v) => v);
-
-                    let len = target_player_indices.len();
-                    if len != 1 {
-                        return Err(ChangeError::WrongNumberOfSelectedPlayers { wanted: 1, got: len});
-                    }
-
-                    let target_player_index = target_player_indices[0];
-
-                    if target_player_index == player_index {
-                        return Ok(false);
-                    }
-
-                    let target_player = state.get_player(target_player_index);
-                    if target_player
-                        .get_statuses()
-                        .iter()
-                        .any(|se| *se == right_status())
-                    {
-                        return Ok(false);
-                    }
-                    return Ok(true);
-                };
-
-                let wrong_state_change = move |state: &mut State, args: ChangeArgs| -> Option<ChangeRequest> {
-                    let target_player_indices = unwrap_args_panic!(args, ChangeArgs::PlayerIndices(v) => v);
-
-                    // Assign the chosen player the wrong status effect
-                    let target_player = state.get_player_mut(target_player_indices[0]);
-                    target_player.add_status(wrong_status());
-
-                    None
-                };
 
                 let right_check_func = move |state: &State, args: &ChangeArgs| -> Result<bool, ChangeError> {
                     let target_player_indices = unwrap_args_err!(args, ChangeArgs::PlayerIndices(v) => v);
@@ -168,7 +132,7 @@ impl quote::ToTokens for WasherwomanLibrarianInvestigator {
                         let player = state.get_player(*target_player_index);
                         if matches!(
                             player.get_character_type(),
-                            CharacterType::Townsfolk | CharacterType::Any
+                            #character_type | CharacterType::Any
                         ) {
                             return Ok(true);
                         }
@@ -187,7 +151,7 @@ impl quote::ToTokens for WasherwomanLibrarianInvestigator {
                     let wrong_status = move || StatusEffect::new(std::sync::Arc::new(#wrong_effect {}), #player_index);
                     let wrong_description = "Select a different player";
 
-                    let change_type = ChangeType::ChoosePlayers(1);
+                    let wrong_change_type = ChangeType::ChoosePlayers(1);
 
                     let wrong_check_func = move |state: &State, args: &ChangeArgs| -> Result<bool, ChangeError> {
                         let target_player_indices = unwrap_args_err!(args, ChangeArgs::PlayerIndices(v) => v);
@@ -224,17 +188,17 @@ impl quote::ToTokens for WasherwomanLibrarianInvestigator {
                         None
                     };
 
-                    Some(new_change_request!(change_type, wrong_description, wrong_check_func, wrong_state_change))
+                    return Some(new_change_request!(wrong_change_type, wrong_description, wrong_check_func, wrong_state_change));
                 };
 
-                Some(
+                return Some(
                     new_change_request!(
                         change_type,
                         right_description,
                         right_check_func,
                         right_state_change
                     )
-                )
+                );
             }
         });
     }
@@ -256,11 +220,11 @@ impl Parse for StatusEffectType {
     }
 }
 
-struct TargetString(syn::LitStr);
+struct CharacterType(syn::Type);
 
-impl Parse for TargetString {
+impl Parse for CharacterType {
     fn parse(input: parse::ParseStream) -> Result<Self> {
-        input.parse::<syn::LitStr>().map(Self)
+        syn::Type::parse(input).map(Self)
     }
 }
 

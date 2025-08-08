@@ -37,6 +37,19 @@ pub(crate) enum CharacterType {
     Any,
 }
 
+impl Display for CharacterType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let string = match self {
+            CharacterType::Townsfolk => "Townsfolk",
+            CharacterType::Outsider => "Outsider",
+            CharacterType::Minion => "Minion",
+            CharacterType::Demon => "Demon",
+            CharacterType::Any => "Any",
+        };
+        f.write_str(string)
+    }
+}
+
 #[derive(Clone, Store)]
 pub(crate) struct Player {
     pub(crate) name: String,

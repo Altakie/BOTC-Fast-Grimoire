@@ -8,6 +8,17 @@ use crate::engine::{
 };
 
 #[derive(Clone)]
+struct StatusTypePtr(Arc<dyn StatusType>);
+
+impl Deref for StatusTypePtr {
+    type Target = dyn StatusType;
+
+    fn deref(&self) -> &Self::Target {
+        self.0.deref()
+    }
+}
+
+#[derive(Clone)]
 pub(crate) struct StatusEffect {
     // pub(crate) status_type: StatusEffects,
     pub(crate) status_type: Arc<dyn StatusType>,

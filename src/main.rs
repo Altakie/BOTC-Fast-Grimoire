@@ -493,6 +493,7 @@ impl TempState {
     fn clear_selected(&mut self) {
         self.selected_players.clear();
         self.selected_roles.clear();
+        self.curr_change_request = None
     }
     fn reset(&mut self) {
         self.selected_player = None;
@@ -663,8 +664,8 @@ fn Game() -> impl IntoView {
     let temp_state = expect_context::<Store<TempState>>();
     let next_button = move |_| {
         // If there is a change request in the queue, process it
-        if let Some(cr) = temp_state.curr_change_request().read().deref() {
-            let cr = cr.clone();
+        if let Some(cr) = temp_state.curr_change_request().get() {
+            // console_log(&format!("Curr cr is {:?}", cr));
             // Do check func and return early if it doesn't pass
             let args = match cr.change_type {
                 ChangeType::ChoosePlayers(_) => Some(ChangeArgs::PlayerIndices(
@@ -684,7 +685,7 @@ fn Game() -> impl IntoView {
                     let cf = check_func.unwrap();
                     cf.call(gs, &args)
                 });
-                console_log(&format!("check_func called, returned {:?}", res));
+                // console_log(&format!("check_func called, returned {:?}", res));
                 match res {
                     Ok(boolean) => {
                         if boolean {
@@ -701,17 +702,24 @@ fn Game() -> impl IntoView {
                 let state_func = cr.state_change_func.unwrap();
                 let next_cr = game_state.try_update(|gs| state_func.call(gs, args));
                 let next_cr = next_cr.unwrap();
+                // console_log(&format!("{:?}", next_cr));
                 // Set the next cr
 
                 temp_state.update(|ts| ts.clear_selected());
 
                 if next_cr.is_some() {
                     temp_state.curr_change_request().set(next_cr);
-                    console_log("New Cr set");
+                    // console_log(&format!(
+                    //     "New Cr set as {:?}, curr cr is now {:?}",
+                    //     next_cr,
+                    //     temp_state.curr_change_request().get()
+                    // ));
                     return;
                 }
             }
         }
+
+        console_log("Moving to next player");
 
         // Only get the next player's change requests if the current change request queue is empty
 

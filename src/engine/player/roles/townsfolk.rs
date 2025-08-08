@@ -1,5 +1,5 @@
-use std::fmt::Display;
 use std::sync::Arc;
+use std::{fmt::Display, ops::Deref};
 
 use leptos::attr::target;
 use macros::washerwoman_librarian_investigator;
@@ -59,7 +59,7 @@ impl Role for Washerwoman {
             player_index,
             WasherwomanTownsfolk,
             WasherwomanWrong,
-            "Townsfolk"
+            CharacterType::Townsfolk
         )
     }
 
@@ -111,7 +111,7 @@ impl Role for Librarian {
     }
 
     fn get_true_character_type(&self) -> CharacterType {
-        CharacterType::Outsider
+        CharacterType::Townsfolk
     }
 
     fn setup_order(&self) -> Option<usize> {
@@ -127,7 +127,7 @@ impl Role for Librarian {
             player_index,
             LibrarianOutsider,
             LibrarianWrong,
-            "Outsider"
+            CharacterType::Outsider
         )
     }
 
@@ -179,7 +179,7 @@ impl Role for Investigator {
     }
 
     fn get_true_character_type(&self) -> CharacterType {
-        CharacterType::Minion
+        CharacterType::Townsfolk
     }
 
     fn setup_order(&self) -> Option<usize> {
@@ -195,7 +195,7 @@ impl Role for Investigator {
             player_index,
             InvestigatorMinion,
             InvestigatorWrong,
-            "Minion"
+            CharacterType::Minion
         )
     }
 
@@ -346,25 +346,65 @@ impl Display for FortunetellerRedHerring {
 }
 
 impl Fortuneteller {
-    fn ability(&self, _player_index: PlayerIndex, _state: &State) -> Option<ChangeRequest> {
-        // TODO: Prompt for a choice of two players
-        // Should yield True or false based on whether at least one of those players is a demon or has the red
-        // herring status effect
-        // Chained change effects, but also need a way to communicate between them?
-        // Maybe don't clear selected players between change effects unless specified?
-        // Could add bool for this
-        // Not exactly actually, message should switch when two players are selected?
+    fn ability(&self, player_index: PlayerIndex, _state: &State) -> Option<ChangeRequest> {
+        let message = "Prompt the FortuneTeller to point to two players";
 
-        let message1 = "Prompt the FortuneTeller to point to two players";
+        let change_type = ChangeType::ChoosePlayers(2);
 
-        let change_type1 = ChangeType::ChoosePlayers(2);
-        let change_type2 = ChangeType::Display;
+        let check_func = move |state: &State, args: &ChangeArgs| -> Result<bool, ChangeError> {
+            let target_players = unwrap_args_err!(args, ChangeArgs::PlayerIndices(pv) => pv);
+            let len = target_players.len();
+            if len != 2 {
+                return Err(ChangeError::WrongNumberOfSelectedPlayers {
+                    wanted: 2,
+                    got: len,
+                });
+            }
 
-        // let check_func = move |state, args| {};
+            // Make sure there are no duplicate players
+            if target_players[0] == target_players[1] {
+                return Err(ChangeError::InvalidSelectedPlayer {
+                    reason: "Please select unique players".into(),
+                });
+            }
 
-        // let state_change_func = move |state, args| {};
+            return Ok(true);
+        };
 
-        todo!()
+        let state_change_func =
+            move |state: &mut State, args: ChangeArgs| -> Option<ChangeRequest> {
+                let target_players = unwrap_args_panic!(args, ChangeArgs::PlayerIndices(pv) => pv);
+
+                // Calculate whether any of the chosen players are either a red herring or a demon
+                let demon_found = target_players.iter().any(|i| {
+                    let player = state.get_player(*i);
+                    matches!(
+                        player.get_character_type(),
+                        CharacterType::Demon | CharacterType::Any
+                    ) || player.get_statuses().iter().any(|se| {
+                        se.source_player_index == player_index
+                            && se.to_string() == FortunetellerRedHerring().to_string()
+                    })
+                });
+                let message = format!(
+                    "Show the Fortuneteller a {}",
+                    match demon_found {
+                        true => "Thumbs Up",
+                        false => "Thumbs Down",
+                    }
+                );
+
+                let change_type = ChangeType::Display;
+
+                Some(new_change_request!(change_type, message))
+            };
+
+        Some(new_change_request!(
+            change_type,
+            message,
+            check_func,
+            state_change_func
+        ))
     }
 }
 
@@ -551,11 +591,6 @@ impl Display for Monk {
     }
 }
 
-// TODO:
-// Ravenkeeper (need to implement triggers or smth). Or more than likely, need to somehow hook up
-// the night order ability to the state of the player (somehow), or store some internal state. Or
-// change the main loop to skip None change effects
-
 #[derive(Default)]
 pub(crate) struct Ravenkeeper {
     ability_used: bool,
@@ -588,16 +623,37 @@ impl Role for Ravenkeeper {
         let change_type = ChangeType::ChoosePlayers(1);
 
         let check_func = move |state: &State, args: &ChangeArgs| -> Result<bool, ChangeError> {
-            // TODO: Check that only one player is selected
-            todo!()
+            let target_players = unwrap_args_err!(args, ChangeArgs::PlayerIndices(pv) => pv);
+            let len = target_players.len();
+            if len != 1 {
+                return Err(ChangeError::WrongNumberOfSelectedPlayers {
+                    wanted: 1,
+                    got: len,
+                });
+            }
+
+            return Ok(true);
         };
-        let change_func = move |state: &mut State, args: ChangeArgs| {
-            // TODO: Shouldn't actually change anything, but should create another change request
-            // that causes a display of the selected player's role
-            todo!()
+        let change_func = move |state: &mut State, args: ChangeArgs| -> Option<ChangeRequest> {
+            let target_players = unwrap_args_panic!(args, ChangeArgs::PlayerIndices(pv) => pv);
+            let target_player = state.get_player(target_players[0]);
+
+            // Create a new change request using the role of the target player
+            let change_type = ChangeType::Display;
+            let message = format!(
+                "Show the Ravenkeeper that they selected the {}",
+                target_player.role
+            );
+
+            Some(new_change_request!(change_type, message))
         };
 
-        todo!()
+        Some(new_change_request!(
+            change_type,
+            message,
+            check_func,
+            change_func
+        ))
     }
 }
 
@@ -607,16 +663,9 @@ impl Display for Ravenkeeper {
     }
 }
 
+#[derive(Default)]
 pub(crate) struct Virgin {
     ability_used: bool,
-}
-
-impl Default for Virgin {
-    fn default() -> Self {
-        Self {
-            ability_used: false,
-        }
-    }
 }
 
 impl Role for Virgin {
@@ -654,9 +703,14 @@ impl Role for Soldier {
         CharacterType::Townsfolk
     }
 
-    // TODO: Overwrite kill method for Soldier so they can't be killed by a demon
-    fn kill(&self, _attacking_player_index: PlayerIndex, _state: &State) -> Option<bool> {
-        todo!()
+    // Overwrite kill method for Soldier so they can't be killed by a demon
+    fn kill(&self, attacking_player_index: PlayerIndex, state: &State) -> Option<bool> {
+        let attacking_player = state.get_player(attacking_player_index);
+        if attacking_player.role.get_true_character_type() == CharacterType::Demon {
+            return Some(false);
+        }
+
+        None
     }
 }
 

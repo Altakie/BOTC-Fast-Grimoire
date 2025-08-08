@@ -4,7 +4,7 @@ use super::{
     player::roles::Roles,
     state::{PlayerIndex, State},
 };
-use std::{ops::Deref, sync::Arc};
+use std::{fmt::Debug, ops::Deref, sync::Arc};
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum ChangeType {
@@ -74,6 +74,16 @@ pub(crate) struct ChangeRequest {
 // impl ChangeRequest {
 //     pub fn new()
 // }
+
+impl Debug for ChangeRequest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ChangeRequest")
+            .field("change_type", &self.change_type)
+            .field("description", &self.description)
+            .field("clear", &self.clear)
+            .finish()
+    }
+}
 
 #[derive(Clone)]
 pub struct CheckFuncPtr(
