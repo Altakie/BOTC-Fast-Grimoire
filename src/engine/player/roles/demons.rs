@@ -17,7 +17,7 @@ use crate::{
 };
 
 #[derive(Default)]
-struct Imp();
+pub(crate) struct Imp();
 
 impl Role for Imp {
     fn get_default_alignment(&self) -> Alignment {

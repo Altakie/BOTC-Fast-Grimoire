@@ -211,7 +211,7 @@ impl State {
     ///
     /// * Option<ChangeRequest> : A change request if the role does something, or none if it
     ///   doesn't
-    pub(crate) fn resolve(&self, player_index: PlayerIndex) -> Option<Vec<ChangeRequest>> {
+    pub(crate) fn resolve(&self, player_index: PlayerIndex) -> Option<ChangeRequest> {
         let role = &self.players[player_index].role;
 
         let res = match self.step {

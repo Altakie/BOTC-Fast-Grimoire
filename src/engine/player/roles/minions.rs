@@ -16,7 +16,7 @@ use crate::{
 };
 
 #[derive(Default)]
-struct Spy {}
+pub(crate) struct Spy();
 impl Spy {
     fn ability(&self) -> Option<ChangeRequest> {
         let change_type = ChangeType::Display;
@@ -71,7 +71,7 @@ impl Display for Spy {
 }
 
 #[derive(Default)]
-struct Baron {}
+pub(crate) struct Baron();
 
 impl Role for Baron {
     fn get_default_alignment(&self) -> Alignment {
@@ -99,7 +99,7 @@ impl Display for Baron {
 }
 
 #[derive(Default)]
-struct Poisoner {}
+pub(crate) struct Poisoner();
 
 impl Poisoner {
     fn ability(&self, player_index: PlayerIndex) -> Option<ChangeRequest> {
@@ -184,7 +184,7 @@ impl Display for Poisoner {
 }
 
 #[derive(Default)]
-struct ScarletWoman {}
+pub(crate) struct ScarletWoman();
 
 impl Role for ScarletWoman {
     fn get_default_alignment(&self) -> Alignment {

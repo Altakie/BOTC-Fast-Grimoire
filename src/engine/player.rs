@@ -1,8 +1,5 @@
 use reactive_stores::Store;
-use std::{
-    fmt::{Debug, Display},
-    sync::Arc,
-};
+use std::fmt::{Debug, Display};
 
 use crate::engine::{
     change_request::{ChangeArgs, ChangeRequest},
@@ -180,7 +177,7 @@ impl Player {
         &self,
         player_index: PlayerIndex,
         state: &State,
-    ) -> Option<Vec<ChangeRequest>> {
+    ) -> Option<ChangeRequest> {
         self.role.setup_ability(player_index, state)
     }
 
@@ -192,8 +189,8 @@ impl Player {
         &self,
         player_index: PlayerIndex,
         state: &State,
-    ) -> Option<Vec<ChangeRequest>> {
-        let mut res = self.role.night_one_ability(player_index, state)?;
+    ) -> Option<ChangeRequest> {
+        let mut cr = self.role.night_one_ability(player_index, state)?;
         // Check for poison or drunk effects
         let status_effect = self.get_statuses().iter().find(|se| {
             matches!(
@@ -203,13 +200,17 @@ impl Player {
         });
 
         if let Some(status_effect) = status_effect {
-            for cr in res.iter_mut() {
-                cr.state_change_func = None;
-                cr.description = format!("(*{}*) ", status_effect) + cr.description.as_str();
-            }
+            // for cr in res.iter_mut() {
+            //     cr.state_change_func = None;
+            //     cr.description = format!("(*{}*) ", status_effect) + cr.description.as_str();
+            // }
+            // FIX: This needs apply to all the crs in the chain, not just the first one (although
+            // this technically disables the chain so we might need to play around that)
+            cr.state_change_func = None;
+            cr.description = format!("(*{}*) ", status_effect) + cr.description.as_str();
         }
 
-        return Some(res);
+        return Some(cr);
     }
 
     /// If the role has an ability that acts during the night (not including night one), this method should be overwritten and return
@@ -218,12 +219,8 @@ impl Player {
         self.role.night_order()
     }
     /// If the role has an ability that acts during the night (not including night one), this method should be overwritten and resolve the night ability
-    pub fn night_ability(
-        &self,
-        player_index: PlayerIndex,
-        state: &State,
-    ) -> Option<Vec<ChangeRequest>> {
-        let mut res = self.role.night_ability(player_index, state)?;
+    pub fn night_ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
+        let mut cr = self.role.night_ability(player_index, state)?;
         let status_effect = self.get_statuses().iter().find(|se| {
             matches!(
                 se.status_type.behavior_type(),
@@ -232,13 +229,15 @@ impl Player {
         });
 
         if let Some(status_effect) = status_effect {
-            for cr in res.iter_mut() {
-                cr.state_change_func = None;
-                cr.description = format!("(*{}*) ", status_effect) + cr.description.as_str();
-            }
+            // for cr in res.iter_mut() {
+            //     cr.state_change_func = None;
+            //     cr.description = format!("(*{}*) ", status_effect) + cr.description.as_str();
+            // }
+            cr.state_change_func = None;
+            cr.description = format!("(*{}*) ", status_effect) + cr.description.as_str();
         }
 
-        return Some(res);
+        return Some(cr);
     }
 
     /// If the role has an ability that acts during the day (not including night one), this method should be overwritten and indicate which part(s) of the day this ability can be triggered during
@@ -246,11 +245,7 @@ impl Player {
         self.role.has_day_ability()
     }
     /// If the role has an ability that acts during the day (not including night one), this method should be overwritten and resolve the day ability
-    pub fn day_ability(
-        &self,
-        player_index: PlayerIndex,
-        state: &State,
-    ) -> Option<Vec<ChangeRequest>> {
+    pub fn day_ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
         self.role.day_ability(player_index, state)
     }
 

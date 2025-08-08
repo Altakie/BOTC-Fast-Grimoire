@@ -6,6 +6,7 @@ use leptos::{
 };
 use reactive_stores::Store;
 use std::collections::VecDeque;
+use std::ops::Deref;
 
 mod initialization;
 use initialization::{CharacterTypeCounts, Script, ScriptJson};
@@ -482,7 +483,7 @@ fn RoleChooser(
 #[derive(Clone, Store, Default)]
 struct TempState {
     selected_player: Option<PlayerIndex>,
-    change_requests: VecDeque<ChangeRequest>,
+    curr_change_request: Option<ChangeRequest>,
     selected_players: Vec<PlayerIndex>,
     selected_roles: Vec<Roles>,
     currently_acting_player: Option<PlayerIndex>,
@@ -496,7 +497,7 @@ impl TempState {
     fn reset(&mut self) {
         self.selected_player = None;
         self.selected_players.clear();
-        self.change_requests.clear();
+        self.curr_change_request = None;
         self.selected_roles.clear();
         self.currently_acting_player = None;
     }
@@ -555,8 +556,8 @@ fn Info() -> impl IntoView {
     };
 
     let change_info = move || {
-        let crs = temp_state.change_requests().get();
-        match crs.front() {
+        let cr = temp_state.curr_change_request().get();
+        match cr {
             Some(cr) => cr.description.clone(),
             // match cr.change_type {
             //     ChangeType::ChoosePlayers(num) => format!("Choose {} Players", num),
@@ -661,27 +662,19 @@ fn Game() -> impl IntoView {
     let game_state = expect_context::<Store<State>>();
     let temp_state = expect_context::<Store<TempState>>();
     let next_button = move |_| {
-        // TODO: This function is too complicated and I don't like it
-        // Want to make the logic a little simpler so it is easier to debug
-        // Break it up into multiple functions
-        // Maybe a clean up func at the end
-        // Maybe check check func and a apply state func function? Could be good to split them
-        // because there is not always a change func and state change func
-        let mut loop_break = false;
-        loop {
-            // If there is a change request in the queue, process it
-            if !temp_state.change_requests().read().is_empty() {
-                let cr = temp_state.change_requests().read().front().unwrap().clone();
-                // Do check func and return early if it doesn't pass
-                let args = match &cr.change_type {
-                    ChangeType::ChoosePlayers(_) => Some(ChangeArgs::PlayerIndices(
-                        temp_state.selected_players().get(),
-                    )),
-                    ChangeType::ChooseRoles(_) => {
-                        Some(ChangeArgs::Roles(temp_state.selected_roles().get()))
-                    }
-                    _ => None,
-                };
+        // If there is a change request in the queue, process it
+        if let Some(cr) = temp_state.curr_change_request().read().deref() {
+            let cr = cr.clone();
+            // Do check func and return early if it doesn't pass
+            let args = match cr.change_type {
+                ChangeType::ChoosePlayers(_) => Some(ChangeArgs::PlayerIndices(
+                    temp_state.selected_players().get(),
+                )),
+                ChangeType::ChooseRoles(_) => {
+                    Some(ChangeArgs::Roles(temp_state.selected_roles().get()))
+                }
+                _ => None,
+            };
 
             // Only apply funcs if change_type requires action
             if args.is_some() {
@@ -691,6 +684,7 @@ fn Game() -> impl IntoView {
                     let cf = check_func.unwrap();
                     cf.call(gs, &args)
                 });
+                console_log(&format!("check_func called, returned {:?}", res));
                 match res {
                     Ok(boolean) => {
                         if boolean {
@@ -698,42 +692,32 @@ fn Game() -> impl IntoView {
                             return;
                         }
                     }
-                    // If it passes, do the apply state func and move on
-                    let state_func = cr.state_change_func.unwrap().clone();
-                    game_state.update(|gs| state_func(gs, args));
-                } else if let ChangeRequest {
-                    change_type: ChangeType::NoStoryteller,
-                    state_change_func: Some(change_func),
-                    ..
-                } = cr
-                {
-                    // TODO: Apply the state change func and skip to the next thing without another
-                    // press of the button
-                    // Current problem: this will be added to the queue, but will not automatically
-                    // call the function again
-                    // Can be fixed by making this a loop and having it not return
-
-                    todo!()
+                    // TODO: Actually inform the player what went wrong using the result
+                    Err(_) => {
+                        return;
+                    }
                 }
                 // If it passes, do the apply state func and move on
                 let state_func = cr.state_change_func.unwrap();
-                game_state.update(|gs| state_func.call(gs, args));
-            }
+                let next_cr = game_state.try_update(|gs| state_func.call(gs, args));
+                let next_cr = next_cr.unwrap();
+                // Set the next cr
 
-            temp_state.update(|ts| ts.clear_selected());
-            // Only get the next player's change requests if the current change request queue is empty
-            if !temp_state.change_requests().read().is_empty() {
-                return;
-            }
-            console_log("Last cr");
+                temp_state.update(|ts| ts.clear_selected());
 
-            // Get next active player based off of current player
-            // TODO: Need phases for dawn dusk (maybe), but also waking up minions and demons to reveal
-            // themselves to each other. These are problematic because they are not tied to players,
-            // and thus not actively with the night order. They need to be inserted in there, maybe
-            // just as a player, or maybe resolve the system to not work off of a next active player,
-            // but maybe a next active event, that has an associated player? Might just have to redo
-            // the whole ordering system at some point
+                if next_cr.is_some() {
+                    temp_state.curr_change_request().set(next_cr);
+                    console_log("New Cr set");
+                    return;
+                }
+            }
+        }
+
+        // Only get the next player's change requests if the current change request queue is empty
+
+        // Get next active player based off of current player
+        let mut loop_break = false;
+        loop {
             let currently_acting_player = temp_state.read().currently_acting_player;
             temp_state.update(|ts| ts.reset());
             // Check for next active player
@@ -743,18 +727,16 @@ fn Game() -> impl IntoView {
             console_log(format!("Next Player is {:?}", next_player).as_str());
             match next_player {
                 Some(p) => {
-                    let next_crs = game_state.try_update(|gs| gs.resolve(p));
+                    let next_cr = game_state.try_update(|gs| gs.resolve(p));
                     temp_state.currently_acting_player().set(Some(p));
                     // FIX: I think this can fail if the next cr is None, this fix is weird, figure
                     // out when the none case can happen. It's when a player doesn't have an
                     // associated change request, which means something is broken. Meaning it's
                     // okay to panic
-                    match next_crs.unwrap() {
-                        Some(next_crs) => {
-                            temp_state
-                                .change_requests()
-                                .update(|crs| crs.extend(next_crs));
-                            // Should not break
+                    match next_cr.unwrap() {
+                        Some(next_cr) => {
+                            temp_state.curr_change_request().set(Some(next_cr));
+                            break;
                         }
                         None => {
                             console_error("Next Change Request is none");
@@ -831,16 +813,12 @@ fn Player_Display() -> impl IntoView {
                                         }
                                     }
                                     on:click=move |_| {
-                                        if temp_state.change_requests().read().is_empty() {
+                                        if temp_state.curr_change_request().read().is_none() {
                                             currently_selected_player.set(Some(i));
                                             return;
                                         }
                                         let cr = temp_state
-                                            .change_requests()
-                                            .read()
-                                            .front()
-                                            .unwrap()
-                                            .clone();
+                                            .curr_change_request().get().unwrap();
                                         let requested_num = match cr.change_type {
                                             ChangeType::ChoosePlayers(num) => num,
                                             _ => {
@@ -944,10 +922,10 @@ fn Picker_Bar() -> impl IntoView {
                                 style:color=move || { if selected.get() { "red" } else { "" } }
                                 on:click=move |_| {
                                     let cr = {
-                                        if temp_state.change_requests().read().is_empty() {
+                                        if temp_state.curr_change_request().read().is_none() {
                                             return;
                                         }
-                                        temp_state.change_requests().get().front().unwrap().clone()
+                                        temp_state.curr_change_request().get().unwrap()
                                     };
                                     let requested_num = match cr.change_type {
                                         ChangeType::ChooseRoles(num) => num,

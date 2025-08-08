@@ -275,7 +275,8 @@ impl Display for Chef {
     }
 }
 
-struct Empath {}
+#[derive(Default)]
+pub(crate) struct Empath();
 
 impl Empath {
     fn ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
@@ -333,6 +334,7 @@ impl Display for Empath {
     }
 }
 
+#[derive(Default)]
 pub(crate) struct Fortuneteller();
 
 struct FortunetellerRedHerring();

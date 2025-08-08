@@ -130,7 +130,7 @@ impl From<Arc<dyn Fn(&mut State, ChangeArgs) -> Option<ChangeRequest> + Send + S
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum ChangeError {
     InvalidSelectedPlayer { reason: String },
     WrongNumberOfSelectedPlayers { wanted: usize, got: usize },

@@ -6,6 +6,9 @@ use std::ops::Deref;
 use std::sync::{Arc, RwLock, RwLockReadGuard};
 
 use crate::engine::change_request::ChangeArgs;
+use crate::engine::player::roles::demons::Imp;
+use crate::engine::player::roles::minions::{Baron, Spy};
+use crate::engine::player::roles::outsiders::Drunk;
 use crate::{
     engine::{
         change_request::ChangeRequest,
@@ -81,7 +84,7 @@ impl Display for Roles {
 
 impl Roles {}
 
-pub struct RolePtr(Arc<dyn Role>);
+pub(crate) struct RolePtr(Arc<dyn Role>);
 
 impl RolePtr {
     pub fn reassign(&mut self, other: RolePtr) {
@@ -225,30 +228,30 @@ impl Roles {
     pub(crate) fn convert(&self) -> RolePtr {
         // TODO: Make classes to roles and resolve them here
         match self {
-            Roles::Investigator => todo!(),
-            Roles::Empath => todo!(),
+            Roles::Investigator => roleptr!(Investigator),
+            Roles::Empath => roleptr!(Empath),
             Roles::Gossip => todo!(),
             Roles::Innkeeper => todo!(),
-            Roles::Washerwoman => todo!(),
-            Roles::Librarian => todo!(),
+            Roles::Washerwoman => roleptr!(Washerwoman),
+            Roles::Librarian => roleptr!(Librarian),
             Roles::Chef => roleptr!(Chef),
-            Roles::Fortuneteller => todo!(),
+            Roles::Fortuneteller => roleptr!(Fortuneteller),
             Roles::Undertaker => todo!(),
-            Roles::Virgin => todo!(),
+            Roles::Virgin => roleptr!(Virgin),
             Roles::Soldier => todo!(),
             Roles::Slayer => todo!(),
             Roles::Mayor => todo!(),
             Roles::Monk => todo!(),
             Roles::Ravenkeeper => todo!(),
-            Roles::Drunk => todo!(),
+            Roles::Drunk => roleptr!(Drunk),
             Roles::Saint => todo!(),
             Roles::Butler => todo!(),
             Roles::Recluse => todo!(),
-            Roles::Spy => todo!(),
-            Roles::Baron => todo!(),
+            Roles::Spy => roleptr!(Spy),
+            Roles::Baron => roleptr!(Baron),
             Roles::Scarletwoman => todo!(),
             Roles::Poisoner => todo!(),
-            Roles::Imp => todo!(),
+            Roles::Imp => roleptr!(Imp),
         }
     }
 

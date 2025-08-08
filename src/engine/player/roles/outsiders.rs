@@ -117,7 +117,7 @@ impl Display for Butler {
 }
 
 #[derive(Default)]
-struct Drunk {
+pub(crate) struct Drunk {
     role: Option<RolePtr>,
 }
 
@@ -164,12 +164,14 @@ impl Role for Drunk {
                 _ => panic!("Wrong input type"),
             };
 
+            let state_snapshot = state.clone();
+
             let drunk = state.get_player_mut(player_index);
             drunk.notify(&args);
             // TODO: For now just instantly trigger the chnage effect for the townsfolk role that is
             // picked after it is picked
             // This should chain into another change effect and return it
-            todo!();
+            drunk.setup_ability(player_index, &state_snapshot)
         };
 
         Some(new_change_request!(
@@ -182,7 +184,7 @@ impl Role for Drunk {
 
     fn notify(&self, args: &ChangeArgs) -> Option<RolePtr> {
         match &self.role {
-            Some(role) => return role.notify(&args),
+            Some(role) => return role.notify(args),
             None => {
                 if let ChangeArgs::Roles(roles) = args {
                     let role = roles[0];

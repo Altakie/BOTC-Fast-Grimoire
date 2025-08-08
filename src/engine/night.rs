@@ -302,38 +302,7 @@ impl State {
 //
 // NOTE: Role Specific Abilities
 
-// TODO: Merge abilities that add a new status every night (monk, poisoner, )
-
-// TODO: Most demons kill, so maybe add a generic demon kill ability at some point
-fn imp_ability(player_index: PlayerIndex) -> Vec<ChangeRequest> {
-    let change_type = ChangeType::ChoosePlayers(1);
-    let message = "".to_string();
-
-    let check_func = move |_: &State, args: &ChangeArgs| -> Result<bool, ()> {
-        let target_players = unwrap_args_err!(args, ChangeArgs::PlayerIndices(v) => v);
-
-        if target_players.len() != 1 {
-            return Err(());
-        }
-
-        return Ok(true);
-    };
-
-    let state_change_func = move |state: &mut State, args: ChangeArgs| {
-        let target_player_index = unwrap_args_panic!(args, ChangeArgs::PlayerIndices(pv) => pv)[0];
-        state.kill_player(player_index, target_player_index);
-        // TODO: If the imp kills themselves, TRIGGER ANOTHER CHANGE REQUEST THAT ALLOWS THE
-        // STORYTELLER TO PICK A NEW IMP
-    };
-
-    vec![new_change_request!(
-        change_type,
-        message,
-        check_func,
-        state_change_func
-    )]
-}
-
+// TODO: Make these tests work with the new roles
 // #[cfg(test)]
 // mod tests {
 //     use crate::{
@@ -504,16 +473,6 @@ fn imp_ability(player_index: PlayerIndex) -> Vec<ChangeRequest> {
 //                 vec![0, 2],
 //                 0,
 //             ),
-//             // TODO: I want the storyteller to be aware in some kind of way that an ability is
-//             // affecting the information
-//             // Perhaps duplicates of information passed out?
-//             // Perhaps just a reminder that something is amiss, to check the roles?
-//             // Need a cleaner solution for recluse and spy rather than just calling them evil
-//             // So actually, this is correct, it should give them the truth of the matter, BUT ALSO
-//             // NOTIFY THE STORYTELLER THAT THE RECLUSE OR SPY CAN AFFECT INFORMATION, GIVING THE
-//             // STORYTELLER THE CHOICE TO DO THAT IF THEY WISH
-//             // Maybe add a star to the message and highlight the relevant statuses on select?
-//             // Perhaps each change effect should also come with statues to highlight?
 //             (
 //                 "Empath recluse evil neighbor",
 //                 vec![Roles::Investigator, Roles::Empath, Roles::Recluse],
