@@ -5,7 +5,7 @@ use macros::washerwoman_librarian_investigator;
 
 use crate::{
     engine::{
-        change_request::{ChangeArgs, ChangeRequest, ChangeType},
+        change_request::{ChangeArgs, ChangeError, ChangeRequest, ChangeType},
         player::{Alignment, CharacterType, roles::Role},
         state::{
             PlayerIndex, State,
@@ -31,11 +31,7 @@ impl Role for Imp {
         Some(34)
     }
 
-    fn night_ability(
-        &self,
-        _player_index: PlayerIndex,
-        _state: &State,
-    ) -> Option<Vec<ChangeRequest>> {
+    fn night_ability(&self, _player_index: PlayerIndex, _state: &State) -> Option<ChangeRequest> {
         let description = "Ask the Imp to point to the player they would like to kill";
         let change_type = ChangeType::ChoosePlayers(1);
 
@@ -44,8 +40,23 @@ impl Role for Imp {
         // scarletwoman, they should be prioritized over other minions. If the demon does pick
         // themselves, there should be another change request triggered that allows the storyteller
         // to pick a player to become demon
-        let check_func = move |state: &State, args: &ChangeArgs| -> Result<bool, ()> { todo!() };
-        let change_func = move |state: &mut State, args: ChangeArgs| todo!();
+        let check_func = move |state: &State, args: &ChangeArgs| -> Result<bool, ChangeError> {
+            let target_players = unwrap_args_err!(args, ChangeArgs::PlayerIndices(pv) => pv);
+            let len = target_players.len();
+            if len != 1 {
+                return Err(ChangeError::WrongNumberOfSelectedPlayers {
+                    wanted: 1,
+                    got: len,
+                });
+            }
+
+            return Ok(true);
+        };
+        let change_func = move |state: &mut State, args: ChangeArgs| -> Option<ChangeRequest> {
+            let target_players = unwrap_args_panic!(args, ChangeArgs::PlayerIndices(pv) => pv);
+            let target_player_index = target_players[0];
+            let target_player = state.get_player_mut(target_player_index);
+        };
         todo!()
     }
 }

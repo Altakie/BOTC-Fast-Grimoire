@@ -176,11 +176,7 @@ pub(crate) trait Role: Display + Send + Sync {
     /// If the role has an ability that acts during the setup phase, this method should be overwritten and
     /// resolve the setup ability. This is NOT the same as affecting the character
     /// counts in the game. That is the initialization phase.
-    fn setup_ability(
-        &self,
-        _player_index: PlayerIndex,
-        _state: &State,
-    ) -> Option<Vec<ChangeRequest>> {
+    fn setup_ability(&self, _player_index: PlayerIndex, _state: &State) -> Option<ChangeRequest> {
         None
     }
 
@@ -194,7 +190,7 @@ pub(crate) trait Role: Display + Send + Sync {
         &self,
         _player_index: PlayerIndex,
         _state: &State,
-    ) -> Option<Vec<ChangeRequest>> {
+    ) -> Option<ChangeRequest> {
         None
     }
 
@@ -204,11 +200,7 @@ pub(crate) trait Role: Display + Send + Sync {
         None
     }
     /// If the role has an ability that acts during the night (not including night one), this method should be overwritten and resolve the night ability
-    fn night_ability(
-        &self,
-        _player_index: PlayerIndex,
-        _state: &State,
-    ) -> Option<Vec<ChangeRequest>> {
+    fn night_ability(&self, _player_index: PlayerIndex, _state: &State) -> Option<ChangeRequest> {
         None
     }
 
@@ -217,11 +209,7 @@ pub(crate) trait Role: Display + Send + Sync {
         None
     }
     /// If the role has an ability that acts during the day (not including night one), this method should be overwritten and resolve the day ability
-    fn day_ability(
-        &self,
-        _player_index: PlayerIndex,
-        _state: &State,
-    ) -> Option<Vec<ChangeRequest>> {
+    fn day_ability(&self, _player_index: PlayerIndex, _state: &State) -> Option<ChangeRequest> {
         None
     }
 

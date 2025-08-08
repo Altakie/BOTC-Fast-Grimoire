@@ -683,21 +683,18 @@ fn Game() -> impl IntoView {
                     _ => None,
                 };
 
-                // Only apply funcs if change_type requires action
-                if let Some(args) = args {
-                    let check_func = cr.check_func.clone();
-                    let res = game_state.with(|gs| {
-                        let cf = check_func.unwrap().clone();
-                        cf(gs, &args)
-                    });
-                    match res {
-                        Ok(boolean) => {
-                            if boolean {
-                            } else {
-                                return;
-                            }
-                        }
-                        Err(()) => {
+            // Only apply funcs if change_type requires action
+            if args.is_some() {
+                let args = args.unwrap();
+                let check_func = cr.check_func;
+                let res = game_state.with(|gs| {
+                    let cf = check_func.unwrap();
+                    cf.call(gs, &args)
+                });
+                match res {
+                    Ok(boolean) => {
+                        if boolean {
+                        } else {
                             return;
                         }
                     }
@@ -718,11 +715,9 @@ fn Game() -> impl IntoView {
 
                     todo!()
                 }
-                // If the state change func is applied, pop the current_cr off of the queue
-                // If we get to this point, we can assume the change request is applied
-                temp_state.change_requests().update(|crs| {
-                    crs.pop_front();
-                });
+                // If it passes, do the apply state func and move on
+                let state_func = cr.state_change_func.unwrap();
+                game_state.update(|gs| state_func.call(gs, args));
             }
 
             temp_state.update(|ts| ts.clear_selected());

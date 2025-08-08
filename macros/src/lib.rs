@@ -111,48 +111,18 @@ impl quote::ToTokens for WasherwomanLibrarianInvestigator {
         tokens.extend(quote! {
             {
                 let right_description = format!("Select a {}", #target_string);
-                let wrong_description = "Select a different player".to_string();
 
                 let right_status = move || StatusEffect::new(std::sync::Arc::new(#right_effect {}), #player_index);
                 let wrong_status = move || StatusEffect::new(std::sync::Arc::new(#wrong_effect {}), #player_index);
 
                 let change_type = ChangeType::ChoosePlayers(1);
-                let right_check_func = move |state: &State, args: &ChangeArgs| -> Result<bool, ()> {
+
+                let wrong_check_func = move |state: &State, args: &ChangeArgs| -> Result<bool, ChangeError> {
                     let target_player_indices = unwrap_args_err!(args, ChangeArgs::PlayerIndices(v) => v);
 
-                    if target_player_indices.len() != 1 {
-                        return Err(());
-                    }
-
-                    for target_player_index in target_player_indices {
-                        if *target_player_index == player_index {
-                            return Ok(false);
-                        }
-
-                        let player = state.get_player(*target_player_index);
-                        if matches!(
-                            player.get_character_type(),
-                            CharacterType::Townsfolk | CharacterType::Any
-                        ) {
-                            return Ok(true);
-                        }
-                    }
-
-                    return Ok(false);
-                };
-
-                let right_state_change = move |state: &mut State, args: ChangeArgs| {
-                    let target_player_indices = unwrap_args_panic!(args, ChangeArgs::PlayerIndices(v) => v);
-
-                    let target_player = state.get_player_mut(target_player_indices[0]);
-                    target_player.add_status(right_status());
-                };
-
-                let wrong_check_func = move |state: &State, args: &ChangeArgs| -> Result<bool, ()> {
-                    let target_player_indices = unwrap_args_err!(args, ChangeArgs::PlayerIndices(v) => v);
-
-                    if target_player_indices.len() != 1 {
-                        return Err(());
+                    let len = target_player_indices.len();
+                    if len != 1 {
+                        return Err(ChangeError::WrongNumberOfSelectedPlayers { wanted: 1, got: len});
                     }
 
                     let target_player_index = target_player_indices[0];
@@ -172,28 +142,99 @@ impl quote::ToTokens for WasherwomanLibrarianInvestigator {
                     return Ok(true);
                 };
 
-                let wrong_state_change = move |state: &mut State, args: ChangeArgs| {
+                let wrong_state_change = move |state: &mut State, args: ChangeArgs| -> Option<ChangeRequest> {
                     let target_player_indices = unwrap_args_panic!(args, ChangeArgs::PlayerIndices(v) => v);
 
                     // Assign the chosen player the wrong status effect
                     let target_player = state.get_player_mut(target_player_indices[0]);
                     target_player.add_status(wrong_status());
+
+                    None
                 };
 
-                Some(vec![
+                let right_check_func = move |state: &State, args: &ChangeArgs| -> Result<bool, ChangeError> {
+                    let target_player_indices = unwrap_args_err!(args, ChangeArgs::PlayerIndices(v) => v);
+
+                    let len = target_player_indices.len();
+                    if len != 1 {
+                        return Err(ChangeError::WrongNumberOfSelectedPlayers { wanted: 1, got: len});
+                    }
+
+                    for target_player_index in target_player_indices {
+                        if *target_player_index == player_index {
+                            return Ok(false);
+                        }
+
+                        let player = state.get_player(*target_player_index);
+                        if matches!(
+                            player.get_character_type(),
+                            CharacterType::Townsfolk | CharacterType::Any
+                        ) {
+                            return Ok(true);
+                        }
+                    }
+
+                    return Ok(false);
+                };
+
+                let right_state_change = move |state: &mut State, args: ChangeArgs| -> Option<ChangeRequest> {
+                    let target_player_indices = unwrap_args_panic!(args, ChangeArgs::PlayerIndices(v) => v);
+
+                    let target_player = state.get_player_mut(target_player_indices[0]);
+                    target_player.add_status(right_status());
+
+
+                    let wrong_status = move || StatusEffect::new(std::sync::Arc::new(#wrong_effect {}), #player_index);
+                    let wrong_description = "Select a different player";
+
+                    let change_type = ChangeType::ChoosePlayers(1);
+
+                    let wrong_check_func = move |state: &State, args: &ChangeArgs| -> Result<bool, ChangeError> {
+                        let target_player_indices = unwrap_args_err!(args, ChangeArgs::PlayerIndices(v) => v);
+
+                        let len = target_player_indices.len();
+                        if len != 1 {
+                            return Err(ChangeError::WrongNumberOfSelectedPlayers { wanted: 1, got: len});
+                        }
+
+                        let target_player_index = target_player_indices[0];
+
+                        if target_player_index == player_index {
+                            return Ok(false);
+                        }
+
+                        let target_player = state.get_player(target_player_index);
+                        if target_player
+                            .get_statuses()
+                            .iter()
+                            .any(|se| *se == right_status())
+                        {
+                            return Ok(false);
+                        }
+                        return Ok(true);
+                    };
+
+                    let wrong_state_change = move |state: &mut State, args: ChangeArgs| -> Option<ChangeRequest> {
+                        let target_player_indices = unwrap_args_panic!(args, ChangeArgs::PlayerIndices(v) => v);
+
+                        // Assign the chosen player the wrong status effect
+                        let target_player = state.get_player_mut(target_player_indices[0]);
+                        target_player.add_status(wrong_status());
+
+                        None
+                    };
+
+                    Some(new_change_request!(change_type, wrong_description, wrong_check_func, wrong_state_change))
+                };
+
+                Some(
                     new_change_request!(
                         change_type,
                         right_description,
                         right_check_func,
                         right_state_change
-                    ),
-                    new_change_request!(
-                        change_type,
-                        wrong_description,
-                        wrong_check_func,
-                        wrong_state_change
-                    ),
-                ])
+                    )
+                )
             }
         });
     }

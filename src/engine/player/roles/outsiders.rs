@@ -3,10 +3,11 @@ use std::sync::Arc;
 
 use macros::roleptr_from;
 
+use crate::engine::change_request::ChangeError;
 use crate::engine::player::roles::RolePtr;
 use crate::{
     engine::{
-        change_request::{ChangeArgs, ChangeRequest, ChangeType},
+        change_request::{ChangeArgs, ChangeRequest, ChangeType, CheckFuncPtr, StateChangeFuncPtr},
         player::{Alignment, CharacterType, roles::Role},
         state::{
             PlayerIndex, State,
@@ -30,18 +31,22 @@ impl Display for BulterMaster {
 }
 
 impl Butler {
-    fn ability(&self, player_index: PlayerIndex) -> Option<Vec<ChangeRequest>> {
+    fn ability(&self, player_index: PlayerIndex) -> Option<ChangeRequest> {
         // Clean up the old butler master status effect (if there is one), prompt for another
         // player, and give them the butler master status effect
 
         let message = "Prompt the butler to pick a player to be their master".to_string();
         let change_type = ChangeType::ChoosePlayers(1);
 
-        let check_func = move |_: &State, args: &ChangeArgs| -> Result<bool, ()> {
+        let check_func = move |_: &State, args: &ChangeArgs| -> Result<bool, ChangeError> {
             let target_players = unwrap_args_err!(args, ChangeArgs::PlayerIndices(v) => v);
 
-            if target_players.len() != 1 {
-                return Err(());
+            let len = target_players.len();
+            if len != 1 {
+                return Err(ChangeError::WrongNumberOfSelectedPlayers {
+                    wanted: 1,
+                    got: len,
+                });
             }
 
             // Check that the butler is not picking themselves
@@ -52,24 +57,26 @@ impl Butler {
             return Ok(true);
         };
 
-        let state_change_func = move |state: &mut State, args: ChangeArgs| {
-            // Check if there are any butler master status effects inflicted by this player and clear
-            // them
-            state.cleanup_statuses(player_index);
+        let state_change_func =
+            move |state: &mut State, args: ChangeArgs| -> Option<ChangeRequest> {
+                // Check if there are any butler master status effects inflicted by this player and clear
+                // them
+                state.cleanup_statuses(player_index);
 
-            let target_player_index =
-                unwrap_args_panic!(args, ChangeArgs::PlayerIndices(pv) => pv)[0];
-            let target_player = state.get_player_mut(target_player_index);
-            let status = StatusEffect::new(Arc::new(BulterMaster {}), player_index);
-            target_player.add_status(status);
-        };
+                let target_player_index =
+                    unwrap_args_panic!(args, ChangeArgs::PlayerIndices(pv) => pv)[0];
+                let target_player = state.get_player_mut(target_player_index);
+                let status = StatusEffect::new(Arc::new(BulterMaster {}), player_index);
+                target_player.add_status(status);
+                None
+            };
 
-        Some(vec![new_change_request!(
+        Some(new_change_request!(
             change_type,
             message,
             check_func,
             state_change_func
-        )])
+        ))
     }
 }
 
@@ -90,7 +97,7 @@ impl Role for Butler {
         &self,
         player_index: PlayerIndex,
         _state: &State,
-    ) -> Option<Vec<ChangeRequest>> {
+    ) -> Option<ChangeRequest> {
         self.ability(player_index)
     }
 
@@ -98,11 +105,7 @@ impl Role for Butler {
         Some(83)
     }
 
-    fn night_ability(
-        &self,
-        player_index: PlayerIndex,
-        _state: &State,
-    ) -> Option<Vec<ChangeRequest>> {
+    fn night_ability(&self, player_index: PlayerIndex, _state: &State) -> Option<ChangeRequest> {
         self.ability(player_index)
     }
 }
@@ -133,18 +136,18 @@ impl Role for Drunk {
         Some(1)
     }
 
-    fn setup_ability(
-        &self,
-        player_index: PlayerIndex,
-        state: &State,
-    ) -> Option<Vec<ChangeRequest>> {
+    fn setup_ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
         let description = "Select a not in play Townfolk role";
         let change_type = ChangeType::ChooseRoles(1);
-        let check_func = move |_: &State, args: &ChangeArgs| -> Result<bool, ()> {
+        let check_func = move |_: &State, args: &ChangeArgs| -> Result<bool, ChangeError> {
             let roles = unwrap_args_err!(args, ChangeArgs::Roles(r) => r);
 
-            if roles.len() != 1 {
-                return Err(());
+            let len = roles.len();
+            if len != 1 {
+                return Err(ChangeError::WrongNumberOfSelectedRoles {
+                    wanted: 1,
+                    got: len,
+                });
             }
 
             // FIX: Fix to use new role traits instead of enum
@@ -155,7 +158,7 @@ impl Role for Drunk {
             return Ok(true);
         };
 
-        let state_change = move |state: &mut State, args: ChangeArgs| {
+        let state_change = move |state: &mut State, args: ChangeArgs| -> Option<ChangeRequest> {
             let roles = match &args {
                 ChangeArgs::Roles(rv) => rv,
                 _ => panic!("Wrong input type"),
@@ -166,15 +169,15 @@ impl Role for Drunk {
             // TODO: For now just instantly trigger the chnage effect for the townsfolk role that is
             // picked after it is picked
             // This should chain into another change effect and return it
-            todo!()
+            todo!();
         };
 
-        Some(vec![new_change_request!(
+        Some(new_change_request!(
             change_type,
             description,
             check_func,
             state_change
-        )])
+        ))
     }
 
     fn notify(&self, args: &ChangeArgs) -> Option<RolePtr> {
@@ -198,11 +201,7 @@ impl Role for Drunk {
         role.night_one_order()
     }
 
-    fn night_one_ability(
-        &self,
-        player_index: PlayerIndex,
-        state: &State,
-    ) -> Option<Vec<ChangeRequest>> {
+    fn night_one_ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
         let role = self.role.clone()?;
         role.night_one_ability(player_index, state)
     }
@@ -212,11 +211,7 @@ impl Role for Drunk {
         role.night_order()
     }
 
-    fn night_ability(
-        &self,
-        player_index: PlayerIndex,
-        state: &State,
-    ) -> Option<Vec<ChangeRequest>> {
+    fn night_ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
         let role = self.role.clone()?;
         role.night_ability(player_index, state)
     }

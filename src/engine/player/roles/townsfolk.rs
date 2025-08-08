@@ -1,12 +1,15 @@
 use std::fmt::Display;
 use std::sync::Arc;
 
+use leptos::attr::target;
 use macros::washerwoman_librarian_investigator;
 
 use crate::{
     engine::{
-        change_request::{ChangeArgs, ChangeRequest, ChangeType},
-        player::{Alignment, CharacterType, roles::Role},
+        change_request::{
+            ChangeArgs, ChangeError, ChangeRequest, ChangeType, CheckFuncPtr, StateChangeFuncPtr,
+        },
+        player::{Alignment, CharacterType, PlayerBehaviors, roles::Role},
         state::{
             PlayerIndex, State,
             status_effects::{StatusEffect, StatusType},
@@ -51,7 +54,7 @@ impl Role for Washerwoman {
         &self,
         player_index: crate::engine::state::PlayerIndex,
         _state: &State,
-    ) -> Option<Vec<ChangeRequest>> {
+    ) -> Option<ChangeRequest> {
         washerwoman_librarian_investigator!(
             player_index,
             WasherwomanTownsfolk,
@@ -68,12 +71,12 @@ impl Role for Washerwoman {
         &self,
         player_index: crate::engine::state::PlayerIndex,
         state: &State,
-    ) -> Option<Vec<ChangeRequest>> {
+    ) -> Option<ChangeRequest> {
         let player = state.get_player(player_index);
         let message = format!("Show the {} the correct roles", player.role);
         let change_type = ChangeType::Display;
 
-        Some(vec![new_change_request!(change_type, message)])
+        Some(new_change_request!(change_type, message))
     }
 }
 
@@ -119,7 +122,7 @@ impl Role for Librarian {
         &self,
         player_index: crate::engine::state::PlayerIndex,
         _state: &State,
-    ) -> Option<Vec<ChangeRequest>> {
+    ) -> Option<ChangeRequest> {
         washerwoman_librarian_investigator!(
             player_index,
             LibrarianOutsider,
@@ -136,12 +139,12 @@ impl Role for Librarian {
         &self,
         player_index: crate::engine::state::PlayerIndex,
         state: &State,
-    ) -> Option<Vec<ChangeRequest>> {
+    ) -> Option<ChangeRequest> {
         let player = state.get_player(player_index);
         let message = format!("Show the {} the correct roles", player.role);
         let change_type = ChangeType::Display;
 
-        Some(vec![new_change_request!(change_type, message)])
+        Some(new_change_request!(change_type, message))
     }
 }
 
@@ -187,7 +190,7 @@ impl Role for Investigator {
         &self,
         player_index: crate::engine::state::PlayerIndex,
         _state: &State,
-    ) -> Option<Vec<ChangeRequest>> {
+    ) -> Option<ChangeRequest> {
         washerwoman_librarian_investigator!(
             player_index,
             InvestigatorMinion,
@@ -204,12 +207,12 @@ impl Role for Investigator {
         &self,
         player_index: crate::engine::state::PlayerIndex,
         state: &State,
-    ) -> Option<Vec<ChangeRequest>> {
+    ) -> Option<ChangeRequest> {
         let player = state.get_player(player_index);
         let message = format!("Show the {} the correct roles", player.role);
         let change_type = ChangeType::Display;
 
-        Some(vec![new_change_request!(change_type, message)])
+        Some(new_change_request!(change_type, message))
     }
 }
 
@@ -239,7 +242,7 @@ impl Role for Chef {
         &self,
         _player_index: crate::engine::state::PlayerIndex,
         state: &State,
-    ) -> Option<Vec<ChangeRequest>> {
+    ) -> Option<ChangeRequest> {
         // Count pairs of evil players
         // For each evil, player, check if the right player is evil, if yes, increment the
         // pair count
@@ -262,7 +265,7 @@ impl Role for Chef {
             pair_count
         );
 
-        Some(vec![new_change_request!(change_type, message)])
+        Some(new_change_request!(change_type, message))
     }
 }
 
@@ -275,7 +278,7 @@ impl Display for Chef {
 struct Empath {}
 
 impl Empath {
-    fn ability(&self, player_index: PlayerIndex, state: &State) -> Option<Vec<ChangeRequest>> {
+    fn ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
         // Check how many players next to the empath are evil
         let mut count = 0;
         {
@@ -294,7 +297,7 @@ impl Empath {
 
         let change_type = ChangeType::Display;
 
-        Some(vec![new_change_request!(change_type, message)])
+        Some(new_change_request!(change_type, message))
     }
 }
 
@@ -315,19 +318,11 @@ impl Role for Empath {
         Some(68)
     }
 
-    fn night_one_ability(
-        &self,
-        player_index: PlayerIndex,
-        state: &State,
-    ) -> Option<Vec<ChangeRequest>> {
+    fn night_one_ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
         self.ability(player_index, state)
     }
 
-    fn night_ability(
-        &self,
-        player_index: PlayerIndex,
-        state: &State,
-    ) -> Option<Vec<ChangeRequest>> {
+    fn night_ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
         self.ability(player_index, state)
     }
 }
@@ -349,7 +344,7 @@ impl Display for FortunetellerRedHerring {
 }
 
 impl Fortuneteller {
-    fn ability(&self, _player_index: PlayerIndex, _state: &State) -> Option<Vec<ChangeRequest>> {
+    fn ability(&self, _player_index: PlayerIndex, _state: &State) -> Option<ChangeRequest> {
         // TODO: Prompt for a choice of two players
         // Should yield True or false based on whether at least one of those players is a demon or has the red
         // herring status effect
@@ -384,19 +379,19 @@ impl Role for Fortuneteller {
         Some(50)
     }
 
-    fn setup_ability(
-        &self,
-        player_index: PlayerIndex,
-        _state: &State,
-    ) -> Option<Vec<ChangeRequest>> {
+    fn setup_ability(&self, player_index: PlayerIndex, _state: &State) -> Option<ChangeRequest> {
         let description = "Select a red-herring for the Fortune Teller".to_string();
 
         let change_type = ChangeType::ChoosePlayers(1);
-        let check_func = move |_: &State, args: &ChangeArgs| -> Result<bool, ()> {
+        let check_func = move |_: &State, args: &ChangeArgs| -> Result<bool, ChangeError> {
             let target_players = unwrap_args_err!(args, ChangeArgs::PlayerIndices(v) => v);
 
+            let len = target_players.len();
             if target_players.len() != 1 {
-                return Err(());
+                return Err(ChangeError::WrongNumberOfSelectedPlayers {
+                    wanted: 1,
+                    got: len,
+                });
             }
 
             if target_players[0] == player_index {
@@ -407,31 +402,29 @@ impl Role for Fortuneteller {
         };
         // Get storyteller input on who red-herring is
         // Add a red-herring through status effects
-        let state_change = move |state: &mut State, args: ChangeArgs| {
+        let state_change = move |state: &mut State, args: ChangeArgs| -> Option<ChangeRequest> {
             let target_players = unwrap_args_panic!(args, ChangeArgs::PlayerIndices(v) => v);
             let target_player_index = target_players[0];
             let target_player = state.get_player_mut(target_player_index);
             let status = StatusEffect::new(Arc::new(FortunetellerRedHerring()), player_index);
             target_player.add_status(status);
+
+            None
         };
 
-        Some(vec![new_change_request!(
+        Some(new_change_request!(
             change_type,
             description,
             check_func,
             state_change
-        )])
+        ))
     }
 
     fn night_one_order(&self) -> Option<usize> {
         Some(50)
     }
 
-    fn night_one_ability(
-        &self,
-        player_index: PlayerIndex,
-        state: &State,
-    ) -> Option<Vec<ChangeRequest>> {
+    fn night_one_ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
         self.ability(player_index, state)
     }
 
@@ -439,11 +432,7 @@ impl Role for Fortuneteller {
         Some(69)
     }
 
-    fn night_ability(
-        &self,
-        player_index: PlayerIndex,
-        state: &State,
-    ) -> Option<Vec<ChangeRequest>> {
+    fn night_ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
         self.ability(player_index, state)
     }
 }
@@ -460,6 +449,39 @@ impl Display for Fortuneteller {
 #[derive(Default)]
 pub(crate) struct Monk();
 
+struct DemonProtected {
+    behaviors: Vec<PlayerBehaviors>,
+}
+
+impl Default for DemonProtected {
+    fn default() -> Self {
+        Self {
+            behaviors: vec![PlayerBehaviors::Kill],
+        }
+    }
+}
+
+impl StatusType for DemonProtected {
+    fn behavior_type(&self) -> Option<&[crate::engine::player::PlayerBehaviors]> {
+        Some(&self.behaviors)
+    }
+
+    fn kill(&self, attacking_player_index: PlayerIndex, state: &State) -> Option<bool> {
+        let attacking_player = state.get_player(attacking_player_index);
+        if attacking_player.get_character_type() == CharacterType::Demon {
+            return Some(false);
+        }
+
+        return None;
+    }
+}
+
+impl Display for DemonProtected {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Demon Protected")
+    }
+}
+
 impl Role for Monk {
     fn get_default_alignment(&self) -> Alignment {
         Alignment::Good
@@ -473,19 +495,19 @@ impl Role for Monk {
         Some(19)
     }
 
-    fn night_ability(
-        &self,
-        _player_index: PlayerIndex,
-        _state: &State,
-    ) -> Option<Vec<ChangeRequest>> {
+    fn night_ability(&self, player_index: PlayerIndex, _state: &State) -> Option<ChangeRequest> {
         let change_type = ChangeType::ChoosePlayers(1);
         let message = "Have the monk select a player to protect";
 
-        let check_func = move |_: &State, args: &ChangeArgs| -> Result<bool, ()> {
+        let check_func = move |_: &State, args: &ChangeArgs| -> Result<bool, ChangeError> {
             let target_players = unwrap_args_err!(args, ChangeArgs::PlayerIndices(v) => v);
 
-            if target_players.len() != 1 {
-                return Err(());
+            let len = target_players.len();
+            if len != 1 {
+                return Err(ChangeError::WrongNumberOfSelectedPlayers {
+                    wanted: 1,
+                    got: len,
+                });
             }
 
             // Make sure the monk can't protect themselves
@@ -496,43 +518,93 @@ impl Role for Monk {
             return Ok(true);
         };
 
-        let state_change_func = move |state: &mut State, args: ChangeArgs| {
-            // Check if there are any poisoned status effects inflicted by this player and clear
-            // them
-            let prev_effects = state.get_inflicted_statuses(player_index);
+        let state_change_func =
+            move |state: &mut State, args: ChangeArgs| -> Option<ChangeRequest> {
+                // Check if there are any poisoned status effects inflicted by this player and clear
+                // them
 
-            let prev_effect = prev_effects
-                .iter()
-                .find(|se| se.status_type == StatusType::DemonProtected);
+                state.cleanup_statuses(player_index);
 
-            if let Some(prev_effect) = prev_effect {
-                state.remove_status(
-                    prev_effect.status_type,
-                    prev_effect.source_player_index,
-                    prev_effect.affected_player_index,
-                );
-            }
+                let target_player_index =
+                    unwrap_args_panic!(args, ChangeArgs::PlayerIndices(pv) => pv)[0];
+                let target_player = state.get_player_mut(target_player_index);
+                let status = StatusEffect::new(Arc::new(DemonProtected::default()), player_index);
+                target_player.add_status(status);
 
-            let target_player_index =
-                unwrap_args_panic!(args, ChangeArgs::PlayerIndices(pv) => pv)[0];
-            state.add_status(
-                StatusType::DemonProtected,
-                player_index,
-                target_player_index,
-            );
-        };
+                None
+            };
 
-        Some(vec![new_change_request!(
+        Some(new_change_request!(
             change_type,
             message,
             check_func,
             state_change_func
-        )])
+        ))
+    }
+}
+
+impl Display for Monk {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Monk")
     }
 }
 
 // TODO:
-// Ravenkeeper
+// Ravenkeeper (need to implement triggers or smth). Or more than likely, need to somehow hook up
+// the night order ability to the state of the player (somehow), or store some internal state. Or
+// change the main loop to skip None change effects
+
+#[derive(Default)]
+pub(crate) struct Ravenkeeper {
+    ability_used: bool,
+}
+
+impl Role for Ravenkeeper {
+    fn get_default_alignment(&self) -> Alignment {
+        Alignment::Good
+    }
+
+    fn get_true_character_type(&self) -> CharacterType {
+        CharacterType::Townsfolk
+    }
+
+    fn night_order(&self) -> Option<usize> {
+        // if player == dead and ability not used, then order
+        // Otherwise no order
+        // Or might be easier to do in ability
+        Some(67)
+    }
+
+    fn night_ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
+        let player = state.get_player(player_index);
+
+        if !player.dead || self.ability_used {
+            return None;
+        }
+
+        let message = "Prompt the Ravenkeeper to point to a player";
+        let change_type = ChangeType::ChoosePlayers(1);
+
+        let check_func = move |state: &State, args: &ChangeArgs| -> Result<bool, ChangeError> {
+            // TODO: Check that only one player is selected
+            todo!()
+        };
+        let change_func = move |state: &mut State, args: ChangeArgs| {
+            // TODO: Shouldn't actually change anything, but should create another change request
+            // that causes a display of the selected player's role
+            todo!()
+        };
+
+        todo!()
+    }
+}
+
+impl Display for Ravenkeeper {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Ravenkeeper")
+    }
+}
+
 pub(crate) struct Virgin {
     ability_used: bool,
 }

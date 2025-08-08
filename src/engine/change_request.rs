@@ -1,8 +1,10 @@
+use leptos::{attr::AttributeValue, prelude::StorageAccess};
+
 use super::{
     player::roles::Roles,
     state::{PlayerIndex, State},
 };
-use std::sync::Arc;
+use std::{ops::Deref, sync::Arc};
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum ChangeType {
@@ -25,7 +27,7 @@ macro_rules! unwrap_args_err {
     ($args:expr,$pat:pat => $guard:expr) => {
         match $args {
             $pat => $guard,
-            _ => return Err(()),
+            _ => return Err(ChangeError::WrongArgType),
         }
     };
 }
@@ -60,13 +62,79 @@ pub(crate) struct ChangeRequest {
     // Types of errors:
     // Invalid Player(s) selected (reason)
     // Wrong Number of players selected(required, current)
-    pub(crate) check_func:
-        Option<Arc<dyn Fn(&State, &ChangeArgs) -> Result<bool, ()> + Send + Sync>>,
+    pub(crate) check_func: Option<CheckFuncPtr>,
     // TODO: Want state_change_func to return a Option<ChangeRequest>, that way change requests are
     // properly chainable, especially based on conditionals
-    pub(crate) state_change_func: Option<Arc<dyn Fn(&mut State, ChangeArgs) + Send + Sync>>,
+    pub(crate) state_change_func: Option<StateChangeFuncPtr>,
     pub(crate) description: String,
     pub(crate) clear: bool,
+}
+
+// impl ChangeRequest {
+//     pub fn new()
+// }
+
+#[derive(Clone)]
+pub struct CheckFuncPtr(
+    Arc<dyn Fn(&State, &ChangeArgs) -> Result<bool, ChangeError> + Send + Sync>,
+);
+impl CheckFuncPtr {
+    pub fn new<F>(func: F) -> Self
+    where
+        F: Fn(&State, &ChangeArgs) -> Result<bool, ChangeError> + Send + Sync + 'static,
+    {
+        Self(Arc::new(func))
+    }
+
+    pub fn call(&self, state: &State, args: &ChangeArgs) -> Result<bool, ChangeError> {
+        self.0(state, args)
+    }
+}
+
+impl From<Arc<dyn Fn(&State, &ChangeArgs) -> Result<bool, ChangeError> + Send + Sync>>
+    for CheckFuncPtr
+{
+    fn from(
+        value: Arc<dyn Fn(&State, &ChangeArgs) -> Result<bool, ChangeError> + Send + Sync>,
+    ) -> Self {
+        Self(value)
+    }
+}
+
+#[derive(Clone)]
+pub struct StateChangeFuncPtr(
+    Arc<dyn Fn(&mut State, ChangeArgs) -> Option<ChangeRequest> + Send + Sync>,
+);
+
+impl StateChangeFuncPtr {
+    pub fn new<F>(func: F) -> Self
+    where
+        F: Fn(&mut State, ChangeArgs) -> Option<ChangeRequest> + Send + Sync + 'static,
+    {
+        Self(Arc::new(func))
+    }
+
+    pub fn call(&self, state: &mut State, args: ChangeArgs) -> Option<ChangeRequest> {
+        self.0(state, args)
+    }
+}
+
+impl From<Arc<dyn Fn(&mut State, ChangeArgs) -> Option<ChangeRequest> + Send + Sync>>
+    for StateChangeFuncPtr
+{
+    fn from(
+        value: Arc<dyn Fn(&mut State, ChangeArgs) -> Option<ChangeRequest> + Send + Sync>,
+    ) -> Self {
+        Self(value)
+    }
+}
+
+#[derive(Clone)]
+pub enum ChangeError {
+    InvalidSelectedPlayer { reason: String },
+    WrongNumberOfSelectedPlayers { wanted: usize, got: usize },
+    WrongNumberOfSelectedRoles { wanted: usize, got: usize },
+    WrongArgType,
 }
 
 #[macro_export]
@@ -75,8 +143,8 @@ macro_rules! new_change_request {
         ChangeRequest {
             change_type: $ct,
             description: $desc.into(),
-            check_func: Some(std::sync::Arc::new($cf)),
-            state_change_func: Some(std::sync::Arc::new($scf)),
+            check_func: CheckFuncPtr::new($cf).into(),
+            state_change_func: StateChangeFuncPtr::new($scf).into(),
             clear: true,
         }
     };
@@ -93,8 +161,8 @@ macro_rules! new_change_request {
         ChangeRequest {
             change_type: $ct,
             description: $desc.into(),
-            check_func: Some(std::sync::Arc::new($cf)),
-            state_change_func: Some(std::sync::Arc::new($scf)),
+            check_func: CheckFuncPtr::new($cf).into(),
+            state_change_func: StateChangeFuncPtr::new($scf).into(),
             clear: false,
         }
     };

@@ -2,7 +2,9 @@ use std::{fmt::Display, sync::Arc};
 
 use crate::{
     engine::{
-        change_request::{ChangeArgs, ChangeRequest, ChangeType},
+        change_request::{
+            ChangeArgs, ChangeError, ChangeRequest, ChangeType, CheckFuncPtr, StateChangeFuncPtr,
+        },
         player::{Alignment, CharacterType, PlayerBehaviors, roles::Role},
         state::{
             PlayerIndex, State,
@@ -16,11 +18,11 @@ use crate::{
 #[derive(Default)]
 struct Spy {}
 impl Spy {
-    fn ability(&self) -> Option<Vec<ChangeRequest>> {
+    fn ability(&self) -> Option<ChangeRequest> {
         let change_type = ChangeType::Display;
-        let message = "Show the Spy the grimoire".to_string();
+        let message = "Show the Spy the grimoire";
 
-        Some(vec![new_change_request!(change_type, message)])
+        Some(new_change_request!(change_type, message))
     }
 }
 
@@ -49,7 +51,7 @@ impl Role for Spy {
         &self,
         _player_index: PlayerIndex,
         _state: &State,
-    ) -> Option<Vec<ChangeRequest>> {
+    ) -> Option<ChangeRequest> {
         self.ability()
     }
 
@@ -57,11 +59,7 @@ impl Role for Spy {
         Some(84)
     }
 
-    fn night_ability(
-        &self,
-        _player_index: PlayerIndex,
-        _state: &State,
-    ) -> Option<Vec<ChangeRequest>> {
+    fn night_ability(&self, _player_index: PlayerIndex, _state: &State) -> Option<ChangeRequest> {
         self.ability()
     }
 }
@@ -104,41 +102,48 @@ impl Display for Baron {
 struct Poisoner {}
 
 impl Poisoner {
-    fn ability(&self, player_index: PlayerIndex) -> Option<Vec<ChangeRequest>> {
+    fn ability(&self, player_index: PlayerIndex) -> Option<ChangeRequest> {
         // Clean up the old poisoned effect, prompt for another
         // player, and give them the poisoned effect
 
         let message = "Prompt the poisoner to pick a player to poison";
         let change_type = ChangeType::ChoosePlayers(1);
 
-        let check_func = move |_: &State, args: &ChangeArgs| -> Result<bool, ()> {
+        let check_func = move |_: &State, args: &ChangeArgs| -> Result<bool, ChangeError> {
             let target_players = unwrap_args_err!(args, ChangeArgs::PlayerIndices(v) => v);
 
+            let len = target_players.len();
             if target_players.len() != 1 {
-                return Err(());
+                return Err(ChangeError::WrongNumberOfSelectedRoles {
+                    wanted: 1,
+                    got: len,
+                });
             }
 
             return Ok(true);
         };
 
-        let state_change_func = move |state: &mut State, args: ChangeArgs| {
-            // Check if there are any poisoned status effects inflicted by this player and clear
-            // them
-            state.cleanup_statuses(player_index);
+        let state_change_func =
+            move |state: &mut State, args: ChangeArgs| -> Option<ChangeRequest> {
+                // Check if there are any poisoned status effects inflicted by this player and clear
+                // them
+                state.cleanup_statuses(player_index);
 
-            let target_player_index =
-                unwrap_args_panic!(args, ChangeArgs::PlayerIndices(pv) => pv)[0];
-            let target_player = state.get_player_mut(target_player_index);
-            let status = StatusEffect::new(Arc::new(Poisoned {}), player_index);
-            target_player.add_status(status);
-        };
+                let target_player_index =
+                    unwrap_args_panic!(args, ChangeArgs::PlayerIndices(pv) => pv)[0];
+                let target_player = state.get_player_mut(target_player_index);
+                let status = StatusEffect::new(Arc::new(Poisoned {}), player_index);
+                target_player.add_status(status);
 
-        Some(vec![new_change_request!(
+                None
+            };
+
+        Some(new_change_request!(
             change_type,
             message.to_string(),
             check_func,
             state_change_func
-        )])
+        ))
     }
 }
 
@@ -159,7 +164,7 @@ impl Role for Poisoner {
         &self,
         player_index: PlayerIndex,
         _state: &State,
-    ) -> Option<Vec<ChangeRequest>> {
+    ) -> Option<ChangeRequest> {
         self.ability(player_index)
     }
 
@@ -167,11 +172,7 @@ impl Role for Poisoner {
         Some(12)
     }
 
-    fn night_ability(
-        &self,
-        player_index: PlayerIndex,
-        _state: &State,
-    ) -> Option<Vec<ChangeRequest>> {
+    fn night_ability(&self, player_index: PlayerIndex, _state: &State) -> Option<ChangeRequest> {
         self.ability(player_index)
     }
 }
@@ -198,11 +199,7 @@ impl Role for ScarletWoman {
         Some(28)
     }
 
-    fn night_ability(
-        &self,
-        player_index: PlayerIndex,
-        state: &State,
-    ) -> Option<Vec<ChangeRequest>> {
+    fn night_ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
         // TODO: This might be a little tricky because the scarlet woman should immediately become
         // demon when the demon dies. Potentially could have role abilities trigger on events that
         // are added to the log as well. This could be useful for scarlet woman. Then have a method
