@@ -653,7 +653,7 @@ impl Role for Soldier {
     }
 
     // TODO: Overwrite kill method for Soldier so they can't be killed by a demon
-    fn kill(&self, _attacking_player_index: PlayerIndex) -> Option<bool> {
+    fn kill(&self, _attacking_player_index: PlayerIndex, _state: &State) -> Option<bool> {
         todo!()
     }
 }
@@ -678,7 +678,7 @@ impl Role for Mayor {
 
     // TODO: Overwrite kill for mayor. Perhaps kill should also trigger a change request or
     // something like that.
-    fn kill(&self, _attacking_player_index: PlayerIndex) -> Option<bool> {
+    fn kill(&self, _attacking_player_index: PlayerIndex, state: &State) -> Option<bool> {
         todo!()
     }
 }

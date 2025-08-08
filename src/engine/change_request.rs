@@ -23,6 +23,7 @@ pub(crate) enum ChangeArgs {
 }
 
 #[macro_export]
+/// Unwrap args and return an error if it's the wrong arg type. Takes in (args, pattern => guard)
 macro_rules! unwrap_args_err {
     ($args:expr,$pat:pat => $guard:expr) => {
         match $args {
@@ -138,6 +139,7 @@ pub enum ChangeError {
 }
 
 #[macro_export]
+/// Args go as follows : change type, description, (Optional) check_func, state_change_func
 macro_rules! new_change_request {
     ($ct:expr, $desc:expr, $cf:expr, $scf:expr) => {
         ChangeRequest {

@@ -141,7 +141,7 @@ pub(crate) trait Role: Display + Send + Sync {
     ///     * Returns a Option<bool> based on whether or not the role overwrites the default kill behavior of
     ///     the player. By default, it does not do anything and returns None. A true indicates the
     ///     player should die.
-    fn kill(&self, _attacking_player_index: PlayerIndex) -> Option<bool> {
+    fn kill(&self, _attacking_player_index: PlayerIndex, _state: &State) -> Option<bool> {
         return None;
     }
 

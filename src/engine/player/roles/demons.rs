@@ -1,16 +1,17 @@
 use std::fmt::Display;
-use std::sync::Arc;
 
-use macros::washerwoman_librarian_investigator;
+use macros::roleptr;
 
 use crate::{
     engine::{
-        change_request::{ChangeArgs, ChangeError, ChangeRequest, ChangeType},
-        player::{Alignment, CharacterType, roles::Role},
-        state::{
-            PlayerIndex, State,
-            status_effects::{StatusEffect, StatusType},
+        change_request::{
+            ChangeArgs, ChangeError, ChangeRequest, ChangeType, CheckFuncPtr, StateChangeFuncPtr,
         },
+        player::{
+            Alignment, CharacterType,
+            roles::{Role, RolePtr},
+        },
+        state::{PlayerIndex, State},
     },
     new_change_request, unwrap_args_err, unwrap_args_panic,
 };
@@ -31,16 +32,11 @@ impl Role for Imp {
         Some(34)
     }
 
-    fn night_ability(&self, _player_index: PlayerIndex, _state: &State) -> Option<ChangeRequest> {
+    fn night_ability(&self, player_index: PlayerIndex, _state: &State) -> Option<ChangeRequest> {
         let description = "Ask the Imp to point to the player they would like to kill";
         let change_type = ChangeType::ChoosePlayers(1);
 
-        // TODO: Make sure that if the imp points to themselves, the game does not end if there is
-        // a minion alive and instead the demon's role is transferred to the minion. If there is a
-        // scarletwoman, they should be prioritized over other minions. If the demon does pick
-        // themselves, there should be another change request triggered that allows the storyteller
-        // to pick a player to become demon
-        let check_func = move |state: &State, args: &ChangeArgs| -> Result<bool, ChangeError> {
+        let check_func = move |_state: &State, args: &ChangeArgs| -> Result<bool, ChangeError> {
             let target_players = unwrap_args_err!(args, ChangeArgs::PlayerIndices(pv) => pv);
             let len = target_players.len();
             if len != 1 {
@@ -55,9 +51,66 @@ impl Role for Imp {
         let change_func = move |state: &mut State, args: ChangeArgs| -> Option<ChangeRequest> {
             let target_players = unwrap_args_panic!(args, ChangeArgs::PlayerIndices(pv) => pv);
             let target_player_index = target_players[0];
+            let state_snapshot = state.clone();
             let target_player = state.get_player_mut(target_player_index);
+
+            target_player.kill(player_index, &state_snapshot);
+
+            if target_player_index == player_index {
+                let description = "Choose a new Imp";
+                let change_type = ChangeType::ChoosePlayers(1);
+
+                let check_func =
+                    move |state: &State, args: &ChangeArgs| -> Result<bool, ChangeError> {
+                        let target_players =
+                            unwrap_args_err!(args, ChangeArgs::PlayerIndices(pv) => pv);
+                        let len = target_players.len();
+                        if len != 1 {
+                            return Err(ChangeError::WrongNumberOfSelectedPlayers {
+                                wanted: 1,
+                                got: len,
+                            });
+                        }
+
+                        let target_player_index = target_players[0];
+                        let target_player = state.get_player(target_player_index);
+                        if target_player.role.get_true_character_type() != CharacterType::Minion {
+                            return Ok(false);
+                        }
+
+                        return Ok(true);
+                    };
+
+                let change_func =
+                    move |state: &mut State, args: ChangeArgs| -> Option<ChangeRequest> {
+                        let target_players =
+                            unwrap_args_panic!(args, ChangeArgs::PlayerIndices(pv) => pv);
+                        let target_player_index = target_players[0];
+                        let target_player = state.get_player_mut(target_player_index);
+
+                        let new_role = roleptr!(Imp);
+
+                        target_player.role.reassign(new_role);
+                        None
+                    };
+
+                return Some(new_change_request!(
+                    change_type,
+                    description,
+                    check_func,
+                    change_func
+                ));
+            }
+
+            return None;
         };
-        todo!()
+
+        return Some(new_change_request!(
+            change_type,
+            description,
+            check_func,
+            change_func
+        ));
     }
 }
 

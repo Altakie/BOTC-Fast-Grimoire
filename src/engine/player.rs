@@ -94,8 +94,8 @@ impl Player {
     // Player Behaviors
 
     /// Default behavior is that the player dies. If the player does not die, it should be because
-    /// of their role or status effects
-    pub(crate) fn kill(&mut self, attacking_player_index: PlayerIndex) {
+    /// of their role or status effects.
+    pub(crate) fn kill(&mut self, attacking_player_index: PlayerIndex, state: &State) {
         // Status Effects
         // Basically go through each status, see if any prevent the player from dying
         // If any do, prevent the player from dying
@@ -105,7 +105,10 @@ impl Player {
                 status_effect.status_type.behavior_type(),
                 Some(&[.., PlayerBehaviors::Kill])
             ) {
-                if let Some(false) = status_effect.status_type.kill(attacking_player_index) {
+                if let Some(false) = status_effect
+                    .status_type
+                    .kill(attacking_player_index, state)
+                {
                     dead = false;
                 }
             }
@@ -116,7 +119,7 @@ impl Player {
         }
 
         // Roles
-        if let Some(dead) = self.role.kill(attacking_player_index) {
+        if let Some(dead) = self.role.kill(attacking_player_index, state) {
             self.dead = dead;
             return;
         }
