@@ -27,7 +27,7 @@ pub enum Step {
     DayDiscussion,
     DayExecution,
     // Night
-    Night1,
+    NightOne,
     Night,
     // Input
     // ChoosePlayers,
@@ -179,10 +179,10 @@ impl State {
     pub(crate) fn next_step(&mut self) {
         let next_step = match self.step {
             Step::Start => Step::Setup,
-            Step::Setup => Step::Night1,
+            Step::Setup => Step::NightOne,
             Step::DayDiscussion => Step::DayExecution,
             Step::DayExecution => Step::Night,
-            Step::Night1 | Step::Night => Step::DayDiscussion,
+            Step::NightOne | Step::Night => Step::DayDiscussion,
         };
 
         self.step = next_step;
@@ -196,7 +196,8 @@ impl State {
         match self.step {
             Step::Start => None,
             Step::Setup => self.get_next_active_setup(previous_player),
-            Step::Night1 => self.get_next_active_night1(previous_player),
+            Step::NightOne => self.get_next_active_night_one(previous_player),
+            Step::Night => self.get_next_active_night(previous_player),
             _ => None,
         }
     }
@@ -216,7 +217,8 @@ impl State {
 
         let res = match self.step {
             Step::Setup => role.setup_ability(player_index, self),
-            Step::Night1 => role.night_one_ability(player_index, self),
+            Step::NightOne => role.night_one_ability(player_index, self),
+            Step::Night => role.night_ability(player_index, self),
             _ => None,
         };
 

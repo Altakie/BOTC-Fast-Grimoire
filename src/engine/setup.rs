@@ -15,8 +15,7 @@ impl State {
 
         let players = self.get_players();
 
-        for (i, player) in players.iter().skip(start_index + 1).enumerate() {
-            let i = i + start_index + 1;
+        for (i, player) in players.iter().enumerate().skip(start_index) {
             if player.role.setup_order().is_some() {
                 return Some(i);
             }
