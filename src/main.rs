@@ -547,10 +547,13 @@ fn Info() -> impl IntoView {
         match step {
             Step::Start => "Start".to_string(),
             Step::Setup => "Setup".to_string(),
-            Step::DayDiscussion | Step::DayExecution => {
-                format!("Day {}", game_state.day_num().get()).to_string()
+            Step::DayDiscussion => {
+                format!("Day {} Discussion", game_state.day_num().get()).to_string()
             }
-            Step::Night1 | Step::Night => {
+            Step::DayExecution => {
+                format!("Day {} Execution", game_state.day_num().get()).to_string()
+            }
+            Step::NightOne | Step::Night => {
                 format!("Night {}", game_state.day_num().get()).to_string()
             }
         }
@@ -662,7 +665,7 @@ fn Info() -> impl IntoView {
 fn Game() -> impl IntoView {
     let game_state = expect_context::<Store<State>>();
     let temp_state = expect_context::<Store<TempState>>();
-    let next_button = move |_| {
+    let next_button = move || {
         // If there is a change request in the queue, process it
         if let Some(cr) = temp_state.curr_change_request().get() {
             // console_log(&format!("Curr cr is {:?}", cr));
@@ -747,8 +750,9 @@ fn Game() -> impl IntoView {
                             break;
                         }
                         None => {
+                            // If there is a player with no change request, just skip them
                             console_error("Next Change Request is none");
-                            break;
+                            continue;
                         }
                     }
                 }
@@ -758,6 +762,13 @@ fn Game() -> impl IntoView {
                         break;
                     }
                     game_state.update(|gs| gs.next_step());
+                    if matches!(
+                        game_state.step().get(),
+                        Step::DayExecution | Step::DayDiscussion
+                    ) {
+                        // Don't want to loop twice during the day
+                        break;
+                    }
                     loop_break = true;
                 }
             }
@@ -766,7 +777,13 @@ fn Game() -> impl IntoView {
     view! {
         <div class="relative w-3/5 flex justify-center items-center">
             <Player_Display />
-            <button class="absolute right-[0px] top-[0px]" on:click=next_button>
+            <button class="absolute right-[0px] top-[0px]" on:click=move |_|next_button()
+            on:keypress=move |ev| {
+                if ev.key() == "Enter" {
+                    next_button()
+                }
+            }
+            >
                 "Next"
             </button>
         </div>
