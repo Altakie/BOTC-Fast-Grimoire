@@ -1,4 +1,14 @@
+
 # BOTC Logic Requirements
+
+## Major TODOS
+
+- Add travellers
+- Add Day phase and make it operational
+- Finish log
+- Players should no longer deliver change requests when dead, fix this to make it more idiomatic
+- Bind enter to the next button (currently broken)
+- Fix Night Counting and Day UI
 
 ## Game Modes
 
@@ -9,7 +19,7 @@
   - Game doesn't automatically execute logic
   - Game will still display night order
   - Events will still be logged
-- Should be able to switch between modes at will 
+- Should be able to switch between modes at will
   - If something goes wrong, want to be able to undo and go back to manual mode
   - Sometimes there are bits of logic that are unable to be captured, and manual mode is good for that
 
@@ -29,7 +39,6 @@
 - GUI
   - A visual way to see all the information that is stored by the game engine
 - Misc story teller notes
-
 
 ## Setup
 
