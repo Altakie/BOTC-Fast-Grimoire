@@ -112,7 +112,7 @@ impl quote::ToTokens for WasherwomanLibrarianInvestigator {
             {
                 let right_description = format!("Select a {}", #character_type.to_string());
 
-                let right_status = move || StatusEffect::new(std::sync::Arc::new(#right_effect {}), #player_index);
+                let right_status = move || StatusEffect::new(std::sync::Arc::new(#right_effect {}), #player_index, None);
 
                 let change_type = ChangeType::ChoosePlayers(1);
 
@@ -148,7 +148,7 @@ impl quote::ToTokens for WasherwomanLibrarianInvestigator {
                     target_player.add_status(right_status());
 
 
-                    let wrong_status = move || StatusEffect::new(std::sync::Arc::new(#wrong_effect {}), #player_index);
+                    let wrong_status = move || StatusEffect::new(std::sync::Arc::new(#wrong_effect {}), #player_index, None);
                     let wrong_description = "Select a different player";
 
                     let wrong_change_type = ChangeType::ChoosePlayers(1);

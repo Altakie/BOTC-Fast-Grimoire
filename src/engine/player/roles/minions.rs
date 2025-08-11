@@ -8,7 +8,7 @@ use crate::{
         player::{Alignment, CharacterType, PlayerBehaviors, roles::Role},
         state::{
             PlayerIndex, State,
-            status_effects::{Poisoned, StatusEffect, StatusType},
+            status_effects::{CleanupPhase, Poisoned, StatusEffect, StatusType},
         },
     },
     initialization::CharacterTypeCounts,
@@ -59,7 +59,11 @@ impl Role for Spy {
         Some(84)
     }
 
-    fn night_ability(&self, _player_index: PlayerIndex, _state: &State) -> Option<ChangeRequest> {
+    fn night_ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
+        let dead = state.get_player(player_index).dead;
+        if dead {
+            return None;
+        }
         self.ability()
     }
 }
@@ -125,14 +129,14 @@ impl Poisoner {
 
         let state_change_func =
             move |state: &mut State, args: ChangeArgs| -> Option<ChangeRequest> {
-                // Check if there are any poisoned status effects inflicted by this player and clear
-                // them
-                state.cleanup_statuses(player_index);
-
                 let target_player_index =
                     unwrap_args_panic!(args, ChangeArgs::PlayerIndices(pv) => pv)[0];
                 let target_player = state.get_player_mut(target_player_index);
-                let status = StatusEffect::new(Arc::new(Poisoned {}), player_index);
+                let status = StatusEffect::new(
+                    Arc::new(Poisoned {}),
+                    player_index,
+                    CleanupPhase::Dusk.into(),
+                );
                 target_player.add_status(status);
 
                 None
@@ -172,7 +176,11 @@ impl Role for Poisoner {
         Some(12)
     }
 
-    fn night_ability(&self, player_index: PlayerIndex, _state: &State) -> Option<ChangeRequest> {
+    fn night_ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
+        let dead = state.get_player(player_index).dead;
+        if dead {
+            return None;
+        }
         self.ability(player_index)
     }
 }

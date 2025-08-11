@@ -18,18 +18,30 @@ impl Deref for StatusTypePtr {
     }
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, PartialOrd)]
+pub(crate) enum CleanupPhase {
+    Dusk,
+    Dawn,
+}
+
 #[derive(Clone)]
 pub(crate) struct StatusEffect {
     // pub(crate) status_type: StatusEffects,
     pub(crate) status_type: Arc<dyn StatusType>,
     pub(crate) source_player_index: PlayerIndex,
+    pub(crate) cleanup_phase: Option<CleanupPhase>,
 }
 
 impl StatusEffect {
-    pub(crate) fn new(status_type: Arc<dyn StatusType>, source_player_index: PlayerIndex) -> Self {
+    pub(crate) fn new(
+        status_type: Arc<dyn StatusType>,
+        source_player_index: PlayerIndex,
+        cleanup_phase: Option<CleanupPhase>,
+    ) -> Self {
         Self {
             status_type,
             source_player_index,
+            cleanup_phase,
         }
     }
 }
@@ -87,9 +99,15 @@ pub(crate) trait StatusType: Send + Sync + Display {
 }
 
 impl State {
-    pub(crate) fn cleanup_statuses(&mut self, source_player_index: PlayerIndex) {
+    pub(crate) fn cleanup_player_statuses(&mut self, source_player_index: PlayerIndex) {
         for player in self.players.iter_mut() {
             player.remove_players_statuses(source_player_index);
+        }
+    }
+
+    pub(crate) fn cleanup_statuses(&mut self, cleanup_phase: CleanupPhase) {
+        for player in self.players.iter_mut() {
+            player.cleanup_statuses(cleanup_phase);
         }
     }
 }
@@ -110,7 +128,7 @@ impl StatusType for Poisoned {
 
 impl Display for Poisoned {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("Posioned")
+        f.write_str("Poisoned")
     }
 }
 

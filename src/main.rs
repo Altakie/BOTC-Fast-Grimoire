@@ -53,8 +53,8 @@ fn App() -> impl IntoView {
     if DEBUG {
         roles.set(vec![
             Roles::Washerwoman,
-            Roles::Investigator,
-            Roles::Librarian,
+            Roles::Poisoner,
+            Roles::Monk,
             Roles::Fortuneteller,
             // Role::Monk,
             Roles::Drunk,
@@ -702,22 +702,23 @@ fn Game() -> impl IntoView {
                     }
                 }
                 // If it passes, do the apply state func and move on
-                let state_func = cr.state_change_func.unwrap();
-                let next_cr = game_state.try_update(|gs| state_func.call(gs, args));
-                let next_cr = next_cr.unwrap();
-                // console_log(&format!("{:?}", next_cr));
-                // Set the next cr
+                if let Some(state_func) = cr.state_change_func {
+                    let next_cr = game_state.try_update(|gs| state_func.call(gs, args));
+                    let next_cr = next_cr.unwrap();
+                    // console_log(&format!("{:?}", next_cr));
+                    // Set the next cr
 
-                temp_state.update(|ts| ts.clear_selected());
+                    temp_state.update(|ts| ts.clear_selected());
 
-                if next_cr.is_some() {
-                    temp_state.curr_change_request().set(next_cr);
-                    // console_log(&format!(
-                    //     "New Cr set as {:?}, curr cr is now {:?}",
-                    //     next_cr,
-                    //     temp_state.curr_change_request().get()
-                    // ));
-                    return;
+                    if next_cr.is_some() {
+                        temp_state.curr_change_request().set(next_cr);
+                        // console_log(&format!(
+                        //     "New Cr set as {:?}, curr cr is now {:?}",
+                        //     next_cr,
+                        //     temp_state.curr_change_request().get()
+                        // ));
+                        return;
+                    }
                 }
             }
         }
@@ -779,7 +780,9 @@ fn Game() -> impl IntoView {
             <Player_Display />
             <button class="absolute right-[0px] top-[0px]" on:click=move |_|next_button()
             on:keypress=move |ev| {
+                    console_log(&format!("Keyboard event happened {:?}", ev));
                 if ev.key() == "Enter" {
+                    console_log("Next Button Pressed");
                     next_button()
                 }
             }
@@ -826,6 +829,14 @@ fn Player_Display() -> impl IntoView {
                                     class="size-[5rem] rounded-full text-center border border-[#000000]"
                                     style:border-style=move || {
                                         if selected.get() { "solid" } else { "none" }
+                                    }
+                                    style:background=move || {
+                                                if let Some(selected_player) = temp_state.currently_acting_player().get(){
+                                                    if selected_player == i {
+                                                        return "aquamarine";
+                                                    }
+                                                }
+                                            ""
                                     }
                                     style:color=move || {
                                         if player.dead {

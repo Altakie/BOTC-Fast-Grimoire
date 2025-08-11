@@ -1,9 +1,9 @@
+use std::fmt::Display;
 use std::sync::Arc;
-use std::{fmt::Display, ops::Deref};
 
-use leptos::attr::target;
 use macros::washerwoman_librarian_investigator;
 
+use crate::engine::state::status_effects::CleanupPhase;
 use crate::{
     engine::{
         change_request::{
@@ -324,6 +324,10 @@ impl Role for Empath {
     }
 
     fn night_ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
+        let dead = state.get_player(player_index).dead;
+        if dead {
+            return None;
+        }
         self.ability(player_index, state)
     }
 }
@@ -346,12 +350,17 @@ impl Display for FortunetellerRedHerring {
 }
 
 impl Fortuneteller {
-    fn ability(&self, player_index: PlayerIndex, _state: &State) -> Option<ChangeRequest> {
+    fn ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
+        let dead = state.get_player(player_index).dead;
+        if dead {
+            return None;
+        }
+
         let message = "Prompt the FortuneTeller to point to two players";
 
         let change_type = ChangeType::ChoosePlayers(2);
 
-        let check_func = move |state: &State, args: &ChangeArgs| -> Result<bool, ChangeError> {
+        let check_func = move |_state: &State, args: &ChangeArgs| -> Result<bool, ChangeError> {
             let target_players = unwrap_args_err!(args, ChangeArgs::PlayerIndices(pv) => pv);
             let len = target_players.len();
             if len != 2 {
@@ -448,7 +457,7 @@ impl Role for Fortuneteller {
             let target_players = unwrap_args_panic!(args, ChangeArgs::PlayerIndices(v) => v);
             let target_player_index = target_players[0];
             let target_player = state.get_player_mut(target_player_index);
-            let status = StatusEffect::new(Arc::new(FortunetellerRedHerring()), player_index);
+            let status = StatusEffect::new(Arc::new(FortunetellerRedHerring()), player_index, None);
             target_player.add_status(status);
 
             None
@@ -510,7 +519,7 @@ impl StatusType for DemonProtected {
 
     fn kill(&self, attacking_player_index: PlayerIndex, state: &State) -> Option<bool> {
         let attacking_player = state.get_player(attacking_player_index);
-        if attacking_player.get_character_type() == CharacterType::Demon {
+        if attacking_player.role.get_true_character_type() == CharacterType::Demon {
             return Some(false);
         }
 
@@ -537,7 +546,11 @@ impl Role for Monk {
         Some(19)
     }
 
-    fn night_ability(&self, player_index: PlayerIndex, _state: &State) -> Option<ChangeRequest> {
+    fn night_ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
+        let dead = state.get_player(player_index).dead;
+        if dead {
+            return None;
+        }
         let change_type = ChangeType::ChoosePlayers(1);
         let message = "Have the monk select a player to protect";
 
@@ -565,12 +578,14 @@ impl Role for Monk {
                 // Check if there are any poisoned status effects inflicted by this player and clear
                 // them
 
-                state.cleanup_statuses(player_index);
-
                 let target_player_index =
                     unwrap_args_panic!(args, ChangeArgs::PlayerIndices(pv) => pv)[0];
                 let target_player = state.get_player_mut(target_player_index);
-                let status = StatusEffect::new(Arc::new(DemonProtected::default()), player_index);
+                let status = StatusEffect::new(
+                    Arc::new(DemonProtected::default()),
+                    player_index,
+                    CleanupPhase::Dawn.into(),
+                );
                 target_player.add_status(status);
 
                 None
@@ -622,7 +637,7 @@ impl Role for Ravenkeeper {
         let message = "Prompt the Ravenkeeper to point to a player";
         let change_type = ChangeType::ChoosePlayers(1);
 
-        let check_func = move |state: &State, args: &ChangeArgs| -> Result<bool, ChangeError> {
+        let check_func = move |_state: &State, args: &ChangeArgs| -> Result<bool, ChangeError> {
             let target_players = unwrap_args_err!(args, ChangeArgs::PlayerIndices(pv) => pv);
             let len = target_players.len();
             if len != 1 {
@@ -692,7 +707,7 @@ impl Display for Virgin {
 // Slayer
 
 #[derive(Default)]
-struct Soldier();
+pub(crate) struct Soldier();
 
 impl Role for Soldier {
     fn get_default_alignment(&self) -> Alignment {
@@ -734,7 +749,7 @@ impl Role for Mayor {
 
     // TODO: Overwrite kill for mayor. Perhaps kill should also trigger a change request or
     // something like that.
-    fn kill(&self, _attacking_player_index: PlayerIndex, state: &State) -> Option<bool> {
+    fn kill(&self, _attacking_player_index: PlayerIndex, _state: &State) -> Option<bool> {
         todo!()
     }
 }

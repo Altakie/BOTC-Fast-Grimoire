@@ -3,12 +3,12 @@
 
 ## Major TODOS
 
+- Add tests for all roles
 - Add travellers
 - Add Day phase and make it operational
 - Finish log
 - Players should no longer deliver change requests when dead, fix this to make it more idiomatic
 - Bind enter to the next button (currently broken)
-- Fix Night Counting and Day UI
 
 ## Game Modes
 

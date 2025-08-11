@@ -12,6 +12,7 @@ use crate::{
     engine::{
         change_request::ChangeRequest,
         player::{Player, roles::Roles},
+        state::status_effects::CleanupPhase,
     },
     initialization::Script,
 };
@@ -90,7 +91,7 @@ impl State {
             win_cond_i,
             status_effects, // active_roles,
             day_phase: DayPhase::Night,
-            day_num: 0,
+            day_num: 1,
             log,
             script,
             step: Step::default(),
@@ -157,32 +158,20 @@ impl State {
         self.players[index].dead
     }
 
-    pub(crate) fn get_order_from_map(
-        &self,
-        mut order_map: HashMap<usize, PlayerIndex>,
-    ) -> Vec<PlayerIndex> {
-        let mut final_order: Vec<PlayerIndex> = vec![];
-        // Pull out the minimum number role and put it into vector until all roles are ordered
-        while order_map.keys().len() != 0 {
-            let min_key = *order_map
-                .keys()
-                .min()
-                .expect("There should be an minimum in the map");
-            let next_role = order_map.remove(&min_key).unwrap();
-            final_order.push(next_role);
-        }
-
-        // Return the new vector
-        return final_order;
-    }
-
     pub(crate) fn next_step(&mut self) {
         let next_step = match self.step {
             Step::Start => Step::Setup,
             Step::Setup => Step::NightOne,
             Step::DayDiscussion => Step::DayExecution,
-            Step::DayExecution => Step::Night,
-            Step::NightOne | Step::Night => Step::DayDiscussion,
+            Step::DayExecution => {
+                self.cleanup_statuses(CleanupPhase::Dusk);
+                self.day_num += 1;
+                Step::Night
+            }
+            Step::NightOne | Step::Night => {
+                self.cleanup_statuses(CleanupPhase::Dawn);
+                Step::DayDiscussion
+            }
         };
 
         self.step = next_step;
@@ -213,17 +202,31 @@ impl State {
     /// * Option<ChangeRequest> : A change request if the role does something, or none if it
     ///   doesn't
     pub(crate) fn resolve(&self, player_index: PlayerIndex) -> Option<ChangeRequest> {
-        let role = &self.players[player_index].role;
+        let player = self.get_player(player_index);
 
         let res = match self.step {
-            Step::Setup => role.setup_ability(player_index, self),
-            Step::NightOne => role.night_one_ability(player_index, self),
-            Step::Night => role.night_ability(player_index, self),
+            Step::Setup => player.setup_ability(player_index, self),
+            Step::NightOne => player.night_one_ability(player_index, self),
+            Step::Night => player.night_ability(player_index, self),
             _ => None,
         };
 
         return res;
         // TODO: Log events that happen in the setup
+    }
+
+    pub(crate) fn kill(
+        &mut self,
+        attacking_player_index: PlayerIndex,
+        target_player_index: PlayerIndex,
+    ) {
+        let state_snapshot = self.clone();
+        self.get_player_mut(target_player_index)
+            .kill(attacking_player_index, &state_snapshot);
+        let dead = self.get_player(target_player_index).dead;
+        if dead {
+            self.cleanup_player_statuses(target_player_index);
+        }
     }
 }
 

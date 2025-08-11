@@ -32,7 +32,12 @@ impl Role for Imp {
         Some(34)
     }
 
-    fn night_ability(&self, player_index: PlayerIndex, _state: &State) -> Option<ChangeRequest> {
+    fn night_ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
+        let dead = state.get_player(player_index).dead;
+        if dead {
+            return None;
+        }
+
         let description = "Ask the Imp to point to the player they would like to kill";
         let change_type = ChangeType::ChoosePlayers(1);
 
@@ -51,10 +56,7 @@ impl Role for Imp {
         let change_func = move |state: &mut State, args: ChangeArgs| -> Option<ChangeRequest> {
             let target_players = unwrap_args_panic!(args, ChangeArgs::PlayerIndices(pv) => pv);
             let target_player_index = target_players[0];
-            let state_snapshot = state.clone();
-            let target_player = state.get_player_mut(target_player_index);
-
-            target_player.kill(player_index, &state_snapshot);
+            state.kill(player_index, target_player_index);
 
             if target_player_index == player_index {
                 let description = "Choose a new Imp";

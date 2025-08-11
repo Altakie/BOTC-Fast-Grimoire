@@ -5,6 +5,7 @@ use macros::roleptr_from;
 
 use crate::engine::change_request::ChangeError;
 use crate::engine::player::roles::RolePtr;
+use crate::engine::state::status_effects::CleanupPhase;
 use crate::{
     engine::{
         change_request::{ChangeArgs, ChangeRequest, ChangeType, CheckFuncPtr, StateChangeFuncPtr},
@@ -18,7 +19,7 @@ use crate::{
 };
 
 #[derive(Default)]
-struct Butler();
+pub(crate) struct Butler();
 
 struct BulterMaster();
 
@@ -34,7 +35,6 @@ impl Butler {
     fn ability(&self, player_index: PlayerIndex) -> Option<ChangeRequest> {
         // Clean up the old butler master status effect (if there is one), prompt for another
         // player, and give them the butler master status effect
-
         let message = "Prompt the butler to pick a player to be their master".to_string();
         let change_type = ChangeType::ChoosePlayers(1);
 
@@ -59,14 +59,14 @@ impl Butler {
 
         let state_change_func =
             move |state: &mut State, args: ChangeArgs| -> Option<ChangeRequest> {
-                // Check if there are any butler master status effects inflicted by this player and clear
-                // them
-                state.cleanup_statuses(player_index);
-
                 let target_player_index =
                     unwrap_args_panic!(args, ChangeArgs::PlayerIndices(pv) => pv)[0];
                 let target_player = state.get_player_mut(target_player_index);
-                let status = StatusEffect::new(Arc::new(BulterMaster {}), player_index);
+                let status = StatusEffect::new(
+                    Arc::new(BulterMaster {}),
+                    player_index,
+                    CleanupPhase::Dusk.into(),
+                );
                 target_player.add_status(status);
                 None
             };
@@ -105,7 +105,11 @@ impl Role for Butler {
         Some(83)
     }
 
-    fn night_ability(&self, player_index: PlayerIndex, _state: &State) -> Option<ChangeRequest> {
+    fn night_ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
+        let dead = state.get_player(player_index).dead;
+        if dead {
+            return None;
+        }
         self.ability(player_index)
     }
 }
@@ -139,7 +143,14 @@ impl Role for Drunk {
     fn setup_ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
         // If the drunk has a role assigned, call its setup ability instead
         if let Some(role) = &self.role {
-            return role.setup_ability(player_index, state);
+            let res = role.setup_ability(player_index, state);
+            return match res {
+                Some(mut cr) => {
+                    cr.state_change_func = None;
+                    Some(cr)
+                }
+                None => None,
+            };
         };
 
         let description = "Select a not in play Townfolk role";
@@ -164,7 +175,7 @@ impl Role for Drunk {
         };
 
         let state_change = move |state: &mut State, args: ChangeArgs| -> Option<ChangeRequest> {
-            let roles = match &args {
+            let _roles = match &args {
                 ChangeArgs::Roles(rv) => rv,
                 _ => panic!("Wrong input type"),
             };
@@ -207,7 +218,14 @@ impl Role for Drunk {
 
     fn night_one_ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
         let role = self.role.clone()?;
-        role.night_one_ability(player_index, state)
+        let res = role.night_one_ability(player_index, state);
+        return match res {
+            Some(mut cr) => {
+                cr.state_change_func = None;
+                Some(cr)
+            }
+            None => None,
+        };
     }
 
     fn night_order(&self) -> Option<usize> {
@@ -217,7 +235,14 @@ impl Role for Drunk {
 
     fn night_ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
         let role = self.role.clone()?;
-        role.night_ability(player_index, state)
+        let res = role.night_ability(player_index, state);
+        return match res {
+            Some(mut cr) => {
+                cr.state_change_func = None;
+                Some(cr)
+            }
+            None => None,
+        };
     }
 }
 
@@ -225,14 +250,14 @@ impl Display for Drunk {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let role = self.role.clone();
         match role {
-            Some(role) => write!(f, "The Drunk {}", role.to_string()),
+            Some(role) => write!(f, "The Drunk {}", role),
             None => f.write_str("The Drunk"),
         }
     }
 }
 
 #[derive(Default)]
-struct Recluse();
+pub(crate) struct Recluse();
 
 impl Role for Recluse {
     fn get_default_alignment(&self) -> Alignment {
@@ -255,7 +280,7 @@ impl Display for Recluse {
 }
 
 #[derive(Default)]
-struct Saint();
+pub(crate) struct Saint();
 // TODO:
 // Saint is technically a win condition, figure out how winning the game actually comes about
 

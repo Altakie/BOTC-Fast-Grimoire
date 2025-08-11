@@ -4,7 +4,10 @@ use std::fmt::{Debug, Display};
 use crate::engine::{
     change_request::{ChangeArgs, ChangeRequest},
     player::roles::{Role, RolePtr},
-    state::{PlayerIndex, State, Step, status_effects::StatusEffect},
+    state::{
+        PlayerIndex, State, Step,
+        status_effects::{CleanupPhase, StatusEffect},
+    },
 };
 
 pub(crate) mod roles;
@@ -99,6 +102,11 @@ impl Player {
     pub(crate) fn remove_players_statuses(&mut self, source_player_index: PlayerIndex) {
         self.status_effects
             .retain(|s| s.source_player_index != source_player_index);
+    }
+
+    pub(crate) fn cleanup_statuses(&mut self, cleanup_phase: CleanupPhase) {
+        self.status_effects
+            .retain(|s| s.cleanup_phase != Some(cleanup_phase));
     }
 
     // Player Behaviors

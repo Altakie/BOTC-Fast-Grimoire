@@ -7,8 +7,8 @@ use std::sync::{Arc, RwLock, RwLockReadGuard};
 
 use crate::engine::change_request::ChangeArgs;
 use crate::engine::player::roles::demons::Imp;
-use crate::engine::player::roles::minions::{Baron, Spy};
-use crate::engine::player::roles::outsiders::Drunk;
+use crate::engine::player::roles::minions::{Baron, Poisoner, Spy};
+use crate::engine::player::roles::outsiders::{Butler, Drunk, Recluse, Saint};
 use crate::{
     engine::{
         change_request::ChangeRequest,
@@ -108,7 +108,7 @@ impl Clone for RolePtr {
 
 impl Display for RolePtr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0.to_string())
+        write!(f, "{}", self.0)
     }
 }
 
@@ -238,19 +238,19 @@ impl Roles {
             Roles::Fortuneteller => roleptr!(Fortuneteller),
             Roles::Undertaker => todo!(),
             Roles::Virgin => roleptr!(Virgin),
-            Roles::Soldier => todo!(),
+            Roles::Soldier => roleptr!(Soldier),
             Roles::Slayer => todo!(),
             Roles::Mayor => todo!(),
-            Roles::Monk => todo!(),
-            Roles::Ravenkeeper => todo!(),
+            Roles::Monk => roleptr!(Monk),
+            Roles::Ravenkeeper => roleptr!(Ravenkeeper),
             Roles::Drunk => roleptr!(Drunk),
-            Roles::Saint => todo!(),
-            Roles::Butler => todo!(),
-            Roles::Recluse => todo!(),
+            Roles::Saint => roleptr!(Saint),
+            Roles::Butler => roleptr!(Butler),
+            Roles::Recluse => roleptr!(Recluse),
             Roles::Spy => roleptr!(Spy),
             Roles::Baron => roleptr!(Baron),
             Roles::Scarletwoman => todo!(),
-            Roles::Poisoner => todo!(),
+            Roles::Poisoner => roleptr!(Poisoner),
             Roles::Imp => roleptr!(Imp),
         }
     }
