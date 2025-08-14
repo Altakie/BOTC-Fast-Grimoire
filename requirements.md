@@ -3,12 +3,12 @@
 
 ## Major TODOS
 
-- Add tests for all roles
-- Add travellers
-- Add Day phase and make it operational
-- Finish log
+- Finish log!
+- Bind enter to the next button (currently broken)!
 - Players should no longer deliver change requests when dead, fix this to make it more idiomatic
-- Bind enter to the next button (currently broken)
+- Add tests for all roles (and transfer old ones)
+- Add Day phase and make it operational!
+- Add travellers
 
 ## Game Modes
 
@@ -28,6 +28,8 @@
 - There should be a way to rollback events using the log
   - Might want to research how this is done
   - Each action should have an opposite action
+  - Could also store state at each step (but this is not memory efficient)
+  - Also could store series of transformations to restore state from initial state
 
 # Old Requirements
 
