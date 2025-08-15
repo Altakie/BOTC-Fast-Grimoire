@@ -5,7 +5,6 @@
 
 - Event logging for all events (and in roles)
 - Display for the log
-- Bind enter to the next button (currently broken)!
 - Players should no longer deliver change requests when dead, fix this to make it more idiomatic
 - Add tests for all roles (and transfer old ones)
 - Add Day phase and make it operational!

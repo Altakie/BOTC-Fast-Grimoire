@@ -5,8 +5,6 @@ use leptos::{
     prelude::*,
 };
 use reactive_stores::Store;
-use std::collections::VecDeque;
-use std::ops::Deref;
 
 mod initialization;
 use initialization::{CharacterTypeCounts, Script, ScriptJson};
@@ -599,10 +597,7 @@ fn Info() -> impl IntoView {
                     }>"Toggle"</button>
                 </p>
                 <p>"Ghost Vote: "{if player.ghost_vote { "Yes" } else { "No" }}</p>
-                <p>
-                    "Alignment: "
-                    {player.alignment.to_string()}
-                </p>
+                <p>"Alignment: " {player.alignment.to_string()}</p>
             </div>
         }
         .into_any();
@@ -633,10 +628,7 @@ fn Info() -> impl IntoView {
                     }>"Toggle"</button>
                 </p>
                 <p>"Ghost Vote: "{if player.ghost_vote { "Yes" } else { "No" }}</p>
-                <p>
-                    "Alignment: "
-                    {player.alignment.to_string()}
-                </p>
+                <p>"Alignment: " {player.alignment.to_string()}</p>
             </div>
         }
         .into_any();
@@ -775,18 +767,35 @@ fn Game() -> impl IntoView {
             }
         }
     };
+
+    let game_element: NodeRef<leptos::html::Div> = NodeRef::new();
+
     view! {
-        <div class="relative w-3/5 flex justify-center items-center">
-            <Player_Display />
-            <button class="absolute right-[0px] top-[0px]" on:click=move |_|next_button()
-            on:keypress=move |ev| {
-                    console_log(&format!("Keyboard event happened {:?}", ev));
+        <div
+            class="relative w-3/5 flex justify-center items-center focus:outline-none"
+            on:keydown=move |ev| {
                 if ev.key() == "Enter" {
                     console_log("Next Button Pressed");
                     next_button()
                 }
             }
-            >
+            on:mouseenter=move |_| {
+                if let Some(element) = game_element.get() {
+                    _ = element.focus();
+                    // console_log(&format!("Focused {:?} {:?}", res, element));
+                }
+            }
+            on:mouseleave=move |_| {
+                if let Some(element) = game_element.get() {
+                    _ = element.blur();
+                    // console_log(&format!("blurred {:?}", element));
+                }
+            }
+            tabindex=-1
+            node_ref=game_element
+        >
+            <Player_Display />
+            <button class="absolute right-[0px] top-[0px]" on:click=move |_| next_button()>
                 "Next"
             </button>
         </div>
@@ -831,12 +840,15 @@ fn Player_Display() -> impl IntoView {
                                         if selected.get() { "solid" } else { "none" }
                                     }
                                     style:background=move || {
-                                                if let Some(selected_player) = temp_state.currently_acting_player().get(){
-                                                    if selected_player == i {
-                                                        return "aquamarine";
-                                                    }
-                                                }
-                                            ""
+                                        if let Some(selected_player) = temp_state
+                                            .currently_acting_player()
+                                            .get()
+                                        {
+                                            if selected_player == i {
+                                                return "aquamarine";
+                                            }
+                                        }
+                                        ""
                                     }
                                     style:color=move || {
                                         if player.dead {
@@ -845,7 +857,7 @@ fn Player_Display() -> impl IntoView {
                                         match player.alignment {
                                             engine::player::Alignment::Good => "blue",
                                             engine::player::Alignment::Evil => "red",
-                                            engine::player::Alignment::Any => "purple"
+                                            engine::player::Alignment::Any => "purple",
                                         }
                                     }
                                     on:click=move |_| {
@@ -853,8 +865,7 @@ fn Player_Display() -> impl IntoView {
                                             currently_selected_player.set(Some(i));
                                             return;
                                         }
-                                        let cr = temp_state
-                                            .curr_change_request().get().unwrap();
+                                        let cr = temp_state.curr_change_request().get().unwrap();
                                         let requested_num = match cr.change_type {
                                             ChangeType::ChoosePlayers(num) => num,
                                             _ => {
@@ -886,7 +897,8 @@ fn Player_Display() -> impl IntoView {
                                 // Status effects
                                 <div class="text-[0.5rem] flex flex-row flex-wrap justify-center items-start absolute w-fit border left-1/2 -translate-x-1/2 top-9/10 ">
                                     {move || {
-                                        let status_effects = game_state.with(|gs| gs.get_player(i).status_effects.clone());
+                                        let status_effects = game_state
+                                            .with(|gs| gs.get_player(i).status_effects.clone());
                                         status_effects
                                             .iter()
                                             .map(|status_effect| {
