@@ -1,82 +1,5 @@
 use super::{PlayerIndex, status_effects::StatusEffect};
-use crate::Player;
 // -- Logging --
-// TODO: Implement all events
-#[derive(Clone, Debug)]
-pub enum EventType {
-    // Game Time Events
-    // PhaseStart(Step),
-    // PhaseEnd(Step),
-    // Player Events
-    Nomination(Player),
-    Voting,
-    Execution(Player),
-    AttemptedKill(Player),
-    Death(Player),
-    // Ability Specific Events
-    StatusApplied(StatusEffect),
-    InfoLearned(String),
-}
-
-#[derive(Clone)]
-pub struct Event {
-    pub event_type: EventType,
-    pub source_player: Option<PlayerIndex>,
-    pub target_player: Option<PlayerIndex>,
-}
-
-impl Event {
-    pub fn new(
-        event_type: EventType,
-        source_player: Option<PlayerIndex>,
-        target_player: Option<PlayerIndex>,
-    ) -> Self {
-        Self {
-            event_type,
-            source_player,
-            target_player,
-        }
-    }
-
-    pub fn new_game_event(event_type: EventType) -> Self {
-        Self {
-            event_type,
-            source_player: None,
-            target_player: None,
-        }
-    }
-
-    // fn phase_start_event() -> Self {
-    //     Self {
-    //         event_type: EventType::PhaseStart,
-    //         source_player: None,
-    //         target_player: None,
-    //     }
-    // }
-    //
-    // fn phase_end_event() -> Self {
-    //     Self {
-    //         event_type: EventType::PhaseEnd,
-    //         source_player: None,
-    //         target_player: None,
-    //     }
-    // }
-    pub fn get_description(&self) -> String {
-        todo!();
-    }
-
-    pub fn get_reason(&self) -> Option<String> {
-        todo!();
-    }
-}
-
-#[derive(PartialEq, Clone)]
-pub enum DayPhase {
-    Setup,
-    DayDiscussion,
-    DayExecution,
-    Night,
-}
 
 #[derive(Clone)]
 pub struct DayPhaseLog {
@@ -96,6 +19,10 @@ pub struct DayPhaseLog {
 pub struct Log {
     // TODO: Make this a tree eventually
     day_phases: Vec<DayPhaseLog>,
+    // TODO: Want to be able to notify roles of certain types of events happening
+    // Maybe for now have an vec of check functions to see if they need to be notified or something
+    // subscriber_map: HashMap<>
+    day_num: usize,
 }
 
 impl Log {
@@ -107,11 +34,25 @@ impl Log {
         };
         Self {
             day_phases: vec![setup_phase],
+            day_num: 0,
         }
     }
 
-    // TODO: Write search macro that takes in optional params (think like a python function)
-    // Use opt args crate
+    // TODO: Probably update this method to be more generic or add more methods for different types
+    // of searches
+    /// Returns the latest event of this type in the log
+    pub fn search<F>(&self, search_func: F) -> Result<&Event, SearchError>
+    where
+        F: Fn(&Event) -> Option<&Event>,
+    {
+        for day_phase in self.day_phases.iter().rev() {
+            if let Some(event) = day_phase.search(&search_func) {
+                return Ok(event);
+            }
+        }
+
+        return Err(SearchError::EventNotFound);
+    }
 
     pub fn next_phase(&mut self) {
         // Check the latest day_phase
@@ -123,11 +64,32 @@ impl Log {
                     log: vec![],
                     day_num: 1,
                 };
+                self.day_num = 1;
                 self.day_phases.push(night_1);
             }
-            DayPhase::DayDiscussion => todo!(),
-            DayPhase::DayExecution => todo!(),
-            DayPhase::Night => todo!(),
+            DayPhase::DayDiscussion => {
+                self.day_phases.push(DayPhaseLog {
+                    day_phase: DayPhase::DayExecution,
+                    log: vec![],
+                    day_num: self.day_num,
+                });
+            }
+            DayPhase::DayExecution => {
+                self.day_phases.push(DayPhaseLog {
+                    day_phase: DayPhase::Night,
+                    log: vec![],
+                    day_num: self.day_num,
+                });
+            }
+            DayPhase::Night => {
+                // Only time we should increment day num
+                self.day_num += 1;
+                self.day_phases.push(DayPhaseLog {
+                    day_phase: DayPhase::DayDiscussion,
+                    log: vec![],
+                    day_num: self.day_num,
+                });
+            }
         }
     }
 
@@ -146,13 +108,71 @@ impl Log {
     // }
 }
 
-enum SearchError {
-    InvalidDayNum,
-    EventNotFound,
-}
-
 impl DayPhaseLog {
     fn log(&mut self, event: Event) {
         self.log.push(event);
     }
+
+    fn search<F>(&self, func: F) -> Option<&Event>
+    where
+        F: Fn(&Event) -> Option<&Event>,
+    {
+        self.log.iter().rev().find_map(func)
+    }
+}
+
+// macro_rules! event_type {
+//     ($event:ty) => {{ EventType(PhantomData::from($event::default())) }};
+// }
+
+//
+// TODO: Implement all events
+#[derive(Clone, Debug, PartialEq)]
+pub enum Event {
+    // Game Time Events
+    // PhaseStart(Step),
+    // PhaseEnd(Step),
+    // Player Events
+    Nomination(PlayerIndex),
+    Voting {
+        players_voted: Option<usize>,
+    },
+    Execution(PlayerIndex),
+    AttemptedKill {
+        attacking_player_index: PlayerIndex,
+        target_player_index: PlayerIndex,
+    },
+    Death(PlayerIndex),
+    // Ability Specific Events
+    StatusApplied(StatusEffect),
+    InfoLearned(String),
+}
+
+impl Event {
+    pub fn get_description(&self) -> String {
+        todo!();
+    }
+
+    pub fn get_reason(&self) -> Option<String> {
+        todo!();
+    }
+}
+
+#[derive(PartialEq, Clone)]
+pub enum DayPhase {
+    Setup,
+    DayDiscussion,
+    DayExecution,
+    Night,
+}
+
+pub enum SearchError {
+    InvalidDayNum,
+    EventNotFound,
+}
+
+mod tests {
+    #![cfg(test)]
+
+    use super::*;
 }
