@@ -1,9 +1,7 @@
-use leptos::prelude::StorageAccess;
-use macros::roleptr;
 use serde_derive::{Deserialize, Serialize};
 use std::fmt::{Debug, Display};
 use std::ops::Deref;
-use std::sync::{Arc, RwLock, RwLockReadGuard};
+use std::sync::Arc;
 
 use crate::engine::change_request::ChangeArgs;
 use crate::engine::player::roles::demons::Imp;
@@ -87,6 +85,14 @@ impl Roles {}
 pub(crate) struct RolePtr(Arc<dyn Role>);
 
 impl RolePtr {
+    pub fn new<R: Role + Default + 'static>() -> Self {
+        Self(Arc::new(R::default()))
+    }
+
+    pub fn from<R: Role + 'static>(role: R) -> Self {
+        Self(Arc::new(role))
+    }
+
     pub fn reassign(&mut self, other: RolePtr) {
         self.0 = other.0
     }
@@ -228,30 +234,30 @@ impl Roles {
     pub(crate) fn convert(&self) -> RolePtr {
         // TODO: Make classes to roles and resolve them here
         match self {
-            Roles::Investigator => roleptr!(Investigator),
-            Roles::Empath => roleptr!(Empath),
+            Roles::Investigator => RolePtr::new::<Investigator>(),
+            Roles::Empath => RolePtr::new::<Empath>(),
             Roles::Gossip => todo!(),
             Roles::Innkeeper => todo!(),
-            Roles::Washerwoman => roleptr!(Washerwoman),
-            Roles::Librarian => roleptr!(Librarian),
-            Roles::Chef => roleptr!(Chef),
-            Roles::Fortuneteller => roleptr!(Fortuneteller),
+            Roles::Washerwoman => RolePtr::new::<Washerwoman>(),
+            Roles::Librarian => RolePtr::new::<Librarian>(),
+            Roles::Chef => RolePtr::new::<Chef>(),
+            Roles::Fortuneteller => RolePtr::new::<Fortuneteller>(),
             Roles::Undertaker => todo!(),
-            Roles::Virgin => roleptr!(Virgin),
-            Roles::Soldier => roleptr!(Soldier),
+            Roles::Virgin => RolePtr::new::<Virgin>(),
+            Roles::Soldier => RolePtr::new::<Soldier>(),
             Roles::Slayer => todo!(),
             Roles::Mayor => todo!(),
-            Roles::Monk => roleptr!(Monk),
-            Roles::Ravenkeeper => roleptr!(Ravenkeeper),
-            Roles::Drunk => roleptr!(Drunk),
-            Roles::Saint => roleptr!(Saint),
-            Roles::Butler => roleptr!(Butler),
-            Roles::Recluse => roleptr!(Recluse),
-            Roles::Spy => roleptr!(Spy),
-            Roles::Baron => roleptr!(Baron),
+            Roles::Monk => RolePtr::new::<Monk>(),
+            Roles::Ravenkeeper => RolePtr::new::<Ravenkeeper>(),
+            Roles::Drunk => RolePtr::new::<Drunk>(),
+            Roles::Saint => RolePtr::new::<Saint>(),
+            Roles::Butler => RolePtr::new::<Butler>(),
+            Roles::Recluse => RolePtr::new::<Recluse>(),
+            Roles::Spy => RolePtr::new::<Spy>(),
+            Roles::Baron => RolePtr::new::<Baron>(),
             Roles::Scarletwoman => todo!(),
-            Roles::Poisoner => roleptr!(Poisoner),
-            Roles::Imp => roleptr!(Imp),
+            Roles::Poisoner => RolePtr::new::<Poisoner>(),
+            Roles::Imp => RolePtr::new::<Imp>(),
         }
     }
 

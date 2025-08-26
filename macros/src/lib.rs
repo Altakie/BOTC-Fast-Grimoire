@@ -1,79 +1,5 @@
 use quote::{ToTokens, quote};
 use syn::{parse::Parse, *};
-
-struct RolePtrArgs {
-    role: RoleType,
-}
-
-impl Parse for RolePtrArgs {
-    fn parse(input: parse::ParseStream) -> Result<Self> {
-        Ok(Self {
-            role: RoleType::parse(input)?,
-        })
-    }
-}
-
-impl ToTokens for RolePtrArgs {
-    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        let RoleType(role) = &self.role;
-        tokens.extend(quote! {
-            {
-                let role = #role::default();
-                RolePtr(std::sync::Arc::new(role))
-            }
-        })
-    }
-}
-
-struct RoleType(syn::Type);
-
-impl Parse for RoleType {
-    fn parse(input: parse::ParseStream) -> Result<Self> {
-        syn::Type::parse(input).map(Self)
-    }
-}
-
-#[proc_macro]
-pub fn roleptr(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let parsed = parse_macro_input!(input as RolePtrArgs);
-    quote! {#parsed}.into()
-}
-
-struct RolePtrFromArgs {
-    role: RoleStruct,
-}
-
-impl Parse for RolePtrFromArgs {
-    fn parse(input: parse::ParseStream) -> Result<Self> {
-        Ok(Self {
-            role: RoleStruct::parse(input)?,
-        })
-    }
-}
-
-impl ToTokens for RolePtrFromArgs {
-    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        let RoleStruct(role_struct) = &self.role;
-        tokens.extend(quote! {
-            RolePtr(std::sync::Arc::new(#role_struct))
-        });
-    }
-}
-
-struct RoleStruct(syn::ExprStruct);
-
-impl Parse for RoleStruct {
-    fn parse(input: parse::ParseStream) -> Result<Self> {
-        syn::ExprStruct::parse(input).map(Self)
-    }
-}
-
-#[proc_macro]
-pub fn roleptr_from(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let p = parse_macro_input!(input as RolePtrFromArgs);
-    quote! {#p}.into()
-}
-
 struct WasherwomanLibrarianInvestigator {
     player_index: PlayerIndex,
     right_effect: StatusEffectType,
@@ -188,13 +114,13 @@ impl quote::ToTokens for WasherwomanLibrarianInvestigator {
                         None
                     };
 
-                    return Some(new_change_request!(wrong_change_type, wrong_description, wrong_check_func, wrong_state_change));
+                    return Some(ChangeRequest::new(wrong_change_type, wrong_description.into(), wrong_check_func, wrong_state_change));
                 };
 
                 return Some(
-                    new_change_request!(
+                    ChangeRequest::new(
                         change_type,
-                        right_description,
+                        right_description.into(),
                         right_check_func,
                         right_state_change
                     )

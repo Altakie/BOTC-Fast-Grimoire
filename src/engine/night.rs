@@ -1,21 +1,6 @@
-// TODO: Realistically we are facing a couple major issues right now that are stopping us from
-// implementing abilites
-// 1. A change type that doesn't require storyteller intervention and is skipped by the interface
-//    when it is detected (nothing pops up, the change is just applied)
-//    - Really easy, just add another change type and have the next button detect it, apply the
-//    change func, and skip to the next change effect without stopping
-// 2. Some abilites need the log to be implemented so they can scan it
-// 3. Some abilities need change effects to be able to be chained, but also somehow share
-//    information
-//  TODO: Think of clever solutions for all of these
-
-use crate::{
-    engine::{
-        change_request::{ChangeArgs, ChangeRequest, ChangeType},
-        player::{Alignment, roles::Roles},
-        state::{PlayerIndex, State, status_effects::StatusType},
-    },
-    new_change_request, unwrap_args_err, unwrap_args_panic,
+use crate::engine::{
+    player::roles::Roles,
+    state::{PlayerIndex, State},
 };
 
 impl State {

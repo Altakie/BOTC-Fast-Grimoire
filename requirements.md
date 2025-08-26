@@ -10,6 +10,7 @@
 - Add Day phase and make it operational!
 - Add travellers
 - Enum dispatch (crate)
+- Disable players/options you can't pick in the ui
 
 ## Game Modes
 

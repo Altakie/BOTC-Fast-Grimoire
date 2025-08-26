@@ -1,21 +1,19 @@
 use std::fmt::Display;
 use std::sync::Arc;
 
-use macros::roleptr_from;
-
 use crate::engine::change_request::ChangeError;
 use crate::engine::player::roles::RolePtr;
 use crate::engine::state::status_effects::CleanupPhase;
 use crate::{
     engine::{
-        change_request::{ChangeArgs, ChangeRequest, ChangeType, CheckFuncPtr, StateChangeFuncPtr},
+        change_request::{ChangeArgs, ChangeRequest, ChangeType},
         player::{Alignment, CharacterType, roles::Role},
         state::{
             PlayerIndex, State,
             status_effects::{StatusEffect, StatusType},
         },
     },
-    new_change_request, unwrap_args_err, unwrap_args_panic,
+    unwrap_args_err, unwrap_args_panic,
 };
 
 #[derive(Default)]
@@ -71,11 +69,11 @@ impl Butler {
                 None
             };
 
-        Some(new_change_request!(
+        Some(ChangeRequest::new(
             change_type,
             message,
             check_func,
-            state_change_func
+            state_change_func,
         ))
     }
 }
@@ -187,11 +185,11 @@ impl Role for Drunk {
             drunk.setup_ability(player_index, &state_snapshot)
         };
 
-        Some(new_change_request!(
+        Some(ChangeRequest::new(
             change_type,
-            description,
+            description.into(),
             check_func,
-            state_change
+            state_change,
         ))
     }
 
@@ -201,8 +199,8 @@ impl Role for Drunk {
             None => {
                 if let ChangeArgs::Roles(roles) = args {
                     let role = roles[0];
-                    return Some(roleptr_from!(Self {
-                        role: Some(role.convert())
+                    return Some(RolePtr::from(Self {
+                        role: Some(role.convert()),
                     }));
                 } else {
                     return None;

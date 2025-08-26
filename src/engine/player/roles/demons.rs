@@ -1,19 +1,13 @@
+use crate::engine::player::roles::RolePtr;
 use std::fmt::Display;
-
-use macros::roleptr;
 
 use crate::{
     engine::{
-        change_request::{
-            ChangeArgs, ChangeError, ChangeRequest, ChangeType, CheckFuncPtr, StateChangeFuncPtr,
-        },
-        player::{
-            Alignment, CharacterType,
-            roles::{Role, RolePtr},
-        },
+        change_request::{ChangeArgs, ChangeError, ChangeRequest, ChangeType},
+        player::{Alignment, CharacterType, roles::Role},
         state::{PlayerIndex, State},
     },
-    new_change_request, unwrap_args_err, unwrap_args_panic,
+    unwrap_args_err, unwrap_args_panic,
 };
 
 #[derive(Default)]
@@ -90,28 +84,28 @@ impl Role for Imp {
                         let target_player_index = target_players[0];
                         let target_player = state.get_player_mut(target_player_index);
 
-                        let new_role = roleptr!(Imp);
+                        let new_role = RolePtr::new::<Imp>();
 
                         target_player.role.reassign(new_role);
                         None
                     };
 
-                return Some(new_change_request!(
+                return Some(ChangeRequest::new(
                     change_type,
-                    description,
+                    description.into(),
                     check_func,
-                    change_func
+                    change_func,
                 ));
             }
 
             return None;
         };
 
-        return Some(new_change_request!(
+        return Some(ChangeRequest::new(
             change_type,
-            description,
+            description.into(),
             check_func,
-            change_func
+            change_func,
         ));
     }
 }

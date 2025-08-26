@@ -6,17 +6,124 @@ use macros::washerwoman_librarian_investigator;
 use crate::engine::state::status_effects::CleanupPhase;
 use crate::{
     engine::{
-        change_request::{
-            ChangeArgs, ChangeError, ChangeRequest, ChangeType, CheckFuncPtr, StateChangeFuncPtr,
-        },
+        change_request::{ChangeArgs, ChangeError, ChangeRequest, ChangeType},
         player::{Alignment, CharacterType, PlayerBehaviors, roles::Role},
         state::{
             PlayerIndex, State,
             status_effects::{StatusEffect, StatusType},
         },
     },
-    new_change_request, unwrap_args_err, unwrap_args_panic,
+    unwrap_args_err, unwrap_args_panic,
 };
+
+fn washerwoman_librarian_investigator<
+    RE: StatusType + Default + 'static,
+    WE: StatusType + Default + 'static,
+>(
+    player_index: PlayerIndex,
+    character_type: CharacterType,
+) -> Option<ChangeRequest> {
+    let right_description = format!("Select a {}", &character_type.to_string());
+
+    let right_status =
+        move || StatusEffect::new(std::sync::Arc::new(RE::default()), player_index, None);
+
+    let change_type = ChangeType::ChoosePlayers(1);
+
+    let right_check_func = move |state: &State, args: &ChangeArgs| -> Result<bool, ChangeError> {
+        let target_player_indices = unwrap_args_err!(args, ChangeArgs::PlayerIndices(v) => v);
+
+        let len = target_player_indices.len();
+        if len != 1 {
+            return Err(ChangeError::WrongNumberOfSelectedPlayers {
+                wanted: 1,
+                got: len,
+            });
+        }
+
+        for target_player_index in target_player_indices {
+            if *target_player_index == player_index {
+                return Ok(false);
+            }
+
+            let ct = state.get_player(*target_player_index).get_character_type();
+            if ct == character_type || ct == CharacterType::Any {
+                return Ok(true);
+            }
+        }
+
+        return Ok(false);
+    };
+
+    let right_state_change = move |state: &mut State, args: ChangeArgs| -> Option<ChangeRequest> {
+        let target_player_indices = unwrap_args_panic!(args, ChangeArgs::PlayerIndices(v) => v);
+
+        let target_player = state.get_player_mut(target_player_indices[0]);
+        target_player.add_status(right_status());
+
+        let wrong_status =
+            move || StatusEffect::new(std::sync::Arc::new(WE::default()), player_index, None);
+        let wrong_description = "Select a different player";
+
+        let wrong_change_type = ChangeType::ChoosePlayers(1);
+
+        let wrong_check_func = move |state: &State,
+                                     args: &ChangeArgs|
+              -> Result<bool, ChangeError> {
+            let target_player_indices = unwrap_args_err!(args, ChangeArgs::PlayerIndices(v) => v);
+
+            let len = target_player_indices.len();
+            if len != 1 {
+                return Err(ChangeError::WrongNumberOfSelectedPlayers {
+                    wanted: 1,
+                    got: len,
+                });
+            }
+
+            let target_player_index = target_player_indices[0];
+
+            if target_player_index == player_index {
+                return Ok(false);
+            }
+
+            let target_player = state.get_player(target_player_index);
+            if target_player
+                .get_statuses()
+                .iter()
+                .any(|se| *se == right_status())
+            {
+                return Ok(false);
+            }
+            return Ok(true);
+        };
+
+        let wrong_state_change = move |state: &mut State,
+                                       args: ChangeArgs|
+              -> Option<ChangeRequest> {
+            let target_player_indices = unwrap_args_panic!(args, ChangeArgs::PlayerIndices(v) => v);
+
+            // Assign the chosen player the wrong status effect
+            let target_player = state.get_player_mut(target_player_indices[0]);
+            target_player.add_status(wrong_status());
+
+            None
+        };
+
+        return Some(ChangeRequest::new(
+            wrong_change_type,
+            wrong_description.into(),
+            wrong_check_func,
+            wrong_state_change,
+        ));
+    };
+
+    return Some(ChangeRequest::new(
+        change_type,
+        right_description.into(),
+        right_check_func,
+        right_state_change,
+    ));
+}
 
 #[derive(Default)]
 pub(crate) struct Washerwoman();
@@ -55,6 +162,7 @@ impl Role for Washerwoman {
         player_index: crate::engine::state::PlayerIndex,
         _state: &State,
     ) -> Option<ChangeRequest> {
+        // TODO: Change back into a function
         washerwoman_librarian_investigator!(
             player_index,
             WasherwomanTownsfolk,
@@ -76,7 +184,7 @@ impl Role for Washerwoman {
         let message = format!("Show the {} the correct roles", player.role);
         let change_type = ChangeType::Display;
 
-        Some(new_change_request!(change_type, message))
+        Some(ChangeRequest::new_display(change_type, message))
     }
 }
 
@@ -144,7 +252,7 @@ impl Role for Librarian {
         let message = format!("Show the {} the correct roles", player.role);
         let change_type = ChangeType::Display;
 
-        Some(new_change_request!(change_type, message))
+        Some(ChangeRequest::new_display(change_type, message))
     }
 }
 
@@ -212,7 +320,7 @@ impl Role for Investigator {
         let message = format!("Show the {} the correct roles", player.role);
         let change_type = ChangeType::Display;
 
-        Some(new_change_request!(change_type, message))
+        Some(ChangeRequest::new_display(change_type, message))
     }
 }
 
@@ -265,7 +373,7 @@ impl Role for Chef {
             pair_count
         );
 
-        Some(new_change_request!(change_type, message))
+        Some(ChangeRequest::new_display(change_type, message))
     }
 }
 
@@ -298,7 +406,7 @@ impl Empath {
 
         let change_type = ChangeType::Display;
 
-        Some(new_change_request!(change_type, message))
+        Some(ChangeRequest::new_display(change_type, message))
     }
 }
 
@@ -405,14 +513,14 @@ impl Fortuneteller {
 
                 let change_type = ChangeType::Display;
 
-                Some(new_change_request!(change_type, message))
+                Some(ChangeRequest::new_display(change_type, message))
             };
 
-        Some(new_change_request!(
+        Some(ChangeRequest::new(
             change_type,
-            message,
+            message.into(),
             check_func,
-            state_change_func
+            state_change_func,
         ))
     }
 }
@@ -463,11 +571,11 @@ impl Role for Fortuneteller {
             None
         };
 
-        Some(new_change_request!(
+        Some(ChangeRequest::new(
             change_type,
             description,
             check_func,
-            state_change
+            state_change,
         ))
     }
 
@@ -591,11 +699,11 @@ impl Role for Monk {
                 None
             };
 
-        Some(new_change_request!(
+        Some(ChangeRequest::new(
             change_type,
-            message,
+            message.into(),
             check_func,
-            state_change_func
+            state_change_func,
         ))
     }
 }
@@ -660,14 +768,14 @@ impl Role for Ravenkeeper {
                 target_player.role
             );
 
-            Some(new_change_request!(change_type, message))
+            Some(ChangeRequest::new_display(change_type, message))
         };
 
-        Some(new_change_request!(
+        Some(ChangeRequest::new(
             change_type,
-            message,
+            message.into(),
             check_func,
-            change_func
+            change_func,
         ))
     }
 }

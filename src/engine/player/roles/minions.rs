@@ -1,18 +1,17 @@
+#![allow(unused_variables)]
 use std::{fmt::Display, sync::Arc};
 
 use crate::{
     engine::{
-        change_request::{
-            ChangeArgs, ChangeError, ChangeRequest, ChangeType, CheckFuncPtr, StateChangeFuncPtr,
-        },
-        player::{Alignment, CharacterType, PlayerBehaviors, roles::Role},
+        change_request::{ChangeArgs, ChangeError, ChangeRequest, ChangeType},
+        player::{Alignment, CharacterType, roles::Role},
         state::{
             PlayerIndex, State,
-            status_effects::{CleanupPhase, Poisoned, StatusEffect, StatusType},
+            status_effects::{CleanupPhase, Poisoned, StatusEffect},
         },
     },
     initialization::CharacterTypeCounts,
-    new_change_request, unwrap_args_err, unwrap_args_panic,
+    unwrap_args_err, unwrap_args_panic,
 };
 
 #[derive(Default)]
@@ -22,7 +21,7 @@ impl Spy {
         let change_type = ChangeType::Display;
         let message = "Show the Spy the grimoire";
 
-        Some(new_change_request!(change_type, message))
+        Some(ChangeRequest::new_display(change_type, message.into()))
     }
 }
 
@@ -142,11 +141,11 @@ impl Poisoner {
                 None
             };
 
-        Some(new_change_request!(
+        Some(ChangeRequest::new(
             change_type,
             message.to_string(),
             check_func,
-            state_change_func
+            state_change_func,
         ))
     }
 }
@@ -207,7 +206,7 @@ impl Role for ScarletWoman {
         Some(28)
     }
 
-    fn night_ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
+    fn night_ability(&self, _player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
         // TODO: This might be a little tricky because the scarlet woman should immediately become
         // demon when the demon dies. Potentially could have role abilities trigger on events that
         // are added to the log as well. This could be useful for scarlet woman. Then have a method
