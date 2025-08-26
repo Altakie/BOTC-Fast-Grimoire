@@ -20,37 +20,16 @@ pub(crate) enum ChangeArgs {
     Roles(Vec<Roles>),
 }
 
-#[macro_export]
-/// Unwrap args and return an error if it's the wrong arg type. Takes in (args, pattern => guard)
-macro_rules! unwrap_args_err {
-    ($args:expr,$pat:pat => $guard:expr) => {
-        match $args {
-            $pat => $guard,
-            _ => return Err(ChangeError::WrongArgType),
-        }
-    };
-}
-
-#[macro_export]
-macro_rules! unwrap_args_panic {
-    ($args:expr,$pat:pat => $guard:expr) => {
-        match $args {
-            $pat => $guard,
-            _ => panic!("Wrong Args"),
-        }
-    };
-}
-
 /**
 A struct to give the interface the necessary information to resolve
 
 # Fields
 
-* Change Type : A enum to tell the ui which input component to load and how much input to
+  * Change Type : A enum to tell the ui which input component to load and how much input to
   ask for
-* FnOnce(Args) -> bool : A check function that validates whether the input the component
+  * FnOnce(Args) -> bool : A check function that validates whether the input the component
   returns will is a valid input for the state mutating function
-* Fnonce(State, Args) -> A function that takes a state and args, and then mutates the state
+  * Fnonce(State, Args) -> A function that takes a state and args, and then mutates the state
   accordingly. Think of this as saving the work that needs to be done for after the input
   is received
 */
@@ -161,4 +140,25 @@ pub enum ChangeError {
     WrongNumberOfSelectedPlayers { wanted: usize, got: usize },
     WrongNumberOfSelectedRoles { wanted: usize, got: usize },
     WrongArgType,
+}
+
+#[macro_export]
+/// Unwrap args and return an error if it's the wrong arg type. Takes in (args, pattern => guard)
+macro_rules! unwrap_args_err {
+    ($args:expr,$pat:pat => $guard:expr) => {
+        match $args {
+            $pat => $guard,
+            _ => return Err(ChangeError::WrongArgType),
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! unwrap_args_panic {
+    ($args:expr,$pat:pat => $guard:expr) => {
+        match $args {
+            $pat => $guard,
+            _ => panic!("Wrong Args"),
+        }
+    };
 }

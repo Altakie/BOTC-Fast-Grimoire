@@ -115,7 +115,7 @@ impl DayPhaseLog {
 
     fn search<F>(&self, func: F) -> Option<&Event>
     where
-        F: Fn(&Event) -> Option<&Event>,
+        F: FnMut(&Event) -> Option<&Event>,
     {
         self.log.iter().rev().find_map(func)
     }

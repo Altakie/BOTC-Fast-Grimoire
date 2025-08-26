@@ -242,7 +242,7 @@ impl Roles {
             Roles::Librarian => RolePtr::new::<Librarian>(),
             Roles::Chef => RolePtr::new::<Chef>(),
             Roles::Fortuneteller => RolePtr::new::<Fortuneteller>(),
-            Roles::Undertaker => todo!(),
+            Roles::Undertaker => RolePtr::new::<Undertaker>(),
             Roles::Virgin => RolePtr::new::<Virgin>(),
             Roles::Soldier => RolePtr::new::<Soldier>(),
             Roles::Slayer => todo!(),

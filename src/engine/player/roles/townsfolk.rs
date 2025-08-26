@@ -1,8 +1,7 @@
 use std::fmt::Display;
 use std::sync::Arc;
 
-use macros::washerwoman_librarian_investigator;
-
+use crate::engine::state::log;
 use crate::engine::state::status_effects::CleanupPhase;
 use crate::{
     engine::{
@@ -128,6 +127,7 @@ fn washerwoman_librarian_investigator<
 #[derive(Default)]
 pub(crate) struct Washerwoman();
 
+#[derive(Default)]
 struct WasherwomanTownsfolk();
 impl StatusType for WasherwomanTownsfolk {}
 impl Display for WasherwomanTownsfolk {
@@ -136,6 +136,7 @@ impl Display for WasherwomanTownsfolk {
     }
 }
 
+#[derive(Default)]
 struct WasherwomanWrong();
 impl StatusType for WasherwomanWrong {}
 impl Display for WasherwomanWrong {
@@ -162,12 +163,9 @@ impl Role for Washerwoman {
         player_index: crate::engine::state::PlayerIndex,
         _state: &State,
     ) -> Option<ChangeRequest> {
-        // TODO: Change back into a function
-        washerwoman_librarian_investigator!(
+        washerwoman_librarian_investigator::<WasherwomanTownsfolk, WasherwomanWrong>(
             player_index,
-            WasherwomanTownsfolk,
-            WasherwomanWrong,
-            CharacterType::Townsfolk
+            CharacterType::Townsfolk,
         )
     }
 
@@ -197,6 +195,7 @@ impl Display for Washerwoman {
 #[derive(Default)]
 pub(crate) struct Librarian();
 
+#[derive(Default)]
 struct LibrarianOutsider();
 impl StatusType for LibrarianOutsider {}
 impl Display for LibrarianOutsider {
@@ -205,6 +204,7 @@ impl Display for LibrarianOutsider {
     }
 }
 
+#[derive(Default)]
 struct LibrarianWrong();
 impl StatusType for LibrarianWrong {}
 impl Display for LibrarianWrong {
@@ -231,11 +231,9 @@ impl Role for Librarian {
         player_index: crate::engine::state::PlayerIndex,
         _state: &State,
     ) -> Option<ChangeRequest> {
-        washerwoman_librarian_investigator!(
+        washerwoman_librarian_investigator::<LibrarianOutsider, LibrarianWrong>(
             player_index,
-            LibrarianOutsider,
-            LibrarianWrong,
-            CharacterType::Outsider
+            CharacterType::Outsider,
         )
     }
 
@@ -265,6 +263,7 @@ impl Display for Librarian {
 #[derive(Default)]
 pub(crate) struct Investigator();
 
+#[derive(Default)]
 struct InvestigatorMinion();
 impl StatusType for InvestigatorMinion {}
 impl Display for InvestigatorMinion {
@@ -273,6 +272,7 @@ impl Display for InvestigatorMinion {
     }
 }
 
+#[derive(Default)]
 struct InvestigatorWrong();
 impl StatusType for InvestigatorWrong {}
 impl Display for InvestigatorWrong {
@@ -299,11 +299,9 @@ impl Role for Investigator {
         player_index: crate::engine::state::PlayerIndex,
         _state: &State,
     ) -> Option<ChangeRequest> {
-        washerwoman_librarian_investigator!(
+        washerwoman_librarian_investigator::<InvestigatorMinion, InvestigatorWrong>(
             player_index,
-            InvestigatorMinion,
-            InvestigatorWrong,
-            CharacterType::Minion
+            CharacterType::Minion,
         )
     }
 
@@ -602,8 +600,57 @@ impl Display for Fortuneteller {
     }
 }
 
-// TODO:
-// Undertaker
+#[derive(Default)]
+pub(crate) struct Undertaker();
+
+impl Role for Undertaker {
+    fn get_default_alignment(&self) -> Alignment {
+        Alignment::Good
+    }
+
+    fn get_true_character_type(&self) -> CharacterType {
+        CharacterType::Townsfolk
+    }
+
+    fn night_order(&self) -> Option<usize> {
+        Some(70)
+    }
+
+    fn night_ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
+        let dead = state.get_player(player_index).dead;
+
+        if dead {
+            return None;
+        }
+
+        // TODO: Change search method to only search the previous day
+        let execution_event = state.log.search(|e| match *e {
+            log::Event::Nomination(_) => Some(e),
+            _ => None,
+        });
+
+        let executed_player_index = match execution_event {
+            Ok(log::Event::Execution(pi)) => *pi,
+            Ok(_) | Err(_) => return None,
+        };
+
+        let executed_role = state.get_player(executed_player_index).role.clone();
+
+        let change_type = ChangeType::Display;
+        let description = format!(
+            "Show the undertaker that the {} was executed yesterday",
+            executed_role
+        );
+
+        Some(ChangeRequest::new_display(change_type, description))
+    }
+}
+
+impl Display for Undertaker {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Undertaker")
+    }
+}
 
 #[derive(Default)]
 pub(crate) struct Monk();
