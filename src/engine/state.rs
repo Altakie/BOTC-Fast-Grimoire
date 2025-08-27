@@ -25,8 +25,9 @@ pub enum Step {
     Start,
     Setup,
     // Day
-    DayDiscussion,
-    DayExecution,
+    // DayDiscussion,
+    // DayExecution,
+    Day,
     // Night
     NightOne,
     Night,
@@ -162,15 +163,20 @@ impl State {
         let next_step = match self.step {
             Step::Start => Step::Setup,
             Step::Setup => Step::NightOne,
-            Step::DayDiscussion => Step::DayExecution,
-            Step::DayExecution => {
+            // Step::DayDiscussion => Step::DayExecution,
+            // Step::DayExecution => {
+            //     self.cleanup_statuses(CleanupPhase::Dusk);
+            //     self.day_num += 1;
+            //     Step::Night
+            // }
+            Step::Day => {
                 self.cleanup_statuses(CleanupPhase::Dusk);
                 self.day_num += 1;
                 Step::Night
             }
             Step::NightOne | Step::Night => {
                 self.cleanup_statuses(CleanupPhase::Dawn);
-                Step::DayDiscussion
+                Step::Day
             }
         };
 

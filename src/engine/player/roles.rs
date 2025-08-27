@@ -80,8 +80,6 @@ impl Display for Roles {
     }
 }
 
-impl Roles {}
-
 pub(crate) struct RolePtr(Arc<dyn Role>);
 
 impl RolePtr {
@@ -163,7 +161,7 @@ pub(crate) trait Role: Display + Send + Sync {
         return None;
     }
 
-    /// An action the player performs on being nominated, if any
+    /// An action the role performs on being nominated, if any
     fn nominated(&self, _nominating_player_index: PlayerIndex, _state: &mut State) {}
 
     /// If the role being in the game affects character type counts, overwrite this method. The
@@ -214,8 +212,8 @@ pub(crate) trait Role: Display + Send + Sync {
     }
 
     /// If the role has an ability that acts during the day (not including night one), this method should be overwritten and indicate which part(s) of the day this ability can be triggered during
-    fn has_day_ability(&self) -> Option<Step> {
-        None
+    fn has_day_ability(&self) -> bool {
+        false
     }
     /// If the role has an ability that acts during the day (not including night one), this method should be overwritten and resolve the day ability
     fn day_ability(&self, _player_index: PlayerIndex, _state: &State) -> Option<ChangeRequest> {
@@ -245,7 +243,7 @@ impl Roles {
             Roles::Undertaker => RolePtr::new::<Undertaker>(),
             Roles::Virgin => RolePtr::new::<Virgin>(),
             Roles::Soldier => RolePtr::new::<Soldier>(),
-            Roles::Slayer => todo!(),
+            Roles::Slayer => RolePtr::new::<Slayer>(),
             Roles::Mayor => todo!(),
             Roles::Monk => RolePtr::new::<Monk>(),
             Roles::Ravenkeeper => RolePtr::new::<Ravenkeeper>(),

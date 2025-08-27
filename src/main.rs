@@ -19,6 +19,8 @@ use engine::{
 mod scripts;
 use scripts::*;
 
+use crate::engine::state::log::DayPhase;
+
 const DEBUG: bool = true;
 // use leptos_router::components::*;
 // use leptos_router::path;
@@ -50,10 +52,10 @@ fn App() -> impl IntoView {
     // NOTE: Debug only
     if DEBUG {
         roles.set(vec![
-            Roles::Washerwoman,
-            Roles::Poisoner,
+            Roles::Chef,
+            Roles::Baron,
             Roles::Monk,
-            Roles::Fortuneteller,
+            Roles::Slayer,
             // Role::Monk,
             Roles::Drunk,
             Roles::Empath,
@@ -545,12 +547,13 @@ fn Info() -> impl IntoView {
         match step {
             Step::Start => "Start".to_string(),
             Step::Setup => "Setup".to_string(),
-            Step::DayDiscussion => {
-                format!("Day {} Discussion", game_state.day_num().get()).to_string()
-            }
-            Step::DayExecution => {
-                format!("Day {} Execution", game_state.day_num().get()).to_string()
-            }
+            // Step::DayDiscussion => {
+            //     format!("Day {} Discussion", game_state.day_num().get()).to_string()
+            // }
+            // Step::DayExecution => {
+            //     format!("Day {} Execution", game_state.day_num().get()).to_string()
+            // }
+            Step::Day => format!("Day {}", game_state.day_num().get()).to_string(),
             Step::NightOne | Step::Night => {
                 format!("Night {}", game_state.day_num().get()).to_string()
             }
@@ -673,8 +676,7 @@ fn Game() -> impl IntoView {
             };
 
             // Only apply funcs if change_type requires action
-            if args.is_some() {
-                let args = args.unwrap();
+            if let Some(args) = args {
                 let check_func = cr.check_func;
                 let res = game_state.with(|gs| {
                     let cf = check_func.unwrap();
@@ -731,13 +733,9 @@ fn Game() -> impl IntoView {
             console_log(format!("Next Player is {:?}", next_player).as_str());
             match next_player {
                 Some(p) => {
-                    let next_cr = game_state.try_update(|gs| gs.resolve(p));
+                    let next_cr = game_state.read().resolve(p);
                     temp_state.currently_acting_player().set(Some(p));
-                    // FIX: I think this can fail if the next cr is None, this fix is weird, figure
-                    // out when the none case can happen. It's when a player doesn't have an
-                    // associated change request, which means something is broken. Meaning it's
-                    // okay to panic
-                    match next_cr.unwrap() {
+                    match next_cr {
                         Some(next_cr) => {
                             temp_state.curr_change_request().set(Some(next_cr));
                             break;
@@ -755,11 +753,8 @@ fn Game() -> impl IntoView {
                         break;
                     }
                     game_state.update(|gs| gs.next_step());
-                    if matches!(
-                        game_state.step().get(),
-                        Step::DayExecution | Step::DayDiscussion
-                    ) {
-                        // Don't want to loop twice during the day
+                    if game_state.step().get() == Step::Day {
+                        // Don't want to accidentally move to next step during day
                         break;
                     }
                     loop_break = true;
@@ -782,13 +777,11 @@ fn Game() -> impl IntoView {
             on:mouseenter=move |_| {
                 if let Some(element) = game_element.get() {
                     _ = element.focus();
-                    // console_log(&format!("Focused {:?} {:?}", res, element));
                 }
             }
             on:mouseleave=move |_| {
                 if let Some(element) = game_element.get() {
                     _ = element.blur();
-                    // console_log(&format!("blurred {:?}", element));
                 }
             }
             tabindex=-1
@@ -806,7 +799,7 @@ fn Game() -> impl IntoView {
 fn Player_Display() -> impl IntoView {
     let game_state = expect_context::<Store<State>>();
     let players = game_state.players();
-    let player_positions = calc_circle(players.read().len(), 75.0);
+    let player_positions = calc_circle(players.read_untracked().len(), 75.0);
 
     let temp_state = expect_context::<Store<TempState>>();
     let currently_selected_player = temp_state.selected_player();
@@ -948,22 +941,44 @@ fn Picker_Bar() -> impl IntoView {
     // Finish button that calls a generic function passed in through something
     // When an item is selected, add it to a result list
     // This should reset and disable after finish button is clicked
-    let _state = expect_context::<Store<State>>();
-    let script = expect_context::<RwSignal<Script>>();
+    let state = expect_context::<Store<State>>();
     let temp_state = expect_context::<Store<TempState>>();
-    let _input = RwSignal::new(String::new());
+
+    let display = move || {
+        if let Some(ChangeRequest {
+            change_type: ChangeType::ChooseRoles(_),
+            ..
+        }) = temp_state.curr_change_request().get()
+        {
+            return RoleSelector().into_any();
+        }
+
+        if let Step::Day = state.step().get() {
+            return DayAbilitySelector().into_any();
+        }
+
+        ().into_any()
+    };
 
     view! {
         <div class="flex-1 border-solid border p-[1rem]">
-            <div>
-                <input bind:input />
-                <button>"Finish"</button>
-            </div>
-            <div class="flex flex-col">
-                <For
-                    each=move || script.get().roles
-                    key=|r| *r
-                    children=move |role| {
+            <div>{display}</div>
+        </div>
+    }
+}
+
+#[component]
+fn RoleSelector() -> impl IntoView {
+    let script = expect_context::<RwSignal<Script>>();
+    let temp_state = expect_context::<Store<TempState>>();
+    view! {
+        <div class="flex flex-col">
+           {move || {
+                script
+                    .get()
+                    .roles
+                    .into_iter()
+                    .map(move |role| {
                         let selected = RwSignal::new(false);
                         view! {
                             <button
@@ -1004,9 +1019,83 @@ fn Picker_Bar() -> impl IntoView {
                                 {role.to_string()}
                             </button>
                         }
-                    }
-                />
-            </div>
+                    }).collect_view()
+            }}
         </div>
+        // <For
+        // each=move || script.get().roles
+        // key=|r| *r
+        // children=move |role| {
+        // let selected = RwSignal::new(false);
+        // view! {
+        // <button
+        // style:color=move || { if selected.get() { "red" } else { "" } }
+        // on:click=move |_| {
+        // let cr = {
+        // if temp_state.curr_change_request().read().is_none() {
+        // return;
+        // }
+        // temp_state.curr_change_request().get().unwrap()
+        // };
+        // let requested_num = match cr.change_type {
+        // ChangeType::ChooseRoles(num) => num,
+        // _ => {
+        // return;
+        // }
+        // };
+        // let selected_roles = temp_state.selected_roles();
+        // if selected.get() {
+        // selected_roles
+        // .update(|pv| {
+        // let remove_index = pv
+        // .iter()
+        // .position(|r| *r == role)
+        // .unwrap();
+        // pv.remove(remove_index);
+        // });
+        // selected.set(false);
+        // return;
+        // }
+        // if selected_roles.read().len() >= requested_num {
+        // return;
+        // }
+        // selected_roles.update(|pv| pv.push(role));
+        // selected.set(true);
+        // }
+        // >
+        // {role.to_string()}
+        // </button>
+        // }
+        // }
+        // />
     }
+}
+
+#[component]
+fn DayAbilitySelector() -> impl IntoView {
+    let state = expect_context::<Store<State>>();
+    let temp_state = expect_context::<Store<TempState>>();
+
+    view! {
+            <div class="flex flex-col">
+    {
+            move || {
+                    let active_players = state.read().get_day_active();
+
+                    active_players.into_iter().map(|player_index| {
+                    let role = state.read().get_player(player_index).role.clone();
+                    view ! {
+                        <button on:click=move|_| {
+                            let player_ability = state.read().day_ability(player_index);
+                            temp_state.curr_change_request().set(player_ability);
+                            temp_state.currently_acting_player().set(Some(player_index));
+                        }>
+                        {move || {format!("{} Ability", role)}}
+                        </button>
+                    }
+                    }).collect_view()
+            }
+        }
+        </div>
+        }
 }

@@ -3,11 +3,11 @@
 
 ## Major TODOS
 
+- Add Day phase and make it operational!
 - Event logging for all events (and in roles)
 - Display for the log
 - Players should no longer deliver change requests when dead, fix this to make it more idiomatic
 - Add tests for all roles (and transfer old ones)
-- Add Day phase and make it operational!
 - Add travellers
 - Enum dispatch (crate)
 - Disable players/options you can't pick in the ui

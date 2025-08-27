@@ -1,6 +1,7 @@
 use std::fmt::Display;
 use std::sync::Arc;
 
+use crate::engine::player::roles::RolePtr;
 use crate::engine::state::log;
 use crate::engine::state::status_effects::CleanupPhase;
 use crate::{
@@ -860,6 +861,81 @@ impl Display for Virgin {
 }
 // TODO:
 // Slayer
+#[derive(Default)]
+pub(crate) struct Slayer {
+    ability_used: bool,
+}
+
+impl Role for Slayer {
+    fn get_default_alignment(&self) -> Alignment {
+        Alignment::Good
+    }
+
+    fn get_true_character_type(&self) -> CharacterType {
+        CharacterType::Townsfolk
+    }
+
+    fn has_day_ability(&self) -> bool {
+        if self.ability_used {
+            return false;
+        }
+
+        true
+    }
+
+    fn day_ability(&self, player_index: PlayerIndex, _state: &State) -> Option<ChangeRequest> {
+        // Choose a player
+        // If it is a demon, kill the demon, otherwise do nothing
+        // Either way, use your ability
+
+        let change_type = ChangeType::ChoosePlayers(1);
+        let description = "Prompt the slayer to point to a player";
+
+        let check_func = move |_state: &State, args: &ChangeArgs| -> Result<bool, ChangeError> {
+            let target_players = unwrap_args_err!(args, ChangeArgs::PlayerIndices(pv) => pv);
+            let len = target_players.len();
+            if len != 1 {
+                return Err(ChangeError::WrongNumberOfSelectedPlayers {
+                    wanted: 1,
+                    got: len,
+                });
+            }
+
+            return Ok(true);
+        };
+
+        let change_func = move |state: &mut State, args: ChangeArgs| -> Option<ChangeRequest> {
+            let target_players = unwrap_args_panic!(args, ChangeArgs::PlayerIndices(pv) => pv);
+
+            let state_snapshot = state.clone();
+            let target_player = state.get_player_mut(target_players[0]);
+
+            if target_player.get_character_type() == CharacterType::Demon {
+                target_player.kill(player_index, &state_snapshot);
+            }
+
+            let slayer = state.get_player_mut(player_index);
+            slayer
+                .role
+                .reassign(RolePtr::from(Self { ability_used: true }));
+
+            None
+        };
+
+        Some(ChangeRequest::new(
+            change_type,
+            description.into(),
+            check_func,
+            change_func,
+        ))
+    }
+}
+
+impl Display for Slayer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Slayer")
+    }
+}
 
 #[derive(Default)]
 pub(crate) struct Soldier();

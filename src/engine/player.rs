@@ -185,7 +185,9 @@ impl Player {
     }
 
     // TODO: Figure out if you want to implement this
-    pub(crate) fn nominate(&self) {}
+    pub(crate) fn nominate(&self, nominating_player_index: PlayerIndex, state: &mut State) {
+        self.role.nominated(nominating_player_index, state);
+    }
 
     // TODO: Figure out if you want to implement this
     pub(crate) fn vote(&self) {}
@@ -262,7 +264,7 @@ impl Player {
     }
 
     /// If the role has an ability that acts during the day (not including night one), this method should be overwritten and indicate which part(s) of the day this ability can be triggered during
-    pub fn has_day_ability(&self) -> Option<Step> {
+    pub fn has_day_ability(&self) -> bool {
         self.role.has_day_ability()
     }
     /// If the role has an ability that acts during the day (not including night one), this method should be overwritten and resolve the day ability

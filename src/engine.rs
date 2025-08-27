@@ -1,6 +1,6 @@
 #![allow(dead_code, clippy::needless_return)]
-// pub(crate) mod day;
 pub(crate) mod change_request;
+pub(crate) mod day;
 pub(crate) mod night;
 pub(crate) mod player;
 pub(crate) mod setup;
