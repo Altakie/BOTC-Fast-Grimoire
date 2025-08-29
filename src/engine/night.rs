@@ -91,8 +91,6 @@ impl State {
             if let Some(prev_player_order) = prev_player_order {
                 if order < prev_player_order {
                     continue;
-                } else if order == prev_player_order + 1 {
-                    return Some(player_index);
                 }
                 // If there's a duplicate, return the next player with a higher player index than the
                 // current player that has the same role
@@ -105,8 +103,12 @@ impl State {
                         continue;
                     }
                     return Some(player_index);
+                } else if order == prev_player_order + 1 {
+                    return Some(player_index);
                 }
             }
+
+            // (player index, order)
             let next_player_info = match next_player {
                 Some(info) => info,
                 None => {
@@ -114,7 +116,7 @@ impl State {
                     continue;
                 }
             };
-            if order > next_player_info.1 {
+            if order >= next_player_info.1 {
                 continue;
             };
             // Getting to this point means order is more than the previous_player but less than the

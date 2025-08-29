@@ -56,12 +56,9 @@ impl Display for CharacterType {
 #[derive(Clone, Store)]
 pub(crate) struct Player {
     pub(crate) name: String,
-    // TODO: Might need to be Arc instead of rc
     pub(crate) role: RolePtr,
-    // Order should be implemented through external array
     pub(crate) dead: bool,
     pub(crate) ghost_vote: bool,
-    // it cleaner
     pub(crate) alignment: Alignment,
     pub(crate) status_effects: Vec<StatusEffect>,
 }

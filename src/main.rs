@@ -818,6 +818,7 @@ fn Player_Display() -> impl IntoView {
                     .map(|(i, player)| {
                         let pos = player_positions[i];
                         let selected = RwSignal::new(false);
+
                         view! {
                             <div
                                 class="translate-1/2 absolute size-fit"
@@ -852,6 +853,9 @@ fn Player_Display() -> impl IntoView {
                                             engine::player::Alignment::Evil => "red",
                                             engine::player::Alignment::Any => "purple",
                                         }
+                                    }
+                                    on:keypress=move |ev| {
+                                        ev.prevent_default();
                                     }
                                     on:click=move |_| {
                                         if temp_state.curr_change_request().read().is_none() {
@@ -973,7 +977,7 @@ fn RoleSelector() -> impl IntoView {
     let temp_state = expect_context::<Store<TempState>>();
     view! {
         <div class="flex flex-col">
-           {move || {
+            {move || {
                 script
                     .get()
                     .roles
@@ -1019,55 +1023,10 @@ fn RoleSelector() -> impl IntoView {
                                 {role.to_string()}
                             </button>
                         }
-                    }).collect_view()
+                    })
+                    .collect_view()
             }}
         </div>
-        // <For
-        // each=move || script.get().roles
-        // key=|r| *r
-        // children=move |role| {
-        // let selected = RwSignal::new(false);
-        // view! {
-        // <button
-        // style:color=move || { if selected.get() { "red" } else { "" } }
-        // on:click=move |_| {
-        // let cr = {
-        // if temp_state.curr_change_request().read().is_none() {
-        // return;
-        // }
-        // temp_state.curr_change_request().get().unwrap()
-        // };
-        // let requested_num = match cr.change_type {
-        // ChangeType::ChooseRoles(num) => num,
-        // _ => {
-        // return;
-        // }
-        // };
-        // let selected_roles = temp_state.selected_roles();
-        // if selected.get() {
-        // selected_roles
-        // .update(|pv| {
-        // let remove_index = pv
-        // .iter()
-        // .position(|r| *r == role)
-        // .unwrap();
-        // pv.remove(remove_index);
-        // });
-        // selected.set(false);
-        // return;
-        // }
-        // if selected_roles.read().len() >= requested_num {
-        // return;
-        // }
-        // selected_roles.update(|pv| pv.push(role));
-        // selected.set(true);
-        // }
-        // >
-        // {role.to_string()}
-        // </button>
-        // }
-        // }
-        // />
     }
 }
 
@@ -1077,25 +1036,24 @@ fn DayAbilitySelector() -> impl IntoView {
     let temp_state = expect_context::<Store<TempState>>();
 
     view! {
-            <div class="flex flex-col">
-    {
-            move || {
-                    let active_players = state.read().get_day_active();
+        <div class="flex flex-col">
+            {move || {
+                let active_players = state.read().get_day_active();
+                active_players
+                    .into_iter()
+                    .map(|player_index| {
+                        let role = state.read().get_player(player_index).role.clone();
 
-                    active_players.into_iter().map(|player_index| {
-                    let role = state.read().get_player(player_index).role.clone();
-                    view ! {
-                        <button on:click=move|_| {
-                            let player_ability = state.read().day_ability(player_index);
-                            temp_state.curr_change_request().set(player_ability);
-                            temp_state.currently_acting_player().set(Some(player_index));
-                        }>
-                        {move || {format!("{} Ability", role)}}
-                        </button>
-                    }
-                    }).collect_view()
-            }
-        }
+                        view! {
+                            <button on:click=move |_| {
+                                let player_ability = state.read().day_ability(player_index);
+                                temp_state.curr_change_request().set(player_ability);
+                                temp_state.currently_acting_player().set(Some(player_index));
+                            }>{move || { format!("{} Ability", role) }}</button>
+                        }
+                    })
+                    .collect_view()
+            }}
         </div>
-        }
+    }
 }

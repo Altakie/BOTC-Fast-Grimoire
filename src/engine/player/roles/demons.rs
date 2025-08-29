@@ -11,7 +11,9 @@ use crate::{
 };
 
 #[derive(Default)]
-pub(crate) struct Imp();
+pub(crate) struct Imp {
+    last_killed: Option<usize>,
+}
 
 impl Role for Imp {
     fn get_default_alignment(&self) -> Alignment {
@@ -30,6 +32,14 @@ impl Role for Imp {
         let dead = state.get_player(player_index).dead;
         if dead {
             return None;
+        }
+
+        let day_num = state.day_num;
+
+        if let Some(prev_day_num) = self.last_killed {
+            if prev_day_num == day_num {
+                return None;
+            }
         }
 
         let description = "Ask the Imp to point to the player they would like to kill";
@@ -52,7 +62,7 @@ impl Role for Imp {
             let target_player_index = target_players[0];
             state.kill(player_index, target_player_index);
 
-            if target_player_index == player_index {
+            if target_player_index == player_index && state.get_player(player_index).dead {
                 let description = "Choose a new Imp";
                 let change_type = ChangeType::ChoosePlayers(1);
 
@@ -82,9 +92,12 @@ impl Role for Imp {
                         let target_players =
                             unwrap_args_panic!(args, ChangeArgs::PlayerIndices(pv) => pv);
                         let target_player_index = target_players[0];
+                        let day_num = state.day_num;
                         let target_player = state.get_player_mut(target_player_index);
 
-                        let new_role = RolePtr::new::<Imp>();
+                        let new_role = RolePtr::from(Imp {
+                            last_killed: Some(day_num),
+                        });
 
                         target_player.role.reassign(new_role);
                         None
