@@ -162,7 +162,13 @@ pub(crate) trait Role: Display + Send + Sync {
     }
 
     /// An action the role performs on being nominated, if any
-    fn nominated(&self, _nominating_player_index: PlayerIndex, _state: &mut State) {}
+    fn nominated(
+        &self,
+        _nominating_player_index: PlayerIndex,
+        _attacking_player_index: PlayerIndex,
+        _state: &mut State,
+    ) {
+    }
 
     /// If the role being in the game affects character type counts, overwrite this method. The
     /// CharacterTypeCounts returned from this function will be added to the ones currently in the

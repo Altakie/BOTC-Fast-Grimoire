@@ -1,11 +1,13 @@
+use std::fmt::Display;
+
 use super::{PlayerIndex, status_effects::StatusEffect};
 // -- Logging --
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct DayPhaseLog {
-    day_phase: DayPhase,
-    log: Vec<Event>,
-    day_num: usize,
+    pub(crate) day_phase: DayPhase,
+    pub(crate) log: Vec<Event>,
+    pub(crate) day_num: usize,
 }
 
 // #[derive(Clone)]
@@ -15,14 +17,14 @@ pub struct DayPhaseLog {
 //     night: DayPhaseLog,
 // }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Log {
     // TODO: Make this a tree eventually
-    day_phases: Vec<DayPhaseLog>,
+    pub(crate) day_phases: Vec<DayPhaseLog>,
     // TODO: Want to be able to notify roles of certain types of events happening
     // Maybe for now have an vec of check functions to see if they need to be notified or something
     // subscriber_map: HashMap<>
-    day_num: usize,
+    pub(crate) day_num: usize,
 }
 
 impl Log {
@@ -133,7 +135,10 @@ pub enum Event {
     // PhaseStart(Step),
     // PhaseEnd(Step),
     // Player Events
-    Nomination(PlayerIndex),
+    Nomination {
+        nominator_player_index: PlayerIndex,
+        target_player_index: PlayerIndex,
+    },
     Voting {
         players_voted: Option<usize>,
     },
@@ -158,7 +163,7 @@ impl Event {
     }
 }
 
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Clone, Debug)]
 pub enum DayPhase {
     Setup,
     DayDiscussion,
@@ -169,6 +174,36 @@ pub enum DayPhase {
 pub enum SearchError {
     InvalidDayNum,
     EventNotFound,
+}
+
+impl Display for Log {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let day_phases_str = self
+            .day_phases
+            .iter()
+            .map(|day_phase| format!("{}", day_phase))
+            .collect::<Vec<String>>()
+            .join("\n");
+        write!(f, "Day {}\n\n{}", self.day_num, day_phases_str)
+    }
+}
+
+impl Display for DayPhaseLog {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let log_str = self
+            .log
+            .iter()
+            .map(|event| format!("\t{}", event))
+            .collect::<Vec<String>>()
+            .join("\n");
+        write!(f, "{:?} {}\n{}", self.day_phase, self.day_num, log_str)
+    }
+}
+
+impl Display for Event {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 mod tests {

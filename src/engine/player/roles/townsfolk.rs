@@ -230,12 +230,27 @@ impl Role for Librarian {
     fn setup_ability(
         &self,
         player_index: crate::engine::state::PlayerIndex,
-        _state: &State,
+        state: &State,
     ) -> Option<ChangeRequest> {
-        washerwoman_librarian_investigator::<LibrarianOutsider, LibrarianWrong>(
-            player_index,
-            CharacterType::Outsider,
-        )
+        let outsider_count = state
+            .get_players()
+            .iter()
+            .filter(|player| {
+                matches!(
+                    player.get_character_type(),
+                    CharacterType::Outsider | CharacterType::Any
+                )
+            })
+            .count();
+
+        if outsider_count > 0 {
+            return washerwoman_librarian_investigator::<LibrarianOutsider, LibrarianWrong>(
+                player_index,
+                CharacterType::Outsider,
+            );
+        }
+
+        None
     }
 
     fn night_one_order(&self) -> Option<usize> {
@@ -248,7 +263,25 @@ impl Role for Librarian {
         state: &State,
     ) -> Option<ChangeRequest> {
         let player = state.get_player(player_index);
-        let message = format!("Show the {} the correct roles", player.role);
+
+        let outsider_count = state
+            .get_players()
+            .iter()
+            .filter(|player| {
+                matches!(
+                    player.get_character_type(),
+                    CharacterType::Outsider | CharacterType::Any
+                )
+            })
+            .count();
+
+        let message = {
+            if outsider_count == 0 {
+                "Show the Librarian there are no outsiders in play".to_string()
+            } else {
+                format!("Show the {} the correct roles", player.role)
+            }
+        };
         let change_type = ChangeType::Display;
 
         Some(ChangeRequest::new_display(change_type, message))
@@ -626,7 +659,7 @@ impl Role for Undertaker {
 
         // TODO: Change search method to only search the previous day
         let execution_event = state.log.search(|e| match *e {
-            log::Event::Nomination(_) => Some(e),
+            log::Event::Nomination { .. } => Some(e),
             _ => None,
         });
 
@@ -848,9 +881,21 @@ impl Role for Virgin {
         CharacterType::Townsfolk
     }
 
-    fn nominated(&self, nominating_player_index: PlayerIndex, state: &mut State) {
+    fn nominated(
+        &self,
+        nominating_player_index: PlayerIndex,
+        target_player_index: PlayerIndex,
+        state: &mut State,
+    ) {
+        let player = state.get_player_mut(target_player_index);
+        player
+            .role
+            .reassign(RolePtr::from(Virgin { ability_used: true }));
+        // FIX: Doesn't account for drunkness or poisoned (bad account for drunkness)
         let nominator = state.get_player_mut(nominating_player_index);
-        nominator.execute();
+        if nominator.role.get_true_character_type() == CharacterType::Townsfolk {
+            nominator.execute();
+        }
     }
 }
 
@@ -859,8 +904,6 @@ impl Display for Virgin {
         f.write_str("Virgin")
     }
 }
-// TODO:
-// Slayer
 #[derive(Default)]
 pub(crate) struct Slayer {
     ability_used: bool,
