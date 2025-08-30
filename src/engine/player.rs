@@ -182,8 +182,14 @@ impl Player {
     }
 
     // TODO: Figure out if you want to implement this
-    pub(crate) fn nominate(&self, nominating_player_index: PlayerIndex, state: &mut State) {
-        self.role.nominated(nominating_player_index, state);
+    pub(crate) fn nominate(
+        &self,
+        nominating_player_index: PlayerIndex,
+        target_player_index: PlayerIndex,
+        state: &mut State,
+    ) {
+        self.role
+            .nominated(nominating_player_index, target_player_index, state);
     }
 
     // TODO: Figure out if you want to implement this

@@ -19,6 +19,7 @@ use engine::{
 mod scripts;
 use scripts::*;
 
+use crate::engine::change_request::ChangeError;
 use crate::engine::state::log::DayPhase;
 
 const DEBUG: bool = true;
@@ -52,14 +53,14 @@ fn App() -> impl IntoView {
     // NOTE: Debug only
     if DEBUG {
         roles.set(vec![
-            Roles::Chef,
-            Roles::Baron,
-            Roles::Monk,
+            Roles::Ravenkeeper,
+            Roles::Virgin,
+            Roles::Undertaker,
             Roles::Slayer,
             // Role::Monk,
-            Roles::Drunk,
+            Roles::Librarian,
             Roles::Empath,
-            Roles::Spy,
+            Roles::Baron,
             Roles::Imp,
         ]);
 
@@ -533,6 +534,8 @@ fn GameInterface(roles: Vec<Roles>, player_names: Vec<String>, script: Script) -
                 <Picker_Bar />
             </div>
         </ErrorBoundary>
+
+        <LogDisplay />
     }
     .into_any()
 }
@@ -586,6 +589,7 @@ fn Info() -> impl IntoView {
 
         return view! {
             <div class="border border-solid w-full p-[1rem]">
+                <h3>"Current Player" </h3>
                 <p class="mx-auto">{player.name}</p>
                 <p>"Role: "{player.role.to_string()}</p>
                 <p>
@@ -617,18 +621,14 @@ fn Info() -> impl IntoView {
 
         return view! {
             <div class="border border-solid w-full p-[1rem]">
+                <h3>"Selected Player" </h3>
                 <p class="mx-auto">{player.name}</p>
                 <p>"Role: "{player.role.to_string()}</p>
                 <p>
                     "Status: "{if player.dead { "Dead" } else { "Alive" }}
                     <button on:click=move |_| {
-                        game_state
-                            .players()
-                            .update(|players: &mut Vec<Player>| {
-                                let dead = &mut players[player_index].dead;
-                                *dead = !*dead;
-                            });
-                    }>"Toggle"</button>
+                        game_state.update(|gs| gs.execute_player(player_index));
+                    }>"Execute"</button>
                 </p>
                 <p>"Ghost Vote: "{if player.ghost_vote { "Yes" } else { "No" }}</p>
                 <p>"Alignment: " {player.alignment.to_string()}</p>
@@ -1035,8 +1035,57 @@ fn DayAbilitySelector() -> impl IntoView {
     let state = expect_context::<Store<State>>();
     let temp_state = expect_context::<Store<TempState>>();
 
+    let nominate_button = move |_| {
+        let description = "Select the nominating player";
+        let change_type = ChangeType::ChoosePlayers(1);
+
+        let check_func = move |_: &State, args: &ChangeArgs| -> Result<bool, ChangeError> {
+            let selected_players = unwrap_args_err!(args, ChangeArgs::PlayerIndices(pv) => pv);
+
+            let len = selected_players.len();
+            if len != 1 {
+                return Err(ChangeError::WrongNumberOfSelectedPlayers {
+                    wanted: 1,
+                    got: len,
+                });
+            }
+
+            Ok(true)
+        };
+        let state_change_func = move |_: &mut State, args: ChangeArgs| -> Option<ChangeRequest> {
+            let nominating_player = unwrap_args_panic!(args, ChangeArgs::PlayerIndices(pv)=>pv)[0];
+            let description = "Select the nominated player";
+
+            let state_change_func =
+                move |state: &mut State, args: ChangeArgs| -> Option<ChangeRequest> {
+                    let nominated_player =
+                        unwrap_args_panic!(args, ChangeArgs::PlayerIndices(pv)=>pv)[0];
+                    state.nominate_player(nominating_player, nominated_player);
+                    None
+                };
+
+            Some(ChangeRequest::new(
+                change_type,
+                description.into(),
+                check_func,
+                state_change_func,
+            ))
+        };
+
+        let nominate_request = ChangeRequest::new(
+            change_type,
+            description.into(),
+            check_func,
+            state_change_func,
+        );
+        temp_state.curr_change_request().set(Some(nominate_request));
+    };
+
     view! {
         <div class="flex flex-col">
+        <button
+        on:click=nominate_button
+        >"Nominate"</button>
             {move || {
                 let active_players = state.read().get_day_active();
                 active_players
@@ -1054,6 +1103,20 @@ fn DayAbilitySelector() -> impl IntoView {
                     })
                     .collect_view()
             }}
+        </div>
+    }
+}
+
+#[component]
+fn LogDisplay() -> impl IntoView {
+    let state = expect_context::<Store<State>>();
+
+    view! {
+        <div class="border">
+        <h2>"Log"</h2>
+        <div>
+            {move || format!("{:?}", state.log().get())}
+        </div>
         </div>
     }
 }

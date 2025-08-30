@@ -235,6 +235,10 @@ impl State {
         let state_snapshot = self.clone();
         self.get_player_mut(target_player_index)
             .kill(attacking_player_index, &state_snapshot);
+        self.log.log_event(Event::AttemptedKill {
+            attacking_player_index,
+            target_player_index,
+        });
         let dead = self.get_player(target_player_index).dead;
         if dead {
             self.cleanup_player_statuses(target_player_index);
