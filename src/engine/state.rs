@@ -1,6 +1,6 @@
 #![allow(dead_code, clippy::needless_return)]
 pub(crate) mod log;
-use log::{DayPhase, Log};
+use log::Log;
 pub(crate) mod status_effects;
 use status_effects::StatusEffect;
 
@@ -44,8 +44,6 @@ pub enum Step {
 pub(crate) struct State {
     players: Vec<Player>,
     win_cond_i: Option<PlayerIndex>,
-    status_effects: Vec<StatusEffect>,
-    day_phase: DayPhase,
     pub(crate) day_num: usize,
     pub(crate) log: Log,
     script: Script,
@@ -90,8 +88,6 @@ impl State {
         return Ok(Self {
             players,
             win_cond_i,
-            status_effects, // active_roles,
-            day_phase: DayPhase::Night,
             day_num: 1,
             log,
             script,
@@ -235,10 +231,6 @@ impl State {
         let state_snapshot = self.clone();
         self.get_player_mut(target_player_index)
             .kill(attacking_player_index, &state_snapshot);
-        self.log.log_event(Event::AttemptedKill {
-            attacking_player_index,
-            target_player_index,
-        });
         let dead = self.get_player(target_player_index).dead;
         if dead {
             self.cleanup_player_statuses(target_player_index);

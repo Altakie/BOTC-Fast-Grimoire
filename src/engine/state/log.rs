@@ -1,11 +1,13 @@
 use std::fmt::Display;
 
+use crate::engine::state::Step;
+
 use super::{PlayerIndex, status_effects::StatusEffect};
 // -- Logging --
 
 #[derive(Clone, Debug)]
 pub struct DayPhaseLog {
-    pub(crate) day_phase: DayPhase,
+    pub(crate) day_phase: Step,
     pub(crate) log: Vec<Event>,
     pub(crate) day_num: usize,
 }
@@ -30,7 +32,7 @@ pub struct Log {
 impl Log {
     pub fn new() -> Self {
         let setup_phase = DayPhaseLog {
-            day_phase: DayPhase::Setup,
+            day_phase: Step::Setup,
             log: vec![],
             day_num: 0,
         };
@@ -43,14 +45,16 @@ impl Log {
     // TODO: Probably update this method to be more generic or add more methods for different types
     // of searches
     /// Returns the latest event of this type in the log
-    pub fn search<F>(&self, search_func: F) -> Result<&Event, SearchError>
+    pub fn search_previous_phase<F>(&self, search_func: F) -> Result<&Event, SearchError>
     where
         F: Fn(&Event) -> Option<&Event>,
     {
-        for day_phase in self.day_phases.iter().rev() {
-            if let Some(event) = day_phase.search(&search_func) {
-                return Ok(event);
-            }
+        let day_phase = match self.get_previous_phase() {
+            Some(day_phase) => day_phase,
+            None => return Err(SearchError::InvalidDayNum),
+        };
+        if let Some(event) = day_phase.search(&search_func) {
+            return Ok(event);
         }
 
         return Err(SearchError::EventNotFound);
@@ -58,50 +62,65 @@ impl Log {
 
     pub fn next_phase(&mut self) {
         // Check the latest day_phase
-        match self.day_phases[self.day_phases.len() - 1].day_phase {
-            DayPhase::Setup => {
+        match self.get_mut_latest_phase().day_phase {
+            Step::Setup => {
                 // Create night one in log
                 let night_1 = DayPhaseLog {
-                    day_phase: DayPhase::Night,
+                    day_phase: Step::NightOne,
                     log: vec![],
                     day_num: 1,
                 };
                 self.day_num = 1;
                 self.day_phases.push(night_1);
             }
-            DayPhase::DayDiscussion => {
+            Step::Day => {
                 self.day_phases.push(DayPhaseLog {
-                    day_phase: DayPhase::DayExecution,
+                    day_phase: Step::Night,
                     log: vec![],
                     day_num: self.day_num,
                 });
             }
-            DayPhase::DayExecution => {
-                self.day_phases.push(DayPhaseLog {
-                    day_phase: DayPhase::Night,
-                    log: vec![],
-                    day_num: self.day_num,
-                });
-            }
-            DayPhase::Night => {
+            Step::NightOne => {
                 // Only time we should increment day num
                 self.day_num += 1;
                 self.day_phases.push(DayPhaseLog {
-                    day_phase: DayPhase::DayDiscussion,
+                    day_phase: Step::Day,
                     log: vec![],
                     day_num: self.day_num,
                 });
             }
+            Step::Night => {
+                // Only time we should increment day num
+                self.day_num += 1;
+                self.day_phases.push(DayPhaseLog {
+                    day_phase: Step::Day,
+                    log: vec![],
+                    day_num: self.day_num,
+                });
+            }
+            Step::Start => panic!("Log should never have Start Phase"),
         }
     }
 
-    fn latest_phase(&mut self) -> &mut DayPhaseLog {
-        // WARN: This should never be empty anyway, but do fix this implementation
+    fn get_previous_phase(&self) -> Option<&DayPhaseLog> {
+        let len = self.day_phases.len();
+        self.day_phases.get(len - 2)
+    }
+
+    fn get_mut_previous_phase(&mut self) -> Option<&mut DayPhaseLog> {
+        let len = self.day_phases.len();
+        self.day_phases.get_mut(len - 2)
+    }
+
+    fn get_mut_latest_phase(&mut self) -> &mut DayPhaseLog {
+        // WARN: This should never be empty anyway, but do fix this implementation to not panic if
+        // it is
+        assert!(!self.day_phases.is_empty());
         self.day_phases.last_mut().unwrap()
     }
 
     pub fn log_event(&mut self, event: Event) {
-        let latest_phase = self.latest_phase();
+        let latest_phase = self.get_mut_latest_phase();
         latest_phase.log(event);
     }
 
@@ -163,14 +182,7 @@ impl Event {
     }
 }
 
-#[derive(PartialEq, Clone, Debug)]
-pub enum DayPhase {
-    Setup,
-    DayDiscussion,
-    DayExecution,
-    Night,
-}
-
+#[derive(Debug)]
 pub enum SearchError {
     InvalidDayNum,
     EventNotFound,
@@ -206,8 +218,27 @@ impl Display for Event {
     }
 }
 
+#[cfg(test)]
 mod tests {
-    #![cfg(test)]
 
     use super::*;
+
+    #[test]
+    fn test_search_previous_phase() {
+        let mut log = Log::new();
+        log.next_phase();
+        log.next_phase();
+        let execution_event = Event::Execution(2);
+        log.log_event(execution_event.clone());
+        log.next_phase();
+
+        let event = log.search_previous_phase(|ev| match *ev {
+            Event::Execution(_) => Some(ev),
+            _ => None,
+        });
+
+        assert!(
+            execution_event == *event.expect("No execution event was found in the previous phase")
+        );
+    }
 }

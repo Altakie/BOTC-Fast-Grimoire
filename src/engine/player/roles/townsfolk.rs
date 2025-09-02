@@ -658,13 +658,13 @@ impl Role for Undertaker {
         }
 
         // TODO: Change search method to only search the previous day
-        let execution_event = state.log.search(|e| match *e {
-            log::Event::Nomination { .. } => Some(e),
+        let execution_event = state.log.search_previous_phase(|e| match *e {
+            log::Event::Execution(_) => Some(e),
             _ => None,
         });
 
         let executed_player_index = match execution_event {
-            Ok(log::Event::Execution(pi)) => *pi,
+            Ok(log::Event::Execution(player_index)) => *player_index,
             Ok(_) | Err(_) => return None,
         };
 
@@ -1031,5 +1031,49 @@ impl Role for Mayor {
 impl Display for Mayor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("Soldier")
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::{engine::player::roles::Roles, scripts::trouble_brewing};
+
+    use super::*;
+
+    fn setup_test_state(roles: Vec<Roles>) -> State {
+        let player_names = roles
+            .iter()
+            .map(|role| role.convert().to_string())
+            .collect();
+        State::new(roles, player_names, trouble_brewing()).unwrap()
+    }
+
+    #[test]
+    fn test_undertaker_ability() {
+        let roles = vec![
+            Roles::Undertaker,
+            Roles::Virgin,
+            Roles::Soldier,
+            Roles::Spy,
+            Roles::Imp,
+        ];
+        let mut state = setup_test_state(roles);
+        let undertaker_role = RolePtr::new::<Undertaker>();
+        let undertaker_index = state
+            .get_players()
+            .iter()
+            .position(|player| player.role.to_string() == "Undertaker")
+            .expect("Undertaker not found");
+
+        let cr = undertaker_role.night_ability(undertaker_index, &state);
+
+        // FIX: This unit test sucks, probably need to refactor code, or use dependency injection
+        // to have a dummy state
+        assert!(cr.is_none());
+        state.next_step();
+        state.next_step();
+        state.next_step();
+
+        todo!()
     }
 }
