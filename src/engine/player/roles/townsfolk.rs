@@ -819,7 +819,7 @@ impl Role for Ravenkeeper {
     fn night_ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
         let player = state.get_player(player_index);
 
-        if !player.dead || self.ability_used {
+        if self.ability_used || !player.dead {
             return None;
         }
 
@@ -839,6 +839,11 @@ impl Role for Ravenkeeper {
             return Ok(true);
         };
         let change_func = move |state: &mut State, args: ChangeArgs| -> Option<ChangeRequest> {
+            state
+                .get_player_mut(player_index)
+                .role
+                .reassign(RolePtr::from(Ravenkeeper { ability_used: true }));
+
             let target_players = unwrap_args_panic!(args, ChangeArgs::PlayerIndices(pv) => pv);
             let target_player = state.get_player(target_players[0]);
 
@@ -887,6 +892,10 @@ impl Role for Virgin {
         target_player_index: PlayerIndex,
         state: &mut State,
     ) {
+        if self.ability_used {
+            return;
+        }
+
         let player = state.get_player_mut(target_player_index);
         player
             .role
@@ -894,7 +903,7 @@ impl Role for Virgin {
         // FIX: Doesn't account for drunkness or poisoned (bad account for drunkness)
         let nominator = state.get_player_mut(nominating_player_index);
         if nominator.role.get_true_character_type() == CharacterType::Townsfolk {
-            nominator.execute();
+            state.execute_player(nominating_player_index);
         }
     }
 }
@@ -1022,7 +1031,7 @@ impl Role for Mayor {
     }
 
     // TODO: Overwrite kill for mayor. Perhaps kill should also trigger a change request or
-    // something like that.
+    // something like that. OR STORE IT FOR LATER?
     fn kill(&self, _attacking_player_index: PlayerIndex, _state: &State) -> Option<bool> {
         todo!()
     }

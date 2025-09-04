@@ -3,14 +3,22 @@
 
 ## Major TODOS
 
-- Add Day phase and make it operational!
-- Event logging for all events (and in roles)
+- Maybe have code cleanup?? Or at least code review where you check if stuff makes still makes sense/ can be better?
+  - Do this after scarletwoman and mayor are implemented
+- End of game
+  - Gather win conditions at the start of the game, and also when they should be checked. Respond to log events that correspond to the win condition's trigger?
+  - Win condition should have a trigger, like a death, or a day switch event?
 - Display for the log
+- Event logging for all events (and in roles)
+  - Most likely just add loggers to the main event methods (kill, execute, nominate, switch day) etc..
 - Players should no longer deliver change requests when dead, fix this to make it more idiomatic
-- Add tests for all roles (and transfer old ones)
 - Add travellers
-- Enum dispatch (crate)
+- Replaying the log
+- Add tests for all roles (and transfer old ones)
+  - Perhaps do some refactoring to do dependency injection?
+  - Make state
 - Disable players/options you can't pick in the ui
+- Enum dispatch (crate)
 
 ## Game Modes
 
@@ -21,6 +29,7 @@
   - Game doesn't automatically execute logic
   - Game will still display night order
   - Events will still be logged
+  - Add associated effects to players and the ability to add them?
 - Should be able to switch between modes at will
   - If something goes wrong, want to be able to undo and go back to manual mode
   - Sometimes there are bits of logic that are unable to be captured, and manual mode is good for that
@@ -76,7 +85,7 @@
 - All info is public
 - There are roles that act only during the day
   - Roles that ask the story teller something privately
-  - Roles that publicly annouce something that may have an effect later
+  - Roles that publicly announce something that may have an effect later
 - Storyteller should manually:
   - Mark that someone claimed a role
   - I think this would be more role specific

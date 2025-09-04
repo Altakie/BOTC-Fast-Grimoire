@@ -20,26 +20,12 @@ pub(crate) enum ChangeArgs {
     Roles(Vec<Roles>),
 }
 
-/**
-A struct to give the interface the necessary information to resolve
-
-# Fields
-
-  * Change Type : A enum to tell the ui which input component to load and how much input to
-  ask for
-  * FnOnce(Args) -> bool : A check function that validates whether the input the component
-  returns will is a valid input for the state mutating function
-  * Fnonce(State, Args) -> A function that takes a state and args, and then mutates the state
-  accordingly. Think of this as saving the work that needs to be done for after the input
-  is received
-*/
 #[derive(Clone)]
 pub(crate) struct ChangeRequest {
     pub(crate) change_type: ChangeType,
     pub(crate) check_func: Option<CheckFuncPtr>,
     pub(crate) state_change_func: Option<StateChangeFuncPtr>,
     pub(crate) description: String,
-    pub(crate) clear: bool,
 }
 
 // impl ChangeRequest {
@@ -51,7 +37,6 @@ impl Debug for ChangeRequest {
         f.debug_struct("ChangeRequest")
             .field("change_type", &self.change_type)
             .field("description", &self.description)
-            .field("clear", &self.clear)
             .finish()
     }
 }
@@ -119,7 +104,6 @@ impl ChangeRequest {
             check_func: Some(CheckFuncPtr::new(check_func)),
             state_change_func: Some(StateChangeFuncPtr::new(state_change_func)),
             description,
-            clear: true,
         }
     }
 
@@ -129,7 +113,6 @@ impl ChangeRequest {
             check_func: None,
             state_change_func: None,
             description,
-            clear: true,
         }
     }
 }

@@ -6,7 +6,6 @@ use status_effects::StatusEffect;
 
 use rand::{self, seq::SliceRandom};
 use reactive_stores::*;
-use std::collections::HashMap;
 
 use crate::{
     engine::{
@@ -18,6 +17,23 @@ use crate::{
 };
 
 pub(crate) type PlayerIndex = usize;
+// #[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
+// pub(crate) struct PlayerIndex(usize);
+// impl Deref for PlayerIndex {
+//     type Target = usize;
+//
+//     fn deref(&self) -> &Self::Target {
+//         &self.0
+//     }
+// }
+//
+// impl Add for PlayerIndex {
+//     type Output;
+//
+//     fn add(self, rhs: Self) -> Self::Output {
+//         todo!()
+//     }
+// }
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub enum Step {
@@ -81,7 +97,6 @@ impl State {
         );
 
         let win_cond_i = players.iter().position(|p| p.role.is_win_condition());
-        let status_effects: Vec<StatusEffect> = vec![];
 
         let log = Log::new();
 

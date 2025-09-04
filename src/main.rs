@@ -627,7 +627,9 @@ fn Info() -> impl IntoView {
                     "Status: "{if player.dead { "Dead" } else { "Alive" }}
                     <button on:click=move |_| {
                         game_state.update(|gs| gs.execute_player(player_index));
-                    }>"Execute"</button>
+                    }
+                disabled=move||{!matches!(game_state.step().get(), Step::Day)}
+                >"Execute"</button>
                 </p>
                 <p>"Ghost Vote: "{if player.ghost_vote { "Yes" } else { "No" }}</p>
                 <p>"Alignment: " {player.alignment.to_string()}</p>
@@ -701,9 +703,8 @@ fn Game() -> impl IntoView {
                     // console_log(&format!("{:?}", next_cr));
                     // Set the next cr
 
-                    temp_state.update(|ts| ts.clear_selected());
-
                     if next_cr.is_some() {
+                        temp_state.update(|ts| ts.clear_selected());
                         temp_state.curr_change_request().set(next_cr);
                         // console_log(&format!(
                         //     "New Cr set as {:?}, curr cr is now {:?}",
@@ -724,6 +725,7 @@ fn Game() -> impl IntoView {
         let mut loop_break = false;
         loop {
             let currently_acting_player = temp_state.read().currently_acting_player;
+            let has_curr_cr = temp_state.get().curr_change_request.is_some();
             temp_state.update(|ts| ts.reset());
             // Check for next active player
             let next_player = game_state
@@ -751,11 +753,12 @@ fn Game() -> impl IntoView {
                     if loop_break {
                         break;
                     }
-                    game_state.update(|gs| gs.next_step());
-                    if game_state.step().get() == Step::Day {
+                    console_log(&*format!("has curr cr{}", has_curr_cr));
+                    if game_state.step().get() == Step::Day && has_curr_cr {
                         // Don't want to accidentally move to next step during day
                         break;
                     }
+                    game_state.update(|gs| gs.next_step());
                     loop_break = true;
                 }
             }
@@ -956,7 +959,9 @@ fn Picker_Bar() -> impl IntoView {
             return RoleSelector().into_any();
         }
 
-        if let Step::Day = state.step().get() {
+        if matches!(state.step().get(), Step::Day)
+            && temp_state.curr_change_request().get().is_none()
+        {
             return DayAbilitySelector().into_any();
         }
 
@@ -1035,6 +1040,7 @@ fn DayAbilitySelector() -> impl IntoView {
     let temp_state = expect_context::<Store<TempState>>();
 
     let nominate_button = move |_| {
+        temp_state.update(|ts| ts.reset());
         let description = "Select the nominating player";
         let change_type = ChangeType::ChoosePlayers(1);
 
@@ -1094,6 +1100,7 @@ fn DayAbilitySelector() -> impl IntoView {
 
                         view! {
                             <button on:click=move |_| {
+                                temp_state.update(|ts| ts.reset());
                                 let player_ability = state.read().day_ability(player_index);
                                 temp_state.curr_change_request().set(player_ability);
                                 temp_state.currently_acting_player().set(Some(player_index));
