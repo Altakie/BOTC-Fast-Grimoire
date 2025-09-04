@@ -87,7 +87,7 @@ impl Role for Baron {
 
     fn initialization_effect(&self) -> Option<crate::initialization::CharacterTypeCounts> {
         Some(CharacterTypeCounts {
-            townsfolk: 0,
+            townsfolk: -2,
             outsiders: 2,
             minions: 0,
             demons: 0,
