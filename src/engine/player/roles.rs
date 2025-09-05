@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use crate::engine::change_request::ChangeArgs;
 use crate::engine::player::roles::demons::Imp;
-use crate::engine::player::roles::minions::{Baron, Poisoner, Spy};
+use crate::engine::player::roles::minions::{Baron, Poisoner, ScarletWoman, Spy};
 use crate::engine::player::roles::outsiders::{Butler, Drunk, Recluse, Saint};
 use crate::{
     engine::{
@@ -264,7 +264,7 @@ impl Roles {
             Roles::Recluse => RolePtr::new::<Recluse>(),
             Roles::Spy => RolePtr::new::<Spy>(),
             Roles::Baron => RolePtr::new::<Baron>(),
-            Roles::Scarletwoman => todo!(),
+            Roles::Scarletwoman => RolePtr::new::<ScarletWoman>(),
             Roles::Poisoner => RolePtr::new::<Poisoner>(),
             Roles::Imp => RolePtr::new::<Imp>(),
         }

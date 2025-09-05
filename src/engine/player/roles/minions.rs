@@ -4,7 +4,10 @@ use std::{fmt::Display, sync::Arc};
 use crate::{
     engine::{
         change_request::{ChangeArgs, ChangeError, ChangeRequest, ChangeType},
-        player::{Alignment, CharacterType, roles::Role},
+        player::{
+            Alignment, CharacterType,
+            roles::{Role, RolePtr, demons::Imp},
+        },
         state::{
             PlayerIndex, State,
             status_effects::{CleanupPhase, Poisoned, StatusEffect},
@@ -202,34 +205,71 @@ impl Role for ScarletWoman {
         CharacterType::Minion
     }
 
-    fn night_order(&self) -> Option<usize> {
-        Some(28)
+    // fn night_order(&self) -> Option<usize> {
+    //     Some(28)
+    // }
+
+    // fn night_ability(&self, _player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
+    //     // TODO: This might be a little tricky because the scarlet woman should immediately become
+    //     // demon when the demon dies. Potentially could have role abilities trigger on events that
+    //     // are added to the log as well. This could be useful for scarlet woman. Then have a method
+    //     // called on event that needs to be overwritten. This "subscribes" that role to that event
+    //     // type in the log. Essentially, whenever that event fires, it will call a function to
+    //     // notify all subscribers. Subscribers should be stored in a hash map and initialized at
+    //     // the start of the game. Something like that
+    //     // Needs to be done for imp as well
+    //     // Check player count and if demon is dead. The change type is dynamic here
+    //     // WARN: Update this method when travelers are added
+    //     let living_player_count = state
+    //         .get_players()
+    //         .iter()
+    //         .filter(|player| !player.dead)
+    //         .count();
+    //
+    //     let demon_alive = state.get_players();
+    //
+    //     if living_player_count < 5 {
+    //         let change_type = ChangeType::NoStoryteller;
+    //     }
+    //
+    //     todo!()
+    // }
+
+    // FIX: Very temporary so that scarlet woman can work somehow
+    fn has_day_ability(&self) -> bool {
+        true
     }
 
-    fn night_ability(&self, _player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
-        // TODO: This might be a little tricky because the scarlet woman should immediately become
-        // demon when the demon dies. Potentially could have role abilities trigger on events that
-        // are added to the log as well. This could be useful for scarlet woman. Then have a method
-        // called on event that needs to be overwritten. This "subscribes" that role to that event
-        // type in the log. Essentially, whenever that event fires, it will call a function to
-        // notify all subscribers. Subscribers should be stored in a hash map and initialized at
-        // the start of the game. Something like that
-        // Needs to be done for imp as well
-        // Check player count and if demon is dead. The change type is dynamic here
-        // WARN: Update this method when travelers are added
+    fn day_ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
+        let demon_alive = state.get_players().iter().any(|player| {
+            player.role.get_true_character_type() == CharacterType::Demon && !player.dead
+        });
         let living_player_count = state
             .get_players()
             .iter()
             .filter(|player| !player.dead)
             .count();
 
-        let demon_alive = state.get_players();
-
-        if living_player_count < 5 {
-            let change_type = ChangeType::NoStoryteller;
+        if living_player_count < 4 || demon_alive {
+            return None;
         }
 
-        todo!()
+        let change_type = ChangeType::NoStoryteller;
+        let description = "The Scarletwoman becomes the imp";
+        let check_func =
+            move |state: &State, args: &ChangeArgs| -> Result<bool, ChangeError> { Ok(true) };
+        let change_func = move |state: &mut State, args: ChangeArgs| -> Option<ChangeRequest> {
+            let scarlet_woman = state.get_player_mut(player_index);
+            scarlet_woman.role.reassign(RolePtr::new::<Imp>());
+            None
+        };
+
+        Some(ChangeRequest::new(
+            change_type,
+            description.into(),
+            check_func,
+            change_func,
+        ))
     }
 }
 

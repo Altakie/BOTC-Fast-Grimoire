@@ -57,7 +57,7 @@ fn App() -> impl IntoView {
             Roles::Monk,
             Roles::Slayer,
             // Role::Monk,
-            Roles::Librarian,
+            Roles::Scarletwoman,
             Roles::Poisoner,
             Roles::Mayor,
             Roles::Imp,
@@ -673,6 +673,7 @@ fn Game() -> impl IntoView {
                 ChangeType::ChooseRoles(_) => {
                     Some(ChangeArgs::Roles(temp_state.selected_roles().get()))
                 }
+                ChangeType::NoStoryteller => Some(ChangeArgs::Blank),
                 _ => None,
             };
 

@@ -18,6 +18,7 @@ pub(crate) enum ChangeType {
 pub(crate) enum ChangeArgs {
     PlayerIndices(Vec<PlayerIndex>),
     Roles(Vec<Roles>),
+    Blank,
 }
 
 #[derive(Clone)]
