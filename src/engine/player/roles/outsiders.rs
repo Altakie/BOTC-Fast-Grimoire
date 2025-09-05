@@ -220,6 +220,7 @@ impl Role for Drunk {
         return match res {
             Some(mut cr) => {
                 cr.state_change_func = None;
+                cr.description = format!("(*Drunk*) {}", cr.description);
                 Some(cr)
             }
             None => None,
@@ -237,6 +238,7 @@ impl Role for Drunk {
         return match res {
             Some(mut cr) => {
                 cr.state_change_func = None;
+                cr.description = format!("(*Drunk*) {}", cr.description);
                 Some(cr)
             }
             None => None,
