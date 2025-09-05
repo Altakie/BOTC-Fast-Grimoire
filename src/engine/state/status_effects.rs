@@ -88,7 +88,12 @@ pub(crate) trait StatusType: Send + Sync + Display {
     }
 
     /// Should be overwritten if this status effect changes how a player dies
-    fn kill(&self, _attacking_player_index: PlayerIndex, _state: &State) -> Option<bool> {
+    fn kill(
+        &self,
+        _attacking_player_index: PlayerIndex,
+        _target_player_index: PlayerIndex,
+        _state: &State,
+    ) -> Option<bool> {
         None
     }
 

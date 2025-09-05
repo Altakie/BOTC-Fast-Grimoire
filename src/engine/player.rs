@@ -113,27 +113,37 @@ impl Player {
     pub(crate) fn kill(
         &mut self,
         attacking_player_index: PlayerIndex,
+        target_player_index: PlayerIndex,
         state: &State,
     ) -> Option<ChangeRequest> {
         // Status Effects
         // Basically go through each status, see if any prevent the player from dying
         // If any do, prevent the player from dying
         for status_effect in self.status_effects.iter() {
-            if matches!(
-                status_effect.status_type.behavior_type(),
-                Some(&[.., PlayerBehaviors::Kill])
-            ) {
-                if let Some(false) = status_effect
-                    .status_type
-                    .kill(attacking_player_index, state)
-                {
+            if status_effect
+                .status_type
+                .behavior_type()
+                .is_some_and(|behaviors| {
+                    behaviors
+                        .iter()
+                        .any(|behavior| matches!(behavior, PlayerBehaviors::Kill))
+                })
+            {
+                if let Some(false) = status_effect.status_type.kill(
+                    attacking_player_index,
+                    target_player_index,
+                    state,
+                ) {
                     return None;
                 }
             }
         }
 
         // Roles
-        if let Some(cr) = self.role.kill(attacking_player_index, state) {
+        if let Some(cr) = self
+            .role
+            .kill(attacking_player_index, target_player_index, state)
+        {
             return cr;
         }
 
@@ -151,10 +161,15 @@ impl Player {
         // If any do, prevent the player from dying
         let mut dead = true;
         for status_effect in self.status_effects.iter() {
-            if matches!(
-                status_effect.status_type.behavior_type(),
-                Some(&[.., PlayerBehaviors::Execute])
-            ) {
+            if status_effect
+                .status_type
+                .behavior_type()
+                .is_some_and(|behaviors| {
+                    behaviors
+                        .iter()
+                        .any(|behavior| matches!(behavior, PlayerBehaviors::Execute))
+                })
+            {
                 if let Some(false) = status_effect.status_type.execute() {
                     dead = false;
                 }

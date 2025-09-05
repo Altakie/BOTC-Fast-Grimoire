@@ -5,6 +5,12 @@
 
 - Maybe have code cleanup?? Or at least code review where you check if stuff makes still makes sense/ can be better?
   - Do this after scarletwoman and mayor are implemented
+  - Maybe I am being too strict in how I allow roles to modify the game
+  - Maybe all interactions with a role (besides getters) should return some kind of change request that bubbles up and is resolved?
+  - IE: Executions, Nominations, kills abilities
+  - Maybe i should be passing along state a lot more than I am
+  - Roles obviously should be able to be swapped out, so they must be stored within an arc, but I also want them to have interior mutability, because recreating them each time is kind of annoying (or maybe this is not an issue).
+  - Rethink change requests slightly (not completely) to see if they should work a little differently. See if there are any ways to make writing roles less grueling and less boilerplate.
 - End of game
   - Gather win conditions at the start of the game, and also when they should be checked. Respond to log events that correspond to the win condition's trigger?
   - Win condition should have a trigger, like a death, or a day switch event?

@@ -54,12 +54,12 @@ fn App() -> impl IntoView {
         roles.set(vec![
             Roles::Ravenkeeper,
             Roles::Virgin,
-            Roles::Undertaker,
+            Roles::Monk,
             Roles::Slayer,
             // Role::Monk,
             Roles::Librarian,
-            Roles::Empath,
-            Roles::Baron,
+            Roles::Poisoner,
+            Roles::Mayor,
             Roles::Imp,
         ]);
 

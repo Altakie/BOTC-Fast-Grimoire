@@ -60,7 +60,10 @@ impl Role for Imp {
         let change_func = move |state: &mut State, args: ChangeArgs| -> Option<ChangeRequest> {
             let target_players = unwrap_args_panic!(args, ChangeArgs::PlayerIndices(pv) => pv);
             let target_player_index = target_players[0];
-            state.kill(player_index, target_player_index);
+            let kill_cr = state.kill(player_index, target_player_index);
+            if kill_cr.is_some() {
+                return kill_cr;
+            }
 
             if target_player_index == player_index && state.get_player(player_index).dead {
                 let description = "Choose a new Imp";

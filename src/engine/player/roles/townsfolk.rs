@@ -16,6 +16,18 @@ use crate::{
     unwrap_args_err, unwrap_args_panic,
 };
 
+fn check_len<T>(vec: &Vec<T>, desired_len: usize) -> Result<(), ChangeError> {
+    let len = vec.len();
+    if len != desired_len {
+        return Err(ChangeError::WrongNumberOfSelectedPlayers {
+            wanted: desired_len,
+            got: len,
+        });
+    }
+
+    return Ok(());
+}
+
 fn washerwoman_librarian_investigator<
     RE: StatusType + Default + 'static,
     WE: StatusType + Default + 'static,
@@ -33,13 +45,7 @@ fn washerwoman_librarian_investigator<
     let right_check_func = move |state: &State, args: &ChangeArgs| -> Result<bool, ChangeError> {
         let target_player_indices = unwrap_args_err!(args, ChangeArgs::PlayerIndices(v) => v);
 
-        let len = target_player_indices.len();
-        if len != 1 {
-            return Err(ChangeError::WrongNumberOfSelectedPlayers {
-                wanted: 1,
-                got: len,
-            });
-        }
+        check_len(target_player_indices, 1)?;
 
         for target_player_index in target_player_indices {
             if *target_player_index == player_index {
@@ -72,13 +78,7 @@ fn washerwoman_librarian_investigator<
               -> Result<bool, ChangeError> {
             let target_player_indices = unwrap_args_err!(args, ChangeArgs::PlayerIndices(v) => v);
 
-            let len = target_player_indices.len();
-            if len != 1 {
-                return Err(ChangeError::WrongNumberOfSelectedPlayers {
-                    wanted: 1,
-                    got: len,
-                });
-            }
+            check_len(target_player_indices, 1)?;
 
             let target_player_index = target_player_indices[0];
 
@@ -501,17 +501,12 @@ impl Fortuneteller {
         let change_type = ChangeType::ChoosePlayers(2);
 
         let check_func = move |_state: &State, args: &ChangeArgs| -> Result<bool, ChangeError> {
-            let target_players = unwrap_args_err!(args, ChangeArgs::PlayerIndices(pv) => pv);
-            let len = target_players.len();
-            if len != 2 {
-                return Err(ChangeError::WrongNumberOfSelectedPlayers {
-                    wanted: 2,
-                    got: len,
-                });
-            }
+            let target_player_indices = unwrap_args_err!(args, ChangeArgs::PlayerIndices(pv) => pv);
+
+            check_len(target_player_indices, 2)?;
 
             // Make sure there are no duplicate players
-            if target_players[0] == target_players[1] {
+            if target_player_indices[0] == target_player_indices[1] {
                 return Err(ChangeError::InvalidSelectedPlayer {
                     reason: "Please select unique players".into(),
                 });
@@ -575,17 +570,11 @@ impl Role for Fortuneteller {
 
         let change_type = ChangeType::ChoosePlayers(1);
         let check_func = move |_: &State, args: &ChangeArgs| -> Result<bool, ChangeError> {
-            let target_players = unwrap_args_err!(args, ChangeArgs::PlayerIndices(v) => v);
+            let target_player_indices = unwrap_args_err!(args, ChangeArgs::PlayerIndices(v) => v);
 
-            let len = target_players.len();
-            if target_players.len() != 1 {
-                return Err(ChangeError::WrongNumberOfSelectedPlayers {
-                    wanted: 1,
-                    got: len,
-                });
-            }
+            check_len(target_player_indices, 1)?;
 
-            if target_players[0] == player_index {
+            if target_player_indices[0] == player_index {
                 return Ok(false);
             }
 
@@ -657,7 +646,6 @@ impl Role for Undertaker {
             return None;
         }
 
-        // TODO: Change search method to only search the previous day
         let execution_event = state.log.search_previous_phase(|e| match *e {
             log::Event::Execution(_) => Some(e),
             _ => None,
@@ -706,7 +694,12 @@ impl StatusType for DemonProtected {
         Some(&self.behaviors)
     }
 
-    fn kill(&self, attacking_player_index: PlayerIndex, state: &State) -> Option<bool> {
+    fn kill(
+        &self,
+        attacking_player_index: PlayerIndex,
+        _target_player_index: PlayerIndex,
+        state: &State,
+    ) -> Option<bool> {
         let attacking_player = state.get_player(attacking_player_index);
         if attacking_player.role.get_true_character_type() == CharacterType::Demon {
             return Some(false);
@@ -744,18 +737,12 @@ impl Role for Monk {
         let message = "Have the monk select a player to protect";
 
         let check_func = move |_: &State, args: &ChangeArgs| -> Result<bool, ChangeError> {
-            let target_players = unwrap_args_err!(args, ChangeArgs::PlayerIndices(v) => v);
+            let target_player_indices = unwrap_args_err!(args, ChangeArgs::PlayerIndices(v) => v);
 
-            let len = target_players.len();
-            if len != 1 {
-                return Err(ChangeError::WrongNumberOfSelectedPlayers {
-                    wanted: 1,
-                    got: len,
-                });
-            }
+            check_len(target_player_indices, 1)?;
 
             // Make sure the monk can't protect themselves
-            if target_players[0] == player_index {
+            if target_player_indices[0] == player_index {
                 return Ok(false);
             }
 
@@ -827,14 +814,8 @@ impl Role for Ravenkeeper {
         let change_type = ChangeType::ChoosePlayers(1);
 
         let check_func = move |_state: &State, args: &ChangeArgs| -> Result<bool, ChangeError> {
-            let target_players = unwrap_args_err!(args, ChangeArgs::PlayerIndices(pv) => pv);
-            let len = target_players.len();
-            if len != 1 {
-                return Err(ChangeError::WrongNumberOfSelectedPlayers {
-                    wanted: 1,
-                    got: len,
-                });
-            }
+            let target_player_indices = unwrap_args_err!(args, ChangeArgs::PlayerIndices(pv) => pv);
+            check_len(target_player_indices, 1)?;
 
             return Ok(true);
         };
@@ -944,32 +925,24 @@ impl Role for Slayer {
         let description = "Prompt the slayer to point to a player";
 
         let check_func = move |_state: &State, args: &ChangeArgs| -> Result<bool, ChangeError> {
-            let target_players = unwrap_args_err!(args, ChangeArgs::PlayerIndices(pv) => pv);
-            let len = target_players.len();
-            if len != 1 {
-                return Err(ChangeError::WrongNumberOfSelectedPlayers {
-                    wanted: 1,
-                    got: len,
-                });
-            }
+            let target_player_indices = unwrap_args_err!(args, ChangeArgs::PlayerIndices(pv) => pv);
+            check_len(target_player_indices, 1)?;
 
             return Ok(true);
         };
 
         let change_func = move |state: &mut State, args: ChangeArgs| -> Option<ChangeRequest> {
-            let target_players = unwrap_args_panic!(args, ChangeArgs::PlayerIndices(pv) => pv);
-
-            let state_snapshot = state.clone();
-            let target_player = state.get_player_mut(target_players[0]);
-
-            if target_player.get_character_type() == CharacterType::Demon {
-                target_player.kill(player_index, &state_snapshot);
-            }
-
             let slayer = state.get_player_mut(player_index);
             slayer
                 .role
                 .reassign(RolePtr::from(Self { ability_used: true }));
+
+            let target_players = unwrap_args_panic!(args, ChangeArgs::PlayerIndices(pv) => pv);
+            let target_player = state.get_player_mut(target_players[0]);
+
+            if target_player.get_character_type() == CharacterType::Demon {
+                return state.kill(player_index, target_players[0]);
+            }
 
             None
         };
@@ -1002,10 +975,15 @@ impl Role for Soldier {
     }
 
     // Overwrite kill method for Soldier so they can't be killed by a demon
-    fn kill(&self, attacking_player_index: PlayerIndex, state: &State) -> Option<bool> {
+    fn kill(
+        &self,
+        attacking_player_index: PlayerIndex,
+        _target_player_index: PlayerIndex,
+        state: &State,
+    ) -> Option<Option<ChangeRequest>> {
         let attacking_player = state.get_player(attacking_player_index);
         if attacking_player.role.get_true_character_type() == CharacterType::Demon {
-            return Some(false);
+            return Some(None);
         }
 
         None
@@ -1019,7 +997,7 @@ impl Display for Soldier {
 }
 
 #[derive(Default)]
-struct Mayor();
+pub(crate) struct Mayor();
 
 impl Role for Mayor {
     fn get_default_alignment(&self) -> Alignment {
@@ -1030,16 +1008,56 @@ impl Role for Mayor {
         CharacterType::Townsfolk
     }
 
-    // TODO: Overwrite kill for mayor. Perhaps kill should also trigger a change request or
-    // something like that. OR STORE IT FOR LATER?
-    fn kill(&self, _attacking_player_index: PlayerIndex, _state: &State) -> Option<bool> {
-        todo!()
+    fn kill(
+        &self,
+        attacking_player_index: PlayerIndex,
+        player_index: PlayerIndex,
+        _state: &State,
+    ) -> Option<Option<ChangeRequest>> {
+        // TODO: Technically shouldn't be the mayor killing themselves but this works for now
+        // Needed to prevent an infinite loop
+        // Allow the mayor to kill themselves
+        if attacking_player_index == player_index {
+            return None;
+        }
+
+        let change_type = ChangeType::ChoosePlayers(1);
+        let description = "Choose a player to die (the mayor may bounce a kill)";
+
+        let check_func = move |state: &State, args: &ChangeArgs| -> Result<bool, ChangeError> {
+            let target_player_indices = unwrap_args_err!(args, ChangeArgs::PlayerIndices(pv) => pv);
+            check_len(target_player_indices, 1)?;
+
+            return Ok(true);
+        };
+
+        let change_func = move |state: &mut State, args: ChangeArgs| -> Option<ChangeRequest> {
+            let target_player_indices =
+                unwrap_args_panic!(args, ChangeArgs::PlayerIndices(pv) => pv);
+            let target_player_index = target_player_indices[0];
+
+            let kill_cr = state.kill(player_index, target_player_index);
+
+            // Stop infinite loop of mayor bouncing kills
+            if target_player_index != player_index {
+                return kill_cr;
+            }
+
+            None
+        };
+
+        Some(Some(ChangeRequest::new(
+            change_type,
+            description.into(),
+            check_func,
+            change_func,
+        )))
     }
 }
 
 impl Display for Mayor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("Soldier")
+        f.write_str("Mayor")
     }
 }
 

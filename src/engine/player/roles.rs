@@ -145,10 +145,15 @@ pub(crate) trait Role: Display + Send + Sync {
 
     /// A kill condition for this role
     /// # Return
-    ///     * Returns a Option<bool> based on whether or not the role overwrites the default kill behavior of
-    ///     the player. By default, it does not do anything and returns None. A true indicates the
-    ///     player should die.
-    fn kill(&self, _attacking_player_index: PlayerIndex, _state: &State) -> Option<bool> {
+    ///     * Returns a Option<ChangeRequest> based on whether or not the role overwrites the default kill behavior of
+    ///     the player. By default, it does not do anything and returns None. If there is special
+    ///     behavior when the player dies, then it will return Some(ChangeRequest)
+    fn kill(
+        &self,
+        _attacking_player_index: PlayerIndex,
+        _target_player_index: PlayerIndex,
+        _state: &State,
+    ) -> Option<Option<ChangeRequest>> {
         return None;
     }
 
@@ -250,7 +255,7 @@ impl Roles {
             Roles::Virgin => RolePtr::new::<Virgin>(),
             Roles::Soldier => RolePtr::new::<Soldier>(),
             Roles::Slayer => RolePtr::new::<Slayer>(),
-            Roles::Mayor => todo!(),
+            Roles::Mayor => RolePtr::new::<Mayor>(),
             Roles::Monk => RolePtr::new::<Monk>(),
             Roles::Ravenkeeper => RolePtr::new::<Ravenkeeper>(),
             Roles::Drunk => RolePtr::new::<Drunk>(),

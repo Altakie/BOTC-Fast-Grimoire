@@ -238,19 +238,26 @@ impl State {
         &mut self,
         attacking_player_index: PlayerIndex,
         target_player_index: PlayerIndex,
-    ) {
+    ) -> Option<ChangeRequest> {
         self.log.log_event(Event::AttemptedKill {
             attacking_player_index,
             target_player_index,
         });
         let state_snapshot = self.clone();
-        self.get_player_mut(target_player_index)
-            .kill(attacking_player_index, &state_snapshot);
+
+        let cr = self.get_player_mut(target_player_index).kill(
+            attacking_player_index,
+            target_player_index,
+            &state_snapshot,
+        );
+
         let dead = self.get_player(target_player_index).dead;
         if dead {
             self.cleanup_player_statuses(target_player_index);
             self.log.log_event(Event::Death(target_player_index));
         }
+
+        return cr;
     }
 }
 
