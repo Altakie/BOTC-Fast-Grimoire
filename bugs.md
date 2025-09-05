@@ -4,7 +4,10 @@
 
 ### Major Bugs
 
-- Scarletwoman is not implemented
+- Scarletwoman
+  - Disregard all else that is said about Scarletwoman
+  - She works, but needs to be used through a day ability
+  - That is, she won't trigger automatically, but you can still put her in the game if you need her
 - Mayor
   - If bounces a kill onto a protected player, it will kill them (not intentional), attempt to bounce on dead player if possible
 - Scarletwoman
