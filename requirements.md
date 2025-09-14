@@ -18,6 +18,8 @@
 - Event logging for all events (and in roles)
   - Most likely just add loggers to the main event methods (kill, execute, nominate, switch day) etc..
 - Players should no longer deliver change requests when dead, fix this to make it more idiomatic
+- Get a way to replace sticky notes
+  - You are blah blah blah
 - Add travellers
 - Replaying the log
 - Add tests for all roles (and transfer old ones)

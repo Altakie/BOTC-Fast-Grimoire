@@ -1,4 +1,6 @@
 #![allow(clippy::needless_return)]
+use std::fmt::format;
+
 use leptos::mount::mount_to_body;
 use leptos::{
     leptos_dom::logging::{console_error, console_log},
@@ -1122,7 +1124,7 @@ fn LogDisplay() -> impl IntoView {
         <div class="border">
         <h2>"Log"</h2>
         <div>
-            {move || format!("{:?}", state.log().get())}
+            {move || {console_log(&format!("{:#?}", state.log().get())); format!("{:#?}", state.log().get())}}
         </div>
         </div>
     }
