@@ -72,19 +72,19 @@ impl Debug for ChangeRequest {
     }
 }
 
-pub type FilterFunc = dyn Fn(&Player) -> bool + Send + Sync;
+pub type FilterFunc = dyn Fn(PlayerIndex, &Player) -> bool + Send + Sync;
 #[derive(Clone)]
 pub struct FilterFuncPtr(Arc<FilterFunc>);
 impl FilterFuncPtr {
     pub fn new<F>(func: F) -> Self
     where
-        F: Fn(&Player) -> bool + Send + Sync + 'static,
+        F: Fn(PlayerIndex, &Player) -> bool + Send + Sync + 'static,
     {
         Self(Arc::new(func))
     }
 
-    pub fn call(&self, player: &Player) -> bool {
-        self.0(player)
+    pub fn call(&self, player_index: PlayerIndex, player: &Player) -> bool {
+        self.0(player_index, player)
     }
 }
 

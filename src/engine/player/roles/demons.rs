@@ -1,5 +1,5 @@
 use crate::engine::{
-    change_request::{ChangeResult, StateChangeFuncPtr, check_len},
+    change_request::{ChangeResult, FilterFuncPtr, StateChangeFuncPtr, check_len},
     player::roles::RolePtr,
 };
 use std::fmt::Display;
@@ -58,6 +58,14 @@ impl Role for Imp {
                 let description = "Choose a new Imp";
                 let change_type = ChangeType::ChoosePlayers(1);
 
+                let filter_func = FilterFuncPtr::new(move |_, player| {
+                    if player.role.get_true_character_type() == CharacterType::Minion {
+                        return true;
+                    }
+
+                    false
+                });
+
                 let change_func = StateChangeFuncPtr::new(move |state, args| {
                     let target_players = args.extract_player_indicies()?;
                     check_len(&target_players, 1)?;
@@ -81,7 +89,13 @@ impl Role for Imp {
                     Ok(None)
                 });
 
-                return ChangeRequest::new(change_type, description.into(), change_func).into();
+                return ChangeRequest::new_with_filter(
+                    change_type,
+                    description.into(),
+                    filter_func,
+                    change_func,
+                )
+                .into();
             }
 
             return Ok(None);
