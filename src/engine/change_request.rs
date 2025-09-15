@@ -1,8 +1,10 @@
+use crate::engine::player::Player;
+
 use super::{
     player::roles::Roles,
     state::{PlayerIndex, State},
 };
-use std::{fmt::Debug, sync::Arc};
+use std::{borrow::Cow, fmt::Debug, ops::Deref, sync::Arc};
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum ChangeType {
@@ -21,10 +23,38 @@ pub(crate) enum ChangeArgs {
     Blank,
 }
 
+impl ChangeArgs {
+    pub fn extract_player_indicies(&self) -> Result<Vec<PlayerIndex>, ChangeError> {
+        match self {
+            ChangeArgs::PlayerIndices(items) => Ok(items.to_owned()),
+            _ => Err(ChangeError::WrongArgType),
+        }
+    }
+
+    pub fn extract_roles(self) -> Result<Vec<Roles>, ChangeError> {
+        match self {
+            ChangeArgs::Roles(items) => Ok(items.to_owned()),
+            _ => Err(ChangeError::WrongArgType),
+        }
+    }
+}
+
+pub fn check_len<T>(vec: &[T], desired_len: usize) -> Result<(), ChangeError> {
+    let len = vec.len();
+    if len != desired_len {
+        return Err(ChangeError::WrongNumberOfSelectedPlayers {
+            wanted: desired_len,
+            got: len,
+        });
+    }
+
+    return Ok(());
+}
+
 #[derive(Clone)]
 pub(crate) struct ChangeRequest {
     pub(crate) change_type: ChangeType,
-    pub(crate) check_func: Option<CheckFuncPtr>,
+    pub(crate) filter_func: Option<FilterFuncPtr>,
     pub(crate) state_change_func: Option<StateChangeFuncPtr>,
     pub(crate) description: String,
 }
@@ -42,68 +72,73 @@ impl Debug for ChangeRequest {
     }
 }
 
-// TODO: This should return a Result<Option<bool>> unless we want to return some sort of error
-// message as to why the result is invalid. Then we should make the result type a string or
-// some sort of error type enum
-// Types of errors:
-// Invalid Player(s) selected (reason)
-// Wrong Number of players selected(required, current)
-pub type CheckFunc = dyn Fn(&State, &ChangeArgs) -> Result<bool, ChangeError> + Send + Sync;
+pub type FilterFunc = dyn Fn(&Player) -> bool + Send + Sync;
 #[derive(Clone)]
-pub struct CheckFuncPtr(Arc<CheckFunc>);
-impl CheckFuncPtr {
+pub struct FilterFuncPtr(Arc<FilterFunc>);
+impl FilterFuncPtr {
     pub fn new<F>(func: F) -> Self
     where
-        F: Fn(&State, &ChangeArgs) -> Result<bool, ChangeError> + Send + Sync + 'static,
+        F: Fn(&Player) -> bool + Send + Sync + 'static,
     {
         Self(Arc::new(func))
     }
 
-    pub fn call(&self, state: &State, args: &ChangeArgs) -> Result<bool, ChangeError> {
-        self.0(state, args)
+    pub fn call(&self, player: &Player) -> bool {
+        self.0(player)
     }
 }
 
 // impl From<Arc<CheckFunc>> for CheckFuncPtr {
-//     fn from(
+//     fn from
 //         value: Arc<dyn Fn(&State, &ChangeArgs) -> Result<bool, ChangeError> + Send + Sync>,
 //     ) -> Self {
 //         Self(value)
 //     }
 // }
 
-pub type StateChangeFunc = dyn Fn(&mut State, ChangeArgs) -> Option<ChangeRequest> + Send + Sync;
+pub type StateChangeFunc = dyn Fn(&mut State, ChangeArgs) -> ChangeResult + Send + Sync;
 #[derive(Clone)]
 pub struct StateChangeFuncPtr(Arc<StateChangeFunc>);
 
 impl StateChangeFuncPtr {
     pub fn new<F>(func: F) -> Self
     where
-        F: Fn(&mut State, ChangeArgs) -> Option<ChangeRequest> + Send + Sync + 'static,
+        F: Fn(&mut State, ChangeArgs) -> ChangeResult + Send + Sync + 'static,
     {
         Self(Arc::new(func))
     }
 
-    pub fn call(&self, state: &mut State, args: ChangeArgs) -> Option<ChangeRequest> {
+    pub fn call(&self, state: &mut State, args: ChangeArgs) -> ChangeResult {
         self.0(state, args)
     }
 }
 
 impl ChangeRequest {
-    pub(crate) fn new<Cf, Scf>(
+    pub(crate) fn new(
         change_type: ChangeType,
         description: String,
-        check_func: Cf,
-        state_change_func: Scf,
+        state_change_func: StateChangeFuncPtr,
     ) -> Self
-    where
-        Cf: Fn(&State, &ChangeArgs) -> Result<bool, ChangeError> + Send + Sync + 'static,
-        Scf: Fn(&mut State, ChangeArgs) -> Option<ChangeRequest> + Send + Sync + 'static,
-    {
+where {
         Self {
             change_type,
-            check_func: Some(CheckFuncPtr::new(check_func)),
-            state_change_func: Some(StateChangeFuncPtr::new(state_change_func)),
+            filter_func: None,
+            state_change_func: Some(state_change_func),
+            description,
+        }
+    }
+
+    pub(crate) fn new_with_filter(
+        change_type: ChangeType,
+        description: String,
+        filter_func: FilterFuncPtr,
+        state_change_func: StateChangeFuncPtr,
+    ) -> Self
+where {
+        Self {
+            change_type,
+            filter_func: Some(filter_func),
+            state_change_func: Some(state_change_func),
             description,
         }
     }
@@ -111,7 +146,7 @@ impl ChangeRequest {
     pub(crate) fn new_display(change_type: ChangeType, description: String) -> Self {
         Self {
             change_type,
-            check_func: None,
+            filter_func: None,
             state_change_func: None,
             description,
         }
@@ -121,28 +156,17 @@ impl ChangeRequest {
 #[derive(Clone, Debug)]
 pub enum ChangeError {
     InvalidSelectedPlayer { reason: String },
+    InvalidSelectedRole { reason: String },
     WrongNumberOfSelectedPlayers { wanted: usize, got: usize },
     WrongNumberOfSelectedRoles { wanted: usize, got: usize },
     WrongArgType,
+    BlankArgs,
 }
 
-#[macro_export]
-/// Unwrap args and return an error if it's the wrong arg type. Takes in (args, pattern => guard)
-macro_rules! unwrap_args_err {
-    ($args:expr,$pat:pat => $guard:expr) => {
-        match $args {
-            $pat => $guard,
-            _ => return Err(ChangeError::WrongArgType),
-        }
-    };
-}
+pub type ChangeResult = Result<Option<ChangeRequest>, ChangeError>;
 
-#[macro_export]
-macro_rules! unwrap_args_panic {
-    ($args:expr,$pat:pat => $guard:expr) => {
-        match $args {
-            $pat => $guard,
-            _ => panic!("Wrong Args"),
-        }
-    };
+impl From<ChangeRequest> for ChangeResult {
+    fn from(value: ChangeRequest) -> Self {
+        Ok(Some(value))
+    }
 }

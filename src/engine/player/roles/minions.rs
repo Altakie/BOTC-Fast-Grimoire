@@ -3,7 +3,7 @@ use std::{fmt::Display, sync::Arc};
 
 use crate::{
     engine::{
-        change_request::{ChangeArgs, ChangeError, ChangeRequest, ChangeType},
+        change_request::{ChangeRequest, ChangeType, StateChangeFuncPtr, check_len},
         player::{
             Alignment, CharacterType,
             roles::{Role, RolePtr, demons::Imp},
@@ -14,7 +14,6 @@ use crate::{
         },
     },
     initialization::CharacterTypeCounts,
-    unwrap_args_err, unwrap_args_panic,
 };
 
 #[derive(Default)]
@@ -24,7 +23,7 @@ impl Spy {
         let change_type = ChangeType::Display;
         let message = "Show the Spy the grimoire";
 
-        Some(ChangeRequest::new_display(change_type, message.into()))
+        ChangeRequest::new_display(change_type, message.into()).into()
     }
 }
 
@@ -115,41 +114,22 @@ impl Poisoner {
         let message = "Prompt the poisoner to pick a player to poison";
         let change_type = ChangeType::ChoosePlayers(1);
 
-        let check_func = move |_: &State, args: &ChangeArgs| -> Result<bool, ChangeError> {
-            let target_players = unwrap_args_err!(args, ChangeArgs::PlayerIndices(v) => v);
+        let state_change_func = StateChangeFuncPtr::new(move |state, args| {
+            let target_players = args.extract_player_indicies()?;
+            check_len(&target_players, 1)?;
 
-            let len = target_players.len();
-            if target_players.len() != 1 {
-                return Err(ChangeError::WrongNumberOfSelectedRoles {
-                    wanted: 1,
-                    got: len,
-                });
-            }
+            let target_player = state.get_player_mut(target_players[0]);
+            let status = StatusEffect::new(
+                Arc::new(Poisoned {}),
+                player_index,
+                CleanupPhase::Dusk.into(),
+            );
+            target_player.add_status(status);
 
-            return Ok(true);
-        };
+            Ok(None)
+        });
 
-        let state_change_func =
-            move |state: &mut State, args: ChangeArgs| -> Option<ChangeRequest> {
-                let target_player_index =
-                    unwrap_args_panic!(args, ChangeArgs::PlayerIndices(pv) => pv)[0];
-                let target_player = state.get_player_mut(target_player_index);
-                let status = StatusEffect::new(
-                    Arc::new(Poisoned {}),
-                    player_index,
-                    CleanupPhase::Dusk.into(),
-                );
-                target_player.add_status(status);
-
-                None
-            };
-
-        Some(ChangeRequest::new(
-            change_type,
-            message.to_string(),
-            check_func,
-            state_change_func,
-        ))
+        ChangeRequest::new(change_type, message.to_string(), state_change_func).into()
     }
 }
 
@@ -209,7 +189,7 @@ impl Role for ScarletWoman {
     //     Some(28)
     // }
 
-    // fn night_ability(&self, _player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
+    // fn night_ability(&self, _player_index: PlayerIndex, state: &State) -> ChangeResult {
     //     // TODO: This might be a little tricky because the scarlet woman should immediately become
     //     // demon when the demon dies. Potentially could have role abilities trigger on events that
     //     // are added to the log as well. This could be useful for scarlet woman. Then have a method
@@ -256,20 +236,13 @@ impl Role for ScarletWoman {
 
         let change_type = ChangeType::NoStoryteller;
         let description = "The Scarletwoman becomes the imp";
-        let check_func =
-            move |state: &State, args: &ChangeArgs| -> Result<bool, ChangeError> { Ok(true) };
-        let change_func = move |state: &mut State, args: ChangeArgs| -> Option<ChangeRequest> {
+        let change_func = StateChangeFuncPtr::new(move |state, args| {
             let scarlet_woman = state.get_player_mut(player_index);
             scarlet_woman.role.reassign(RolePtr::new::<Imp>());
-            None
-        };
+            Ok(None)
+        });
 
-        Some(ChangeRequest::new(
-            change_type,
-            description.into(),
-            check_func,
-            change_func,
-        ))
+        ChangeRequest::new(change_type, description.into(), change_func).into()
     }
 }
 

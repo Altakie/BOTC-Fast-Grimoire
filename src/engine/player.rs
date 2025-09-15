@@ -2,7 +2,7 @@ use reactive_stores::Store;
 use std::fmt::{Debug, Display};
 
 use crate::engine::{
-    change_request::{ChangeArgs, ChangeRequest},
+    change_request::{ChangeArgs, ChangeRequest, ChangeResult},
     player::roles::{Role, RolePtr},
     state::{
         PlayerIndex, State, Step,
@@ -115,7 +115,7 @@ impl Player {
         attacking_player_index: PlayerIndex,
         target_player_index: PlayerIndex,
         state: &State,
-    ) -> Option<ChangeRequest> {
+    ) -> ChangeResult {
         // Status Effects
         // Basically go through each status, see if any prevent the player from dying
         // If any do, prevent the player from dying
@@ -134,7 +134,7 @@ impl Player {
                     target_player_index,
                     state,
                 ) {
-                    return None;
+                    return Ok(None);
                 }
             }
         }
@@ -150,7 +150,7 @@ impl Player {
         // Default behavior
         self.dead = true;
 
-        None
+        Ok(None)
     }
 
     /// Default behavior is that the player dies. If the player does not die, it should be because
@@ -252,7 +252,7 @@ impl Player {
             cr.description = format!("(*{}*) ", status_effect) + cr.description.as_str();
         }
 
-        return Some(cr);
+        return cr.into();
     }
 
     /// If the role has an ability that acts during the night (not including night one), this method should be overwritten and return
@@ -280,7 +280,7 @@ impl Player {
             cr.description = format!("(*{}*) ", status_effect) + cr.description.as_str();
         }
 
-        return Some(cr);
+        return cr.into();
     }
 
     /// If the role has an ability that acts during the day (not including night one), this method should be overwritten and indicate which part(s) of the day this ability can be triggered during

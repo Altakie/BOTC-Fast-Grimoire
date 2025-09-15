@@ -1,32 +1,18 @@
 use std::fmt::Display;
 use std::sync::Arc;
 
+use crate::engine::change_request::{ChangeResult, StateChangeFuncPtr};
 use crate::engine::player::roles::RolePtr;
 use crate::engine::state::log;
 use crate::engine::state::status_effects::CleanupPhase;
-use crate::{
-    engine::{
-        change_request::{ChangeArgs, ChangeError, ChangeRequest, ChangeType},
-        player::{Alignment, CharacterType, PlayerBehaviors, roles::Role},
-        state::{
-            PlayerIndex, State,
-            status_effects::{StatusEffect, StatusType},
-        },
+use crate::engine::{
+    change_request::{ChangeError, ChangeRequest, ChangeType, check_len},
+    player::{Alignment, CharacterType, PlayerBehaviors, roles::Role},
+    state::{
+        PlayerIndex, State,
+        status_effects::{StatusEffect, StatusType},
     },
-    unwrap_args_err, unwrap_args_panic,
 };
-
-fn check_len<T>(vec: &Vec<T>, desired_len: usize) -> Result<(), ChangeError> {
-    let len = vec.len();
-    if len != desired_len {
-        return Err(ChangeError::WrongNumberOfSelectedPlayers {
-            wanted: desired_len,
-            got: len,
-        });
-    }
-
-    return Ok(());
-}
 
 fn washerwoman_librarian_investigator<
     RE: StatusType + Default + 'static,
@@ -36,93 +22,71 @@ fn washerwoman_librarian_investigator<
     character_type: CharacterType,
 ) -> Option<ChangeRequest> {
     let right_description = format!("Select a {}", &character_type.to_string());
+    let change_type = ChangeType::ChoosePlayers(1);
 
     let right_status =
         move || StatusEffect::new(std::sync::Arc::new(RE::default()), player_index, None);
 
-    let change_type = ChangeType::ChoosePlayers(1);
+    let wrong_status =
+        move || StatusEffect::new(std::sync::Arc::new(WE::default()), player_index, None);
 
-    let right_check_func = move |state: &State, args: &ChangeArgs| -> Result<bool, ChangeError> {
-        let target_player_indices = unwrap_args_err!(args, ChangeArgs::PlayerIndices(v) => v);
-
-        check_len(target_player_indices, 1)?;
-
-        for target_player_index in target_player_indices {
-            if *target_player_index == player_index {
-                return Ok(false);
-            }
-
-            let ct = state.get_player(*target_player_index).get_character_type();
-            if ct == character_type || ct == CharacterType::Any {
-                return Ok(true);
-            }
-        }
-
-        return Ok(false);
-    };
-
-    let right_state_change = move |state: &mut State, args: ChangeArgs| -> Option<ChangeRequest> {
-        let target_player_indices = unwrap_args_panic!(args, ChangeArgs::PlayerIndices(v) => v);
+    let right_state_change = StateChangeFuncPtr::new(move |state, args| {
+        let target_player_indices = args.extract_player_indicies()?;
+        check_len(&target_player_indices, 1)?;
 
         let target_player = state.get_player_mut(target_player_indices[0]);
         target_player.add_status(right_status());
 
-        let wrong_status =
-            move || StatusEffect::new(std::sync::Arc::new(WE::default()), player_index, None);
-        let wrong_description = "Select a different player";
+        return washerwoman_librarian_investigator_wrong(player_index, right_status, wrong_status);
+    });
 
-        let wrong_change_type = ChangeType::ChoosePlayers(1);
+    return ChangeRequest::new(change_type, right_description.into(), right_state_change).into();
+}
 
-        let wrong_check_func = move |state: &State,
-                                     args: &ChangeArgs|
-              -> Result<bool, ChangeError> {
-            let target_player_indices = unwrap_args_err!(args, ChangeArgs::PlayerIndices(v) => v);
+fn washerwoman_librarian_investigator_wrong(
+    player_index: PlayerIndex,
+    right_status: impl Fn() -> StatusEffect + Send + Sync + 'static,
+    wrong_status: impl Fn() -> StatusEffect + Send + Sync + 'static,
+) -> ChangeResult {
+    let wrong_description = "Select a different player";
+    let wrong_change_type = ChangeType::ChoosePlayers(1);
 
-            check_len(target_player_indices, 1)?;
+    let wrong_state_change = StateChangeFuncPtr::new(move |state, args| {
+        let target_player_indices = args.extract_player_indicies()?;
+        check_len(&target_player_indices, 1)?;
 
-            let target_player_index = target_player_indices[0];
+        let target_player_index = target_player_indices[0];
 
-            if target_player_index == player_index {
-                return Ok(false);
-            }
+        if target_player_index == player_index {
+            return Err(ChangeError::InvalidSelectedPlayer {
+                reason: "TODO".to_string(),
+            });
+        }
 
-            let target_player = state.get_player(target_player_index);
-            if target_player
-                .get_statuses()
-                .iter()
-                .any(|se| *se == right_status())
-            {
-                return Ok(false);
-            }
-            return Ok(true);
-        };
+        let target_player = state.get_player(target_player_index);
+        if target_player
+            .get_statuses()
+            .iter()
+            .any(|se| *se == right_status())
+        {
+            return Err(ChangeError::InvalidSelectedPlayer {
+                reason: "TODO".to_string(),
+            });
+        }
 
-        let wrong_state_change = move |state: &mut State,
-                                       args: ChangeArgs|
-              -> Option<ChangeRequest> {
-            let target_player_indices = unwrap_args_panic!(args, ChangeArgs::PlayerIndices(v) => v);
+        // Assign the chosen player the wrong status effect
+        let target_player = state.get_player_mut(target_player_indices[0]);
+        target_player.add_status(wrong_status());
 
-            // Assign the chosen player the wrong status effect
-            let target_player = state.get_player_mut(target_player_indices[0]);
-            target_player.add_status(wrong_status());
+        Ok(None)
+    });
 
-            None
-        };
-
-        return Some(ChangeRequest::new(
-            wrong_change_type,
-            wrong_description.into(),
-            wrong_check_func,
-            wrong_state_change,
-        ));
-    };
-
-    return Some(ChangeRequest::new(
-        change_type,
-        right_description.into(),
-        right_check_func,
-        right_state_change,
-    ));
+    return ChangeRequest::new(
+        wrong_change_type,
+        wrong_description.into(),
+        wrong_state_change,
+    )
+    .into();
 }
 
 #[derive(Default)]
@@ -183,7 +147,7 @@ impl Role for Washerwoman {
         let message = format!("Show the {} the correct roles", player.role);
         let change_type = ChangeType::Display;
 
-        Some(ChangeRequest::new_display(change_type, message))
+        ChangeRequest::new_display(change_type, message).into()
     }
 }
 
@@ -284,7 +248,7 @@ impl Role for Librarian {
         };
         let change_type = ChangeType::Display;
 
-        Some(ChangeRequest::new_display(change_type, message))
+        ChangeRequest::new_display(change_type, message).into()
     }
 }
 
@@ -352,7 +316,7 @@ impl Role for Investigator {
         let message = format!("Show the {} the correct roles", player.role);
         let change_type = ChangeType::Display;
 
-        Some(ChangeRequest::new_display(change_type, message))
+        ChangeRequest::new_display(change_type, message).into()
     }
 }
 
@@ -405,7 +369,7 @@ impl Role for Chef {
             pair_count
         );
 
-        Some(ChangeRequest::new_display(change_type, message))
+        ChangeRequest::new_display(change_type, message).into()
     }
 }
 
@@ -438,7 +402,7 @@ impl Empath {
 
         let change_type = ChangeType::Display;
 
-        Some(ChangeRequest::new_display(change_type, message))
+        ChangeRequest::new_display(change_type, message).into()
     }
 }
 
@@ -500,55 +464,43 @@ impl Fortuneteller {
 
         let change_type = ChangeType::ChoosePlayers(2);
 
-        let check_func = move |_state: &State, args: &ChangeArgs| -> Result<bool, ChangeError> {
-            let target_player_indices = unwrap_args_err!(args, ChangeArgs::PlayerIndices(pv) => pv);
+        let state_change_func = StateChangeFuncPtr::new(move |state, args| {
+            let target_player_indicies = args.extract_player_indicies()?;
 
-            check_len(target_player_indices, 2)?;
+            check_len(&target_player_indicies, 2)?;
 
             // Make sure there are no duplicate players
-            if target_player_indices[0] == target_player_indices[1] {
+            if target_player_indicies[0] == target_player_indicies[1] {
                 return Err(ChangeError::InvalidSelectedPlayer {
                     reason: "Please select unique players".into(),
                 });
             }
 
-            return Ok(true);
-        };
+            // Calculate whether any of the chosen players are either a red herring or a demon
+            let demon_found = target_player_indicies.iter().any(|i| {
+                let player = state.get_player(*i);
+                matches!(
+                    player.get_character_type(),
+                    CharacterType::Demon | CharacterType::Any
+                ) || player.get_statuses().iter().any(|se| {
+                    se.source_player_index == player_index
+                        && se.to_string() == FortunetellerRedHerring().to_string()
+                })
+            });
+            let message = format!(
+                "Show the Fortuneteller a {}",
+                match demon_found {
+                    true => "Thumbs Up",
+                    false => "Thumbs Down",
+                }
+            );
 
-        let state_change_func =
-            move |state: &mut State, args: ChangeArgs| -> Option<ChangeRequest> {
-                let target_players = unwrap_args_panic!(args, ChangeArgs::PlayerIndices(pv) => pv);
+            let change_type = ChangeType::Display;
 
-                // Calculate whether any of the chosen players are either a red herring or a demon
-                let demon_found = target_players.iter().any(|i| {
-                    let player = state.get_player(*i);
-                    matches!(
-                        player.get_character_type(),
-                        CharacterType::Demon | CharacterType::Any
-                    ) || player.get_statuses().iter().any(|se| {
-                        se.source_player_index == player_index
-                            && se.to_string() == FortunetellerRedHerring().to_string()
-                    })
-                });
-                let message = format!(
-                    "Show the Fortuneteller a {}",
-                    match demon_found {
-                        true => "Thumbs Up",
-                        false => "Thumbs Down",
-                    }
-                );
+            ChangeRequest::new_display(change_type, message).into()
+        });
 
-                let change_type = ChangeType::Display;
-
-                Some(ChangeRequest::new_display(change_type, message))
-            };
-
-        Some(ChangeRequest::new(
-            change_type,
-            message.into(),
-            check_func,
-            state_change_func,
-        ))
+        ChangeRequest::new(change_type, message.into(), state_change_func).into()
     }
 }
 
@@ -569,35 +521,28 @@ impl Role for Fortuneteller {
         let description = "Select a red-herring for the Fortune Teller".to_string();
 
         let change_type = ChangeType::ChoosePlayers(1);
-        let check_func = move |_: &State, args: &ChangeArgs| -> Result<bool, ChangeError> {
-            let target_player_indices = unwrap_args_err!(args, ChangeArgs::PlayerIndices(v) => v);
-
-            check_len(target_player_indices, 1)?;
-
-            if target_player_indices[0] == player_index {
-                return Ok(false);
-            }
-
-            return Ok(true);
-        };
         // Get storyteller input on who red-herring is
         // Add a red-herring through status effects
-        let state_change = move |state: &mut State, args: ChangeArgs| -> Option<ChangeRequest> {
-            let target_players = unwrap_args_panic!(args, ChangeArgs::PlayerIndices(v) => v);
-            let target_player_index = target_players[0];
+        let state_change = StateChangeFuncPtr::new(move |state, args| {
+            let target_player_indices = args.extract_player_indicies()?;
+
+            check_len(&target_player_indices, 1)?;
+
+            if target_player_indices[0] == player_index {
+                return Err(ChangeError::InvalidSelectedPlayer {
+                    reason: "Cannot select the fortune teller as their own red-herring".into(),
+                });
+            }
+
+            let target_player_index = target_player_indices[0];
             let target_player = state.get_player_mut(target_player_index);
             let status = StatusEffect::new(Arc::new(FortunetellerRedHerring()), player_index, None);
             target_player.add_status(status);
 
-            None
-        };
+            Ok(None)
+        });
 
-        Some(ChangeRequest::new(
-            change_type,
-            description,
-            check_func,
-            state_change,
-        ))
+        ChangeRequest::new(change_type, description, state_change).into()
     }
 
     fn night_one_order(&self) -> Option<usize> {
@@ -664,7 +609,7 @@ impl Role for Undertaker {
             executed_role
         );
 
-        Some(ChangeRequest::new_display(change_type, description))
+        ChangeRequest::new_display(change_type, description).into()
     }
 }
 
@@ -736,43 +681,32 @@ impl Role for Monk {
         let change_type = ChangeType::ChoosePlayers(1);
         let message = "Have the monk select a player to protect";
 
-        let check_func = move |_: &State, args: &ChangeArgs| -> Result<bool, ChangeError> {
-            let target_player_indices = unwrap_args_err!(args, ChangeArgs::PlayerIndices(v) => v);
+        let state_change_func = StateChangeFuncPtr::new(move |state, args| {
+            // Check if there are any poisoned status effects inflicted by this player and clear
+            // them
+            let target_player_indices = args.extract_player_indicies()?;
 
-            check_len(target_player_indices, 1)?;
+            check_len(&target_player_indices, 1)?;
 
             // Make sure the monk can't protect themselves
             if target_player_indices[0] == player_index {
-                return Ok(false);
+                return Err(ChangeError::InvalidSelectedPlayer {
+                    reason: "Monk cannot protect themselves".into(),
+                });
             }
 
-            return Ok(true);
-        };
+            let target_player = state.get_player_mut(target_player_indices[0]);
+            let status = StatusEffect::new(
+                Arc::new(DemonProtected::default()),
+                player_index,
+                CleanupPhase::Dawn.into(),
+            );
+            target_player.add_status(status);
 
-        let state_change_func =
-            move |state: &mut State, args: ChangeArgs| -> Option<ChangeRequest> {
-                // Check if there are any poisoned status effects inflicted by this player and clear
-                // them
+            Ok(None)
+        });
 
-                let target_player_index =
-                    unwrap_args_panic!(args, ChangeArgs::PlayerIndices(pv) => pv)[0];
-                let target_player = state.get_player_mut(target_player_index);
-                let status = StatusEffect::new(
-                    Arc::new(DemonProtected::default()),
-                    player_index,
-                    CleanupPhase::Dawn.into(),
-                );
-                target_player.add_status(status);
-
-                None
-            };
-
-        Some(ChangeRequest::new(
-            change_type,
-            message.into(),
-            check_func,
-            state_change_func,
-        ))
+        ChangeRequest::new(change_type, message.into(), state_change_func).into()
     }
 }
 
@@ -813,20 +747,16 @@ impl Role for Ravenkeeper {
         let message = "Prompt the Ravenkeeper to point to a player";
         let change_type = ChangeType::ChoosePlayers(1);
 
-        let check_func = move |_state: &State, args: &ChangeArgs| -> Result<bool, ChangeError> {
-            let target_player_indices = unwrap_args_err!(args, ChangeArgs::PlayerIndices(pv) => pv);
-            check_len(target_player_indices, 1)?;
+        let change_func = StateChangeFuncPtr::new(move |state, args| {
+            let target_player_indices = args.extract_player_indicies()?;
+            check_len(&target_player_indices, 1)?;
 
-            return Ok(true);
-        };
-        let change_func = move |state: &mut State, args: ChangeArgs| -> Option<ChangeRequest> {
             state
                 .get_player_mut(player_index)
                 .role
                 .reassign(RolePtr::from(Ravenkeeper { ability_used: true }));
 
-            let target_players = unwrap_args_panic!(args, ChangeArgs::PlayerIndices(pv) => pv);
-            let target_player = state.get_player(target_players[0]);
+            let target_player = state.get_player(target_player_indices[0]);
 
             // Create a new change request using the role of the target player
             let change_type = ChangeType::Display;
@@ -835,15 +765,10 @@ impl Role for Ravenkeeper {
                 target_player.role
             );
 
-            Some(ChangeRequest::new_display(change_type, message))
-        };
+            ChangeRequest::new_display(change_type, message).into()
+        });
 
-        Some(ChangeRequest::new(
-            change_type,
-            message.into(),
-            check_func,
-            change_func,
-        ))
+        ChangeRequest::new(change_type, message.into(), change_func).into()
     }
 }
 
@@ -867,6 +792,7 @@ impl Role for Virgin {
         CharacterType::Townsfolk
     }
 
+    // TODO: Want to make this method more idiomatic
     fn nominated(
         &self,
         nominating_player_index: PlayerIndex,
@@ -924,35 +850,25 @@ impl Role for Slayer {
         let change_type = ChangeType::ChoosePlayers(1);
         let description = "Prompt the slayer to point to a player";
 
-        let check_func = move |_state: &State, args: &ChangeArgs| -> Result<bool, ChangeError> {
-            let target_player_indices = unwrap_args_err!(args, ChangeArgs::PlayerIndices(pv) => pv);
-            check_len(target_player_indices, 1)?;
+        let change_func = StateChangeFuncPtr::new(move |state, args| {
+            let target_player_indices = args.extract_player_indicies()?;
+            check_len(&target_player_indices, 1)?;
 
-            return Ok(true);
-        };
-
-        let change_func = move |state: &mut State, args: ChangeArgs| -> Option<ChangeRequest> {
             let slayer = state.get_player_mut(player_index);
             slayer
                 .role
                 .reassign(RolePtr::from(Self { ability_used: true }));
 
-            let target_players = unwrap_args_panic!(args, ChangeArgs::PlayerIndices(pv) => pv);
-            let target_player = state.get_player_mut(target_players[0]);
+            let target_player = state.get_player_mut(target_player_indices[0]);
 
             if target_player.get_character_type() == CharacterType::Demon {
-                return state.kill(player_index, target_players[0]);
+                return state.kill(player_index, target_player_indices[0]);
             }
 
-            None
-        };
+            Ok(None)
+        });
 
-        Some(ChangeRequest::new(
-            change_type,
-            description.into(),
-            check_func,
-            change_func,
-        ))
+        ChangeRequest::new(change_type, description.into(), change_func).into()
     }
 }
 
@@ -980,10 +896,10 @@ impl Role for Soldier {
         attacking_player_index: PlayerIndex,
         _target_player_index: PlayerIndex,
         state: &State,
-    ) -> Option<Option<ChangeRequest>> {
+    ) -> Option<ChangeResult> {
         let attacking_player = state.get_player(attacking_player_index);
         if attacking_player.role.get_true_character_type() == CharacterType::Demon {
-            return Some(None);
+            return Some(Ok(None));
         }
 
         None
@@ -1013,7 +929,7 @@ impl Role for Mayor {
         attacking_player_index: PlayerIndex,
         player_index: PlayerIndex,
         _state: &State,
-    ) -> Option<Option<ChangeRequest>> {
+    ) -> Option<ChangeResult> {
         // TODO: Technically shouldn't be the mayor killing themselves but this works for now
         // Needed to prevent an infinite loop
         // Allow the mayor to kill themselves
@@ -1024,16 +940,10 @@ impl Role for Mayor {
         let change_type = ChangeType::ChoosePlayers(1);
         let description = "Choose a player to die (the mayor may bounce a kill)";
 
-        let check_func = move |state: &State, args: &ChangeArgs| -> Result<bool, ChangeError> {
-            let target_player_indices = unwrap_args_err!(args, ChangeArgs::PlayerIndices(pv) => pv);
-            check_len(target_player_indices, 1)?;
+        let change_func = StateChangeFuncPtr::new(move |state, args| {
+            let target_player_indices = args.extract_player_indicies()?;
+            check_len(&target_player_indices, 1)?;
 
-            return Ok(true);
-        };
-
-        let change_func = move |state: &mut State, args: ChangeArgs| -> Option<ChangeRequest> {
-            let target_player_indices =
-                unwrap_args_panic!(args, ChangeArgs::PlayerIndices(pv) => pv);
             let target_player_index = target_player_indices[0];
 
             let kill_cr = state.kill(player_index, target_player_index);
@@ -1043,15 +953,10 @@ impl Role for Mayor {
                 return kill_cr;
             }
 
-            None
-        };
+            Ok(None)
+        });
 
-        Some(Some(ChangeRequest::new(
-            change_type,
-            description.into(),
-            check_func,
-            change_func,
-        )))
+        Some(ChangeRequest::new(change_type, description.into(), change_func).into())
     }
 }
 
