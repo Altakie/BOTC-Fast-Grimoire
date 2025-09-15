@@ -3,9 +3,9 @@ use std::fmt::{Debug, Display};
 
 use crate::engine::{
     change_request::{ChangeArgs, ChangeRequest, ChangeResult},
-    player::roles::{Role, RolePtr},
+    player::roles::RolePtr,
     state::{
-        PlayerIndex, State, Step,
+        PlayerIndex, State,
         status_effects::{CleanupPhase, StatusEffect},
     },
 };

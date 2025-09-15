@@ -55,53 +55,59 @@ impl Role for Imp {
             }
 
             if target_player_index == player_index && state.get_player(player_index).dead {
-                let description = "Choose a new Imp";
-                let change_type = ChangeType::ChoosePlayers(1);
-
-                let filter_func = FilterFuncPtr::new(move |_, player| {
-                    if player.role.get_true_character_type() == CharacterType::Minion {
-                        return true;
-                    }
-
-                    false
-                });
-
-                let change_func = StateChangeFuncPtr::new(move |state, args| {
-                    let target_players = args.extract_player_indicies()?;
-                    check_len(&target_players, 1)?;
-
-                    let target_player_index = target_players[0];
-                    let target_player = state.get_player(target_player_index);
-                    if target_player.role.get_true_character_type() != CharacterType::Minion {
-                        return Err(ChangeError::InvalidSelectedPlayer {
-                            reason: "Cannot select a non-minion to become the new imp".into(),
-                        });
-                    }
-                    let target_player_index = target_players[0];
-                    let day_num = state.day_num;
-                    let target_player = state.get_player_mut(target_player_index);
-
-                    let new_role = RolePtr::from(Imp {
-                        last_killed: Some(day_num),
-                    });
-
-                    target_player.role.reassign(new_role);
-                    Ok(None)
-                });
-
-                return ChangeRequest::new_with_filter(
-                    change_type,
-                    description.into(),
-                    filter_func,
-                    change_func,
-                )
-                .into();
+                return Imp::new_imp();
             }
 
             return Ok(None);
         });
 
         return ChangeRequest::new(change_type, description.into(), change_func).into();
+    }
+}
+
+impl Imp {
+    fn new_imp() -> ChangeResult {
+        let description = "Choose a new Imp";
+        let change_type = ChangeType::ChoosePlayers(1);
+
+        let filter_func = FilterFuncPtr::new(move |_, player| {
+            if player.role.get_true_character_type() == CharacterType::Minion {
+                return true;
+            }
+
+            false
+        });
+
+        let change_func = StateChangeFuncPtr::new(move |state, args| {
+            let target_players = args.extract_player_indicies()?;
+            check_len(&target_players, 1)?;
+
+            let target_player_index = target_players[0];
+            let target_player = state.get_player(target_player_index);
+            if target_player.role.get_true_character_type() != CharacterType::Minion {
+                return Err(ChangeError::InvalidSelectedPlayer {
+                    reason: "Cannot select a non-minion to become the new imp".into(),
+                });
+            }
+            let target_player_index = target_players[0];
+            let day_num = state.day_num;
+            let target_player = state.get_player_mut(target_player_index);
+
+            let new_role = RolePtr::from(Imp {
+                last_killed: Some(day_num),
+            });
+
+            target_player.role.reassign(new_role);
+            Ok(None)
+        });
+
+        return ChangeRequest::new_with_filter(
+            change_type,
+            description.into(),
+            filter_func,
+            change_func,
+        )
+        .into();
     }
 }
 

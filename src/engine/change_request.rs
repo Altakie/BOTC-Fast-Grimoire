@@ -4,7 +4,7 @@ use super::{
     player::roles::Roles,
     state::{PlayerIndex, State},
 };
-use std::{borrow::Cow, fmt::Debug, ops::Deref, sync::Arc};
+use std::{fmt::Debug, sync::Arc};
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum ChangeType {
