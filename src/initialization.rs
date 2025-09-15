@@ -127,10 +127,6 @@ impl CharacterTypeCounts {
         Self::default()
     }
 
-    pub(crate) fn is_empty(&self) -> bool {
-        self.townsfolk == 0 && self.outsiders == 0 && self.minions == 0 && self.demons == 0
-    }
-
     pub(crate) fn on_choose(&mut self, role: Roles) {
         let delta = role.convert().initialization_effect();
         if let Some(delta) = delta {
@@ -218,7 +214,7 @@ mod tests {
         // NOTE: Should have a test for all roles that modify character_types
 
         // Baron
-        let character_counts = CharacterTypeCounts::new(5).unwrap();
+        let _character_counts = CharacterTypeCounts::new(5).unwrap();
         todo!()
     }
 }

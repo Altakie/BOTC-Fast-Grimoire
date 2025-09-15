@@ -40,7 +40,7 @@ fn washerwoman_librarian_investigator<
         return washerwoman_librarian_investigator_wrong(player_index, right_status, wrong_status);
     });
 
-    return ChangeRequest::new(change_type, right_description.into(), right_state_change).into();
+    return ChangeRequest::new(change_type, right_description, right_state_change).into();
 }
 
 fn washerwoman_librarian_investigator_wrong(
@@ -939,13 +939,6 @@ impl Role for Mayor {
         player_index: PlayerIndex,
         _state: &State,
     ) -> Option<ChangeResult> {
-        // TODO: Technically shouldn't be the mayor killing themselves but this works for now
-        // Needed to prevent an infinite loop
-        // Allow the mayor to kill themselves
-        if attacking_player_index == player_index {
-            return None;
-        }
-
         let change_type = ChangeType::ChoosePlayers(1);
         let description = "Choose a player to die (the mayor may bounce a kill)";
 
@@ -955,14 +948,13 @@ impl Role for Mayor {
 
             let target_player_index = target_player_indices[0];
 
-            let kill_cr = state.kill(player_index, target_player_index);
-
             // Stop infinite loop of mayor bouncing kills
-            if target_player_index != player_index {
-                return kill_cr;
+            if target_player_index == player_index {
+                state.get_player_mut(player_index).dead = true;
+                return Ok(None);
             }
 
-            Ok(None)
+            return state.kill(attacking_player_index, target_player_index);
         });
 
         Some(ChangeRequest::new(change_type, description.into(), change_func).into())

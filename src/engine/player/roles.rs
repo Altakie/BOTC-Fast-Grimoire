@@ -11,7 +11,7 @@ use crate::{
     engine::{
         change_request::ChangeRequest,
         player::{roles::townsfolk::*, *},
-        state::{PlayerIndex, State, Step},
+        state::{PlayerIndex, State},
     },
     initialization::CharacterTypeCounts,
 };

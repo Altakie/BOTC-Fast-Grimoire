@@ -2,7 +2,6 @@
 pub(crate) mod log;
 use log::Log;
 pub(crate) mod status_effects;
-use status_effects::StatusEffect;
 
 use rand::{self, seq::SliceRandom};
 use reactive_stores::*;

@@ -60,6 +60,18 @@ impl Log {
         return Err(SearchError::EventNotFound);
     }
 
+    pub fn search_current_phase<F>(&self, search_func: F) -> Result<&Event, SearchError>
+    where
+        F: Fn(&Event) -> Option<&Event>,
+    {
+        let day_phase = self.get_latest_phase();
+        if let Some(event) = day_phase.search(&search_func) {
+            return Ok(event);
+        }
+
+        return Err(SearchError::EventNotFound);
+    }
+
     pub fn next_phase(&mut self) {
         // Check the latest day_phase
         match self.get_mut_latest_phase().day_phase {
@@ -110,6 +122,13 @@ impl Log {
     fn get_mut_previous_phase(&mut self) -> Option<&mut DayPhaseLog> {
         let len = self.day_phases.len();
         self.day_phases.get_mut(len - 2)
+    }
+
+    fn get_latest_phase(&self) -> &DayPhaseLog {
+        // WARN: This should never be empty anyway, but do fix this implementation to not panic if
+        // it is
+        assert!(!self.day_phases.is_empty());
+        self.day_phases.last().unwrap()
     }
 
     fn get_mut_latest_phase(&mut self) -> &mut DayPhaseLog {

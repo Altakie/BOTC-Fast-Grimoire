@@ -5,7 +5,7 @@ use crate::engine::change_request::{ChangeArgs, ChangeError, StateChangeFuncPtr}
 use crate::engine::player::roles::RolePtr;
 use crate::engine::state::status_effects::CleanupPhase;
 use crate::engine::{
-    change_request::{ChangeRequest, ChangeResult, ChangeType, check_len},
+    change_request::{ChangeRequest, ChangeType, check_len},
     player::{Alignment, CharacterType, roles::Role},
     state::{
         PlayerIndex, State,
