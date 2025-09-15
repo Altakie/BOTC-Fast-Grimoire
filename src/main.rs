@@ -829,6 +829,13 @@ fn Player_Display() -> impl IntoView {
                                 </p>
                                 <button
                                     class="size-[5rem] rounded-full text-center border border-[#000000]"
+                                    disabled=move||{
+                                            if let Some(ChangeRequest{filter_func: Some(filter_func), ..}) = temp_state.curr_change_request().get() {
+                                                return !filter_func.call(i, &player.read());
+                                            }
+
+                                            false
+                                        }
                                     style:border-style=move || {
                                         if selected() { "solid" } else { "none" }
                                     }

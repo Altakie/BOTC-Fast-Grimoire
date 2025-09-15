@@ -1,7 +1,7 @@
 use std::fmt::Display;
 use std::sync::Arc;
 
-use crate::engine::change_request::{ChangeResult, StateChangeFuncPtr};
+use crate::engine::change_request::{ChangeResult, FilterFuncPtr, StateChangeFuncPtr};
 use crate::engine::player::roles::RolePtr;
 use crate::engine::state::log;
 use crate::engine::state::status_effects::CleanupPhase;
@@ -681,6 +681,14 @@ impl Role for Monk {
         let change_type = ChangeType::ChoosePlayers(1);
         let message = "Have the monk select a player to protect";
 
+        let filter_func = FilterFuncPtr::new(move |pi, _| {
+            if pi == player_index {
+                return false;
+            }
+
+            return true;
+        });
+
         let state_change_func = StateChangeFuncPtr::new(move |state, args| {
             // Check if there are any poisoned status effects inflicted by this player and clear
             // them
@@ -706,7 +714,8 @@ impl Role for Monk {
             Ok(None)
         });
 
-        ChangeRequest::new(change_type, message.into(), state_change_func).into()
+        ChangeRequest::new_with_filter(change_type, message.into(), filter_func, state_change_func)
+            .into()
     }
 }
 
