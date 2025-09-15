@@ -1,5 +1,5 @@
 use crate::engine::{
-    change_request::ChangeRequest,
+    change_request::{ChangeRequest, ChangeResult},
     state::{PlayerIndex, State, log::Event},
 };
 

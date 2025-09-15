@@ -9,7 +9,7 @@ use reactive_stores::*;
 
 use crate::{
     engine::{
-        change_request::ChangeRequest,
+        change_request::{ChangeRequest, ChangeResult},
         player::{Player, roles::Roles},
         state::{log::Event, status_effects::CleanupPhase},
     },
@@ -238,7 +238,7 @@ impl State {
         &mut self,
         attacking_player_index: PlayerIndex,
         target_player_index: PlayerIndex,
-    ) -> Option<ChangeRequest> {
+    ) -> ChangeResult {
         self.log.log_event(Event::AttemptedKill {
             attacking_player_index,
             target_player_index,

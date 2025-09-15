@@ -3,7 +3,7 @@ use std::fmt::{Debug, Display};
 use std::ops::Deref;
 use std::sync::Arc;
 
-use crate::engine::change_request::ChangeArgs;
+use crate::engine::change_request::{ChangeArgs, ChangeResult};
 use crate::engine::player::roles::demons::Imp;
 use crate::engine::player::roles::minions::{Baron, Poisoner, ScarletWoman, Spy};
 use crate::engine::player::roles::outsiders::{Butler, Drunk, Recluse, Saint};
@@ -145,7 +145,7 @@ pub(crate) trait Role: Display + Send + Sync {
 
     /// A kill condition for this role
     /// # Return
-    ///     * Returns a Option<ChangeRequest> based on whether or not the role overwrites the default kill behavior of
+    ///     * Returns a ChangeResult based on whether or not the role overwrites the default kill behavior of
     ///     the player. By default, it does not do anything and returns None. If there is special
     ///     behavior when the player dies, then it will return Some(ChangeRequest)
     fn kill(
@@ -153,7 +153,8 @@ pub(crate) trait Role: Display + Send + Sync {
         _attacking_player_index: PlayerIndex,
         _target_player_index: PlayerIndex,
         _state: &State,
-    ) -> Option<Option<ChangeRequest>> {
+    ) -> Option<ChangeResult> {
+        // WARN: Potentially needs to change back to ChangeRequest
         return None;
     }
 

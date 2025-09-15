@@ -1,5 +1,4 @@
 #![allow(clippy::needless_return)]
-use std::fmt::format;
 
 use leptos::mount::mount_to_body;
 use leptos::{
@@ -21,7 +20,7 @@ use engine::{
 mod scripts;
 use scripts::*;
 
-use crate::engine::change_request::ChangeError;
+use crate::engine::change_request::{ChangeError, ChangeResult, StateChangeFuncPtr, check_len};
 
 const DEBUG: bool = true;
 // use leptos_router::components::*;
@@ -482,7 +481,7 @@ fn RoleChooser(
     }
 }
 
-#[derive(Clone, Store, Default)]
+#[derive(Clone, Debug, Store, Default)]
 struct TempState {
     selected_player: Option<PlayerIndex>,
     curr_change_request: Option<ChangeRequest>,
@@ -590,7 +589,7 @@ fn Info() -> impl IntoView {
 
         return view! {
             <div class="border border-solid w-full p-[1rem]">
-                <h3>"Current Player" </h3>
+                <h3>"Current Player"</h3>
                 <p class="mx-auto">{player.name}</p>
                 <p>"Role: "{player.role.to_string()}</p>
                 <p>
@@ -622,16 +621,19 @@ fn Info() -> impl IntoView {
 
         return view! {
             <div class="border border-solid w-full p-[1rem]">
-                <h3>"Selected Player" </h3>
+                <h3>"Selected Player"</h3>
                 <p class="mx-auto">{player.name}</p>
                 <p>"Role: "{player.role.to_string()}</p>
                 <p>
                     "Status: "{if player.dead { "Dead" } else { "Alive" }}
-                    <button on:click=move |_| {
-                        game_state.update(|gs| gs.execute_player(player_index));
-                    }
-                disabled=move||{!matches!(game_state.step().get(), Step::Day)}
-                >"Execute"</button>
+                    <button
+                        on:click=move |_| {
+                            game_state.update(|gs| gs.execute_player(player_index));
+                        }
+                        disabled=move || { !matches!(game_state.step().get(), Step::Day) }
+                    >
+                        "Execute"
+                    </button>
                 </p>
                 <p>"Ghost Vote: "{if player.ghost_vote { "Yes" } else { "No" }}</p>
                 <p>"Alignment: " {player.alignment.to_string()}</p>
@@ -681,28 +683,21 @@ fn Game() -> impl IntoView {
 
             // Only apply funcs if change_type requires action
             if let Some(args) = args {
-                let check_func = cr.check_func;
-                let res = game_state.with(|gs| {
-                    let cf = check_func.unwrap();
-                    cf.call(gs, &args)
-                });
-                // console_log(&format!("check_func called, returned {:?}", res));
-                match res {
-                    Ok(boolean) => {
-                        if boolean {
-                        } else {
+                if let Some(state_func) = cr.state_change_func {
+                    let next_cr = game_state
+                        .try_update(|gs| state_func.call(gs, args))
+                        .unwrap();
+
+                    let next_cr = match next_cr {
+                        Ok(cr) => cr,
+                        // TODO: Actually inform the player what went wrong using the result
+                        Err(e) => {
+                            console_log(format!("Error: {:?}", e).as_str());
+                            console_log(format!("TempState: {:#?}", temp_state.get()).as_str());
                             return;
                         }
-                    }
-                    // TODO: Actually inform the player what went wrong using the result
-                    Err(_) => {
-                        return;
-                    }
-                }
-                // If it passes, do the apply state func and move on
-                if let Some(state_func) = cr.state_change_func {
-                    let next_cr = game_state.try_update(|gs| state_func.call(gs, args));
-                    let next_cr = next_cr.unwrap();
+                    };
+
                     // console_log(&format!("{:?}", next_cr));
                     // Set the next cr
 
@@ -756,7 +751,7 @@ fn Game() -> impl IntoView {
                     if loop_break {
                         break;
                     }
-                    console_log(&*format!("has curr cr{}", has_curr_cr));
+                    console_log(&format!("has curr cr{}", has_curr_cr));
                     if game_state.step().get() == Step::Day && has_curr_cr {
                         // Don't want to accidentally move to next step during day
                         break;
@@ -814,15 +809,14 @@ fn Player_Display() -> impl IntoView {
 
     view! {
         <div class="relative origin-bottom-right size-1/2 flex flex-wrap rounded-full justify-between items-between">
-            // Static list because players don't change
-            {move || {
-                players
-                    .get()
-                    .into_iter()
-                    .enumerate()
-                    .map(|(i, player)| {
+        <For
+        each=move|| players.get().into_iter().enumerate()
+        key = |(i, _)| *i
+                    children = move |(i, _)| {
                         let pos = player_positions[i];
-                        let selected = RwSignal::new(false);
+                        let player = Memo::new(move |_| players.get()[i].clone());
+                        console_log("New Signal Created");
+                        let selected = move || temp_state.selected_players().get().contains(&i);
 
                         view! {
                             <div
@@ -831,12 +825,12 @@ fn Player_Display() -> impl IntoView {
                                 style:top=move || format!("calc(35% + {}%)", pos.1)
                             >
                                 <p class="absolute left-1/2 -translate-x-1/2 bottom-3/5 border-solid border text-center bg-[#ffffff]">
-                                    {player.name}
+                                    {player.get().name}
                                 </p>
                                 <button
                                     class="size-[5rem] rounded-full text-center border border-[#000000]"
                                     style:border-style=move || {
-                                        if selected.get() { "solid" } else { "none" }
+                                        if selected() { "solid" } else { "none" }
                                     }
                                     style:background=move || {
                                         if let Some(selected_player) = temp_state
@@ -850,10 +844,10 @@ fn Player_Display() -> impl IntoView {
                                         ""
                                     }
                                     style:color=move || {
-                                        if player.dead {
+                                        if player.get().dead {
                                             return "gray";
                                         }
-                                        match player.alignment {
+                                        match player.get().alignment {
                                             engine::player::Alignment::Good => "blue",
                                             engine::player::Alignment::Evil => "red",
                                             engine::player::Alignment::Any => "purple",
@@ -875,7 +869,7 @@ fn Player_Display() -> impl IntoView {
                                                 return;
                                             }
                                         };
-                                        if selected.get() {
+                                        if selected() {
                                             selected_players
                                                 .update(|pv| {
                                                     let remove_index = pv
@@ -884,17 +878,15 @@ fn Player_Display() -> impl IntoView {
                                                         .unwrap();
                                                     pv.remove(remove_index);
                                                 });
-                                            selected.set(false);
                                             return;
                                         }
                                         if selected_players.read().len() >= requested_num {
                                             return;
                                         }
                                         selected_players.update(|pv| pv.push(i));
-                                        selected.set(true);
                                     }
                                 >
-                                    {move || { player.role.to_string() }}
+                                    {move || { player.get().role.to_string() }}
                                 </button>
                                 // Status effects
                                 <div class="text-[0.5rem] flex flex-row flex-wrap justify-center items-start absolute w-fit border left-1/2 -translate-x-1/2 top-9/10 ">
@@ -917,9 +909,7 @@ fn Player_Display() -> impl IntoView {
                                 </div>
                             </div>
                         }
-                    })
-                    .collect_view()
-            }}
+            } />
         </div>
     }
 }
@@ -1047,53 +1037,34 @@ fn DayAbilitySelector() -> impl IntoView {
         let description = "Select the nominating player";
         let change_type = ChangeType::ChoosePlayers(1);
 
-        let check_func = move |_: &State, args: &ChangeArgs| -> Result<bool, ChangeError> {
-            let selected_players = unwrap_args_err!(args, ChangeArgs::PlayerIndices(pv) => pv);
+        let state_change_func = StateChangeFuncPtr::new(move |_, args| {
+            let nominating_players = args.extract_player_indicies()?;
+            check_len(&nominating_players, 1)?;
 
-            let len = selected_players.len();
-            if len != 1 {
-                return Err(ChangeError::WrongNumberOfSelectedPlayers {
-                    wanted: 1,
-                    got: len,
-                });
-            }
+            let nominating_player = nominating_players[0];
 
-            Ok(true)
-        };
-        let state_change_func = move |_: &mut State, args: ChangeArgs| -> Option<ChangeRequest> {
-            let nominating_player = unwrap_args_panic!(args, ChangeArgs::PlayerIndices(pv)=>pv)[0];
             let description = "Select the nominated player";
 
-            let state_change_func =
-                move |state: &mut State, args: ChangeArgs| -> Option<ChangeRequest> {
-                    let nominated_player =
-                        unwrap_args_panic!(args, ChangeArgs::PlayerIndices(pv)=>pv)[0];
-                    state.nominate_player(nominating_player, nominated_player);
-                    None
-                };
+            let state_change_func = StateChangeFuncPtr::new(move |state, args| {
+                let target_players = args.extract_player_indicies()?;
+                check_len(&target_players, 1)?;
 
-            Some(ChangeRequest::new(
-                change_type,
-                description.into(),
-                check_func,
-                state_change_func,
-            ))
-        };
+                let nominated_player = target_players[0];
+                state.nominate_player(nominating_player, nominated_player);
+                Ok(None)
+            });
 
-        let nominate_request = ChangeRequest::new(
-            change_type,
-            description.into(),
-            check_func,
-            state_change_func,
-        );
+            ChangeRequest::new(change_type, description.into(), state_change_func).into()
+        });
+
+        let nominate_request =
+            ChangeRequest::new(change_type, description.into(), state_change_func);
         temp_state.curr_change_request().set(Some(nominate_request));
     };
 
     view! {
         <div class="flex flex-col">
-        <button
-        on:click=nominate_button
-        >"Nominate"</button>
+            <button on:click=nominate_button>"Nominate"</button>
             {move || {
                 let active_players = state.read().get_day_active();
                 active_players
@@ -1122,10 +1093,8 @@ fn LogDisplay() -> impl IntoView {
 
     view! {
         <div class="border">
-        <h2>"Log"</h2>
-        <div>
-            {move || {console_log(&format!("{:#?}", state.log().get())); format!("{:#?}", state.log().get())}}
-        </div>
+            <h2>"Log"</h2>
+            <div>{move || { format!("{:#?}", state.log().get()) }}</div>
         </div>
     }
 }

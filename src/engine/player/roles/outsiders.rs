@@ -1,19 +1,16 @@
 use std::fmt::Display;
 use std::sync::Arc;
 
-use crate::engine::change_request::ChangeError;
+use crate::engine::change_request::{ChangeArgs, ChangeError, StateChangeFuncPtr};
 use crate::engine::player::roles::RolePtr;
 use crate::engine::state::status_effects::CleanupPhase;
-use crate::{
-    engine::{
-        change_request::{ChangeArgs, ChangeRequest, ChangeType},
-        player::{Alignment, CharacterType, roles::Role},
-        state::{
-            PlayerIndex, State,
-            status_effects::{StatusEffect, StatusType},
-        },
+use crate::engine::{
+    change_request::{ChangeRequest, ChangeResult, ChangeType, check_len},
+    player::{Alignment, CharacterType, roles::Role},
+    state::{
+        PlayerIndex, State,
+        status_effects::{StatusEffect, StatusType},
     },
-    unwrap_args_err, unwrap_args_panic,
 };
 
 #[derive(Default)]
@@ -36,45 +33,28 @@ impl Butler {
         let message = "Prompt the butler to pick a player to be their master".to_string();
         let change_type = ChangeType::ChoosePlayers(1);
 
-        let check_func = move |_: &State, args: &ChangeArgs| -> Result<bool, ChangeError> {
-            let target_players = unwrap_args_err!(args, ChangeArgs::PlayerIndices(v) => v);
-
-            let len = target_players.len();
-            if len != 1 {
-                return Err(ChangeError::WrongNumberOfSelectedPlayers {
-                    wanted: 1,
-                    got: len,
-                });
-            }
+        let state_change_func = StateChangeFuncPtr::new(move |state, args| {
+            let target_players = args.extract_player_indicies()?;
+            check_len(&target_players, 1)?;
 
             // Check that the butler is not picking themselves
             if target_players[0] == player_index {
-                return Ok(false);
+                return Err(ChangeError::InvalidSelectedPlayer {
+                    reason: "Butler Should not be able to pick themselves".into(),
+                });
             }
 
-            return Ok(true);
-        };
+            let target_player = state.get_player_mut(target_players[0]);
+            let status = StatusEffect::new(
+                Arc::new(BulterMaster {}),
+                player_index,
+                CleanupPhase::Dusk.into(),
+            );
+            target_player.add_status(status);
+            Ok(None)
+        });
 
-        let state_change_func =
-            move |state: &mut State, args: ChangeArgs| -> Option<ChangeRequest> {
-                let target_player_index =
-                    unwrap_args_panic!(args, ChangeArgs::PlayerIndices(pv) => pv)[0];
-                let target_player = state.get_player_mut(target_player_index);
-                let status = StatusEffect::new(
-                    Arc::new(BulterMaster {}),
-                    player_index,
-                    CleanupPhase::Dusk.into(),
-                );
-                target_player.add_status(status);
-                None
-            };
-
-        Some(ChangeRequest::new(
-            change_type,
-            message,
-            check_func,
-            state_change_func,
-        ))
+        ChangeRequest::new(change_type, message, state_change_func).into()
     }
 }
 
@@ -134,6 +114,7 @@ impl Role for Drunk {
         CharacterType::Outsider
     }
 
+    // TODO: Should change based on what role is assigned
     fn setup_order(&self) -> Option<usize> {
         Some(1)
     }
@@ -153,44 +134,26 @@ impl Role for Drunk {
 
         let description = "Select a not in play Townfolk role";
         let change_type = ChangeType::ChooseRoles(1);
-        let check_func = move |_: &State, args: &ChangeArgs| -> Result<bool, ChangeError> {
-            let roles = unwrap_args_err!(args, ChangeArgs::Roles(r) => r);
 
-            let len = roles.len();
-            if len != 1 {
-                return Err(ChangeError::WrongNumberOfSelectedRoles {
-                    wanted: 1,
-                    got: len,
+        let state_change = StateChangeFuncPtr::new(move |state, args| {
+            let roles = args.clone().extract_roles()?;
+
+            check_len(&roles, 1)?;
+
+            if roles[0].get_type() != CharacterType::Townsfolk {
+                return Err(ChangeError::InvalidSelectedRole {
+                    reason: "Drunk has to be a townsfolk role".into(),
                 });
             }
-
-            // FIX: Fix to use new role traits instead of enum
-            if roles[0].get_type() != CharacterType::Townsfolk {
-                return Ok(false);
-            }
-
-            return Ok(true);
-        };
-
-        let state_change = move |state: &mut State, args: ChangeArgs| -> Option<ChangeRequest> {
-            let _roles = match &args {
-                ChangeArgs::Roles(rv) => rv,
-                _ => panic!("Wrong input type"),
-            };
 
             let state_snapshot = state.clone();
 
             let drunk = state.get_player_mut(player_index);
             drunk.notify(&args);
-            drunk.setup_ability(player_index, &state_snapshot)
-        };
+            Ok(drunk.setup_ability(player_index, &state_snapshot))
+        });
 
-        Some(ChangeRequest::new(
-            change_type,
-            description.into(),
-            check_func,
-            state_change,
-        ))
+        ChangeRequest::new(change_type, description.into(), state_change).into()
     }
 
     fn notify(&self, args: &ChangeArgs) -> Option<RolePtr> {
@@ -216,6 +179,7 @@ impl Role for Drunk {
 
     fn night_one_ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
         let role = self.role.clone()?;
+
         let res = role.night_one_ability(player_index, state);
         return match res {
             Some(mut cr) => {
@@ -234,6 +198,7 @@ impl Role for Drunk {
 
     fn night_ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
         let role = self.role.clone()?;
+
         let res = role.night_ability(player_index, state);
         return match res {
             Some(mut cr) => {
