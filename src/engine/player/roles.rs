@@ -9,7 +9,7 @@ use crate::engine::player::roles::minions::{Baron, Poisoner, ScarletWoman, Spy};
 use crate::engine::player::roles::outsiders::{Butler, Drunk, Recluse, Saint};
 use crate::{
     engine::{
-        change_request::ChangeRequest,
+        change_request::ChangeRequestBuilder,
         player::{roles::townsfolk::*, *},
         state::{PlayerIndex, State},
     },
@@ -147,14 +147,14 @@ pub(crate) trait Role: Display + Send + Sync {
     /// # Return
     ///     * Returns a ChangeResult based on whether or not the role overwrites the default kill behavior of
     ///     the player. By default, it does not do anything and returns None. If there is special
-    ///     behavior when the player dies, then it will return Some(ChangeRequest)
+    ///     behavior when the player dies, then it will return Some(ChangeRequestBuilder)
     fn kill(
         &self,
         _attacking_player_index: PlayerIndex,
         _target_player_index: PlayerIndex,
         _state: &State,
     ) -> Option<ChangeResult> {
-        // WARN: Potentially needs to change back to ChangeRequest
+        // WARN: Potentially needs to change back to ChangeRequestBuilder
         return None;
     }
 
@@ -195,7 +195,11 @@ pub(crate) trait Role: Display + Send + Sync {
     /// If the role has an ability that acts during the setup phase, this method should be overwritten and
     /// resolve the setup ability. This is NOT the same as affecting the character
     /// counts in the game. That is the initialization phase.
-    fn setup_ability(&self, _player_index: PlayerIndex, _state: &State) -> Option<ChangeRequest> {
+    fn setup_ability(
+        &self,
+        _player_index: PlayerIndex,
+        _state: &State,
+    ) -> Option<ChangeRequestBuilder> {
         None
     }
 
@@ -209,7 +213,7 @@ pub(crate) trait Role: Display + Send + Sync {
         &self,
         _player_index: PlayerIndex,
         _state: &State,
-    ) -> Option<ChangeRequest> {
+    ) -> Option<ChangeRequestBuilder> {
         None
     }
 
@@ -219,7 +223,11 @@ pub(crate) trait Role: Display + Send + Sync {
         None
     }
     /// If the role has an ability that acts during the night (not including night one), this method should be overwritten and resolve the night ability
-    fn night_ability(&self, _player_index: PlayerIndex, _state: &State) -> Option<ChangeRequest> {
+    fn night_ability(
+        &self,
+        _player_index: PlayerIndex,
+        _state: &State,
+    ) -> Option<ChangeRequestBuilder> {
         None
     }
 
@@ -228,7 +236,11 @@ pub(crate) trait Role: Display + Send + Sync {
         false
     }
     /// If the role has an ability that acts during the day (not including night one), this method should be overwritten and resolve the day ability
-    fn day_ability(&self, _player_index: PlayerIndex, _state: &State) -> Option<ChangeRequest> {
+    fn day_ability(
+        &self,
+        _player_index: PlayerIndex,
+        _state: &State,
+    ) -> Option<ChangeRequestBuilder> {
         None
     }
 

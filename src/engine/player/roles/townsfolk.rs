@@ -1,16 +1,19 @@
 use std::fmt::Display;
 use std::sync::Arc;
 
-use crate::engine::change_request::{ChangeResult, FilterFuncPtr, StateChangeFuncPtr};
-use crate::engine::player::roles::RolePtr;
-use crate::engine::state::log;
-use crate::engine::state::status_effects::CleanupPhase;
 use crate::engine::{
-    change_request::{ChangeError, ChangeRequest, ChangeType, check_len},
-    player::{Alignment, CharacterType, PlayerBehaviors, roles::Role},
+    change_request::{
+        ChangeError, ChangeRequest, ChangeRequestBuilder, ChangeResult, ChangeType, FilterFuncPtr,
+        StateChangeFuncPtr, check_len,
+    },
+    player::{
+        Alignment, CharacterType, PlayerBehaviors,
+        roles::{Role, RolePtr},
+    },
     state::{
         PlayerIndex, State,
-        status_effects::{StatusEffect, StatusType},
+        log::Event,
+        status_effects::{CleanupPhase, StatusEffect, StatusType},
     },
 };
 
@@ -20,17 +23,18 @@ fn washerwoman_librarian_investigator<
 >(
     player_index: PlayerIndex,
     character_type: CharacterType,
-) -> Option<ChangeRequest> {
-    let right_description = format!("Select a {}", &character_type.to_string());
-    let change_type = ChangeType::ChoosePlayers(1);
-
+) -> Option<ChangeRequestBuilder> {
     let right_status =
         move || StatusEffect::new(std::sync::Arc::new(RE::default()), player_index, None);
 
     let wrong_status =
         move || StatusEffect::new(std::sync::Arc::new(WE::default()), player_index, None);
 
-    let right_state_change = StateChangeFuncPtr::new(move |state, args| {
+    return ChangeRequest::new(
+        ChangeType::ChoosePlayers(1),
+        format!("Select a {}", &character_type.to_string()),
+    )
+    .state_change_func(StateChangeFuncPtr::new(move |state, args| {
         let target_player_indices = args.extract_player_indicies()?;
         check_len(&target_player_indices, 1)?;
 
@@ -38,9 +42,8 @@ fn washerwoman_librarian_investigator<
         target_player.add_status(right_status());
 
         return washerwoman_librarian_investigator_wrong(player_index, right_status, wrong_status);
-    });
-
-    return ChangeRequest::new(change_type, right_description, right_state_change).into();
+    }))
+    .into();
 }
 
 fn washerwoman_librarian_investigator_wrong(
@@ -48,10 +51,11 @@ fn washerwoman_librarian_investigator_wrong(
     right_status: impl Fn() -> StatusEffect + Send + Sync + 'static,
     wrong_status: impl Fn() -> StatusEffect + Send + Sync + 'static,
 ) -> ChangeResult {
-    let wrong_description = "Select a different player";
-    let wrong_change_type = ChangeType::ChoosePlayers(1);
-
-    let wrong_state_change = StateChangeFuncPtr::new(move |state, args| {
+    return ChangeRequest::new(
+        ChangeType::ChoosePlayers(1),
+        "Select a different player".into(),
+    )
+    .state_change_func(StateChangeFuncPtr::new(move |state, args| {
         let target_player_indices = args.extract_player_indicies()?;
         check_len(&target_player_indices, 1)?;
 
@@ -79,13 +83,7 @@ fn washerwoman_librarian_investigator_wrong(
         target_player.add_status(wrong_status());
 
         Ok(None)
-    });
-
-    return ChangeRequest::new(
-        wrong_change_type,
-        wrong_description.into(),
-        wrong_state_change,
-    )
+    }))
     .into();
 }
 
@@ -127,7 +125,7 @@ impl Role for Washerwoman {
         &self,
         player_index: crate::engine::state::PlayerIndex,
         _state: &State,
-    ) -> Option<ChangeRequest> {
+    ) -> Option<ChangeRequestBuilder> {
         washerwoman_librarian_investigator::<WasherwomanTownsfolk, WasherwomanWrong>(
             player_index,
             CharacterType::Townsfolk,
@@ -142,12 +140,13 @@ impl Role for Washerwoman {
         &self,
         player_index: crate::engine::state::PlayerIndex,
         state: &State,
-    ) -> Option<ChangeRequest> {
+    ) -> Option<ChangeRequestBuilder> {
         let player = state.get_player(player_index);
-        let message = format!("Show the {} the correct roles", player.role);
-        let change_type = ChangeType::Display;
-
-        ChangeRequest::new_display(change_type, message).into()
+        ChangeRequest::new(
+            ChangeType::Display,
+            format!("Show the {} the correct roles", player.role),
+        )
+        .into()
     }
 }
 
@@ -195,7 +194,7 @@ impl Role for Librarian {
         &self,
         player_index: crate::engine::state::PlayerIndex,
         state: &State,
-    ) -> Option<ChangeRequest> {
+    ) -> Option<ChangeRequestBuilder> {
         let outsider_count = state
             .get_players()
             .iter()
@@ -225,7 +224,7 @@ impl Role for Librarian {
         &self,
         player_index: crate::engine::state::PlayerIndex,
         state: &State,
-    ) -> Option<ChangeRequest> {
+    ) -> Option<ChangeRequestBuilder> {
         let player = state.get_player(player_index);
 
         let outsider_count = state
@@ -239,16 +238,14 @@ impl Role for Librarian {
             })
             .count();
 
-        let message = {
+        ChangeRequest::new(ChangeType::Display, {
             if outsider_count == 0 {
                 "Show the Librarian there are no outsiders in play".to_string()
             } else {
                 format!("Show the {} the correct roles", player.role)
             }
-        };
-        let change_type = ChangeType::Display;
-
-        ChangeRequest::new_display(change_type, message).into()
+        })
+        .into()
     }
 }
 
@@ -296,7 +293,7 @@ impl Role for Investigator {
         &self,
         player_index: crate::engine::state::PlayerIndex,
         _state: &State,
-    ) -> Option<ChangeRequest> {
+    ) -> Option<ChangeRequestBuilder> {
         washerwoman_librarian_investigator::<InvestigatorMinion, InvestigatorWrong>(
             player_index,
             CharacterType::Minion,
@@ -311,12 +308,14 @@ impl Role for Investigator {
         &self,
         player_index: crate::engine::state::PlayerIndex,
         state: &State,
-    ) -> Option<ChangeRequest> {
+    ) -> Option<ChangeRequestBuilder> {
         let player = state.get_player(player_index);
-        let message = format!("Show the {} the correct roles", player.role);
-        let change_type = ChangeType::Display;
 
-        ChangeRequest::new_display(change_type, message).into()
+        ChangeRequest::new(
+            ChangeType::Display,
+            format!("Show the {} the correct roles", player.role),
+        )
+        .into()
     }
 }
 
@@ -346,30 +345,29 @@ impl Role for Chef {
         &self,
         _player_index: crate::engine::state::PlayerIndex,
         state: &State,
-    ) -> Option<ChangeRequest> {
+    ) -> Option<ChangeRequestBuilder> {
         // Count pairs of evil players
         // For each evil, player, check if the right player is evil, if yes, increment the
         // pair count
-        let change_type = ChangeType::Display;
-        let mut pair_count = 0;
-
         let players = state.get_players();
 
-        for (player_index, player) in players.iter().enumerate() {
-            if player.alignment != Alignment::Evil {
-                continue;
-            }
-            let right_player = state.get_player(state.right_player(player_index));
-            if right_player.alignment == Alignment::Evil {
-                pair_count += 1;
-            }
-        }
-        let message = format!(
-            "Show the chef that there are {} pairs of evil players",
-            pair_count
-        );
+        let pair_count = players
+            .iter()
+            .enumerate()
+            .filter(|(pi, player)| {
+                let right_player = state.get_player(state.right_player(*pi));
+                player.alignment == Alignment::Evil && right_player.alignment == Alignment::Evil
+            })
+            .count();
 
-        ChangeRequest::new_display(change_type, message).into()
+        ChangeRequest::new(
+            ChangeType::Display,
+            format!(
+                "Show the chef that there are {} pairs of evil players",
+                pair_count
+            ),
+        )
+        .into()
     }
 }
 
@@ -383,26 +381,23 @@ impl Display for Chef {
 pub(crate) struct Empath();
 
 impl Empath {
-    fn ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
+    fn ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequestBuilder> {
         // Check how many players next to the empath are evil
         let mut count = 0;
-        {
-            let left_player = state.get_player(state.left_player(player_index));
-            if left_player.alignment == Alignment::Evil {
-                count += 1;
-            }
+        let left_player = state.get_player(state.left_player(player_index));
+        if left_player.alignment == Alignment::Evil {
+            count += 1;
         }
-        {
-            let right_player = state.get_player(state.right_player(player_index));
-            if right_player.alignment == Alignment::Evil {
-                count += 1;
-            }
+        let right_player = state.get_player(state.right_player(player_index));
+        if right_player.alignment == Alignment::Evil {
+            count += 1;
         }
-        let message = format!("Empath has {} evil neighbors", count);
 
-        let change_type = ChangeType::Display;
-
-        ChangeRequest::new_display(change_type, message).into()
+        ChangeRequest::new(
+            ChangeType::Display,
+            format!("Empath has {} evil neighbors", count),
+        )
+        .into()
     }
 }
 
@@ -423,11 +418,19 @@ impl Role for Empath {
         Some(68)
     }
 
-    fn night_one_ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
+    fn night_one_ability(
+        &self,
+        player_index: PlayerIndex,
+        state: &State,
+    ) -> Option<ChangeRequestBuilder> {
         self.ability(player_index, state)
     }
 
-    fn night_ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
+    fn night_ability(
+        &self,
+        player_index: PlayerIndex,
+        state: &State,
+    ) -> Option<ChangeRequestBuilder> {
         let dead = state.get_player(player_index).dead;
         if dead {
             return None;
@@ -454,17 +457,17 @@ impl Display for FortunetellerRedHerring {
 }
 
 impl Fortuneteller {
-    fn ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
+    fn ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequestBuilder> {
         let dead = state.get_player(player_index).dead;
         if dead {
             return None;
         }
 
-        let message = "Prompt the FortuneTeller to point to two players";
-
-        let change_type = ChangeType::ChoosePlayers(2);
-
-        let state_change_func = StateChangeFuncPtr::new(move |state, args| {
+        ChangeRequest::new(
+            ChangeType::ChoosePlayers(2),
+            "Prompt the FortuneTeller to point to two players".into(),
+        )
+        .state_change_func(StateChangeFuncPtr::new(move |state, args| {
             let target_player_indicies = args.extract_player_indicies()?;
 
             check_len(&target_player_indicies, 2)?;
@@ -487,20 +490,19 @@ impl Fortuneteller {
                         && se.to_string() == FortunetellerRedHerring().to_string()
                 })
             });
-            let message = format!(
-                "Show the Fortuneteller a {}",
-                match demon_found {
-                    true => "Thumbs Up",
-                    false => "Thumbs Down",
-                }
-            );
-
-            let change_type = ChangeType::Display;
-
-            ChangeRequest::new_display(change_type, message).into()
-        });
-
-        ChangeRequest::new(change_type, message.into(), state_change_func).into()
+            ChangeRequest::new(
+                ChangeType::Display,
+                format!(
+                    "Show the Fortuneteller a {}",
+                    match demon_found {
+                        true => "Thumbs Up",
+                        false => "Thumbs Down",
+                    }
+                ),
+            )
+            .into()
+        }))
+        .into()
     }
 }
 
@@ -517,13 +519,18 @@ impl Role for Fortuneteller {
         Some(50)
     }
 
-    fn setup_ability(&self, player_index: PlayerIndex, _state: &State) -> Option<ChangeRequest> {
-        let description = "Select a red-herring for the Fortune Teller".to_string();
-
-        let change_type = ChangeType::ChoosePlayers(1);
+    fn setup_ability(
+        &self,
+        player_index: PlayerIndex,
+        _state: &State,
+    ) -> Option<ChangeRequestBuilder> {
         // Get storyteller input on who red-herring is
         // Add a red-herring through status effects
-        let state_change = StateChangeFuncPtr::new(move |state, args| {
+        ChangeRequest::new(
+            ChangeType::ChoosePlayers(1),
+            "Select a red-herring for the Fortune Teller".to_string(),
+        )
+        .state_change_func(StateChangeFuncPtr::new(move |state, args| {
             let target_player_indices = args.extract_player_indicies()?;
 
             check_len(&target_player_indices, 1)?;
@@ -540,16 +547,19 @@ impl Role for Fortuneteller {
             target_player.add_status(status);
 
             Ok(None)
-        });
-
-        ChangeRequest::new(change_type, description, state_change).into()
+        }))
+        .into()
     }
 
     fn night_one_order(&self) -> Option<usize> {
         Some(50)
     }
 
-    fn night_one_ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
+    fn night_one_ability(
+        &self,
+        player_index: PlayerIndex,
+        state: &State,
+    ) -> Option<ChangeRequestBuilder> {
         self.ability(player_index, state)
     }
 
@@ -557,7 +567,11 @@ impl Role for Fortuneteller {
         Some(69)
     }
 
-    fn night_ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
+    fn night_ability(
+        &self,
+        player_index: PlayerIndex,
+        state: &State,
+    ) -> Option<ChangeRequestBuilder> {
         self.ability(player_index, state)
     }
 }
@@ -584,7 +598,11 @@ impl Role for Undertaker {
         Some(70)
     }
 
-    fn night_ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
+    fn night_ability(
+        &self,
+        player_index: PlayerIndex,
+        state: &State,
+    ) -> Option<ChangeRequestBuilder> {
         let dead = state.get_player(player_index).dead;
 
         if dead {
@@ -592,24 +610,25 @@ impl Role for Undertaker {
         }
 
         let execution_event = state.log.search_previous_phase(|e| match *e {
-            log::Event::Execution(_) => Some(e),
+            Event::Execution(_) => Some(e),
             _ => None,
         });
 
         let executed_player_index = match execution_event {
-            Ok(log::Event::Execution(player_index)) => *player_index,
+            Ok(Event::Execution(player_index)) => *player_index,
             Ok(_) | Err(_) => return None,
         };
 
         let executed_role = state.get_player(executed_player_index).role.clone();
 
-        let change_type = ChangeType::Display;
-        let description = format!(
-            "Show the undertaker that the {} was executed yesterday",
-            executed_role
-        );
-
-        ChangeRequest::new_display(change_type, description).into()
+        ChangeRequest::new(
+            ChangeType::Display,
+            format!(
+                "Show the undertaker that the {} was executed yesterday",
+                executed_role
+            ),
+        )
+        .into()
     }
 }
 
@@ -673,23 +692,20 @@ impl Role for Monk {
         Some(19)
     }
 
-    fn night_ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
+    fn night_ability(
+        &self,
+        player_index: PlayerIndex,
+        state: &State,
+    ) -> Option<ChangeRequestBuilder> {
         let dead = state.get_player(player_index).dead;
         if dead {
             return None;
         }
-        let change_type = ChangeType::ChoosePlayers(1);
-        let message = "Have the monk select a player to protect";
-
-        let filter_func = FilterFuncPtr::new(move |pi, _| {
-            if pi == player_index {
-                return false;
-            }
-
-            return true;
-        });
-
-        let state_change_func = StateChangeFuncPtr::new(move |state, args| {
+        ChangeRequest::new(
+            ChangeType::ChoosePlayers(1),
+            "Have the monk select a player to protect".into(),
+        )
+        .state_change_func(StateChangeFuncPtr::new(move |state, args| {
             // Check if there are any poisoned status effects inflicted by this player and clear
             // them
             let target_player_indices = args.extract_player_indicies()?;
@@ -712,10 +728,9 @@ impl Role for Monk {
             target_player.add_status(status);
 
             Ok(None)
-        });
-
-        ChangeRequest::new_with_filter(change_type, message.into(), filter_func, state_change_func)
-            .into()
+        }))
+        .filter_func(FilterFuncPtr::new(move |pi, _| !pi == player_index))
+        .into()
     }
 }
 
@@ -746,9 +761,13 @@ impl Role for Ravenkeeper {
         Some(67)
     }
 
-    fn night_ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
+    fn night_ability(
+        &self,
+        player_index: PlayerIndex,
+        state: &State,
+    ) -> Option<ChangeRequestBuilder> {
         let death_event = state.log.search_current_phase(|event| match event {
-            log::Event::Death(pi) => {
+            Event::Death(pi) => {
                 if *pi == player_index {
                     Some(event)
                 } else {
@@ -762,10 +781,11 @@ impl Role for Ravenkeeper {
             return None;
         }
 
-        let message = "Prompt the Ravenkeeper to point to a player";
-        let change_type = ChangeType::ChoosePlayers(1);
-
-        let change_func = StateChangeFuncPtr::new(move |state, args| {
+        ChangeRequest::new(
+            ChangeType::ChoosePlayers(1),
+            "Prompt the Ravenkeeper to point to a player".into(),
+        )
+        .state_change_func(StateChangeFuncPtr::new(move |state, args| {
             let target_player_indices = args.extract_player_indicies()?;
             check_len(&target_player_indices, 1)?;
 
@@ -777,16 +797,16 @@ impl Role for Ravenkeeper {
             let target_player = state.get_player(target_player_indices[0]);
 
             // Create a new change request using the role of the target player
-            let change_type = ChangeType::Display;
-            let message = format!(
-                "Show the Ravenkeeper that they selected the {}",
-                target_player.role
-            );
-
-            ChangeRequest::new_display(change_type, message).into()
-        });
-
-        ChangeRequest::new(change_type, message.into(), change_func).into()
+            ChangeRequest::new(
+                ChangeType::Display,
+                format!(
+                    "Show the Ravenkeeper that they selected the {}",
+                    target_player.role
+                ),
+            )
+            .into()
+        }))
+        .into()
     }
 }
 
@@ -860,15 +880,20 @@ impl Role for Slayer {
         true
     }
 
-    fn day_ability(&self, player_index: PlayerIndex, _state: &State) -> Option<ChangeRequest> {
+    fn day_ability(
+        &self,
+        player_index: PlayerIndex,
+        _state: &State,
+    ) -> Option<ChangeRequestBuilder> {
         // Choose a player
         // If it is a demon, kill the demon, otherwise do nothing
         // Either way, use your ability
 
-        let change_type = ChangeType::ChoosePlayers(1);
-        let description = "Prompt the slayer to point to a player";
-
-        let change_func = StateChangeFuncPtr::new(move |state, args| {
+        ChangeRequest::new(
+            ChangeType::ChoosePlayers(1),
+            "Prompt the slayer to point to a player".into(),
+        )
+        .state_change_func(StateChangeFuncPtr::new(move |state, args| {
             let target_player_indices = args.extract_player_indicies()?;
             check_len(&target_player_indices, 1)?;
 
@@ -884,9 +909,8 @@ impl Role for Slayer {
             }
 
             Ok(None)
-        });
-
-        ChangeRequest::new(change_type, description.into(), change_func).into()
+        }))
+        .into()
     }
 }
 
@@ -948,25 +972,27 @@ impl Role for Mayor {
         player_index: PlayerIndex,
         _state: &State,
     ) -> Option<ChangeResult> {
-        let change_type = ChangeType::ChoosePlayers(1);
-        let description = "Choose a player to die (the mayor may bounce a kill)";
+        Some(
+            ChangeRequest::new(
+                ChangeType::ChoosePlayers(1),
+                "Choose a player to die (the mayor may bounce a kill)".into(),
+            )
+            .state_change_func(StateChangeFuncPtr::new(move |state, args| {
+                let target_player_indices = args.extract_player_indicies()?;
+                check_len(&target_player_indices, 1)?;
 
-        let change_func = StateChangeFuncPtr::new(move |state, args| {
-            let target_player_indices = args.extract_player_indicies()?;
-            check_len(&target_player_indices, 1)?;
+                let target_player_index = target_player_indices[0];
 
-            let target_player_index = target_player_indices[0];
+                // Stop infinite loop of mayor bouncing kills
+                if target_player_index == player_index {
+                    state.get_player_mut(player_index).dead = true;
+                    return Ok(None);
+                }
 
-            // Stop infinite loop of mayor bouncing kills
-            if target_player_index == player_index {
-                state.get_player_mut(player_index).dead = true;
-                return Ok(None);
-            }
-
-            return state.kill(attacking_player_index, target_player_index);
-        });
-
-        Some(ChangeRequest::new(change_type, description.into(), change_func).into())
+                return state.kill(attacking_player_index, target_player_index);
+            }))
+            .into(),
+        )
     }
 }
 

@@ -1,11 +1,11 @@
 use std::fmt::Display;
 use std::sync::Arc;
 
-use crate::engine::change_request::{ChangeArgs, ChangeError, StateChangeFuncPtr};
+use crate::engine::change_request::{ChangeArgs, ChangeError, ChangeRequest, StateChangeFuncPtr};
 use crate::engine::player::roles::RolePtr;
 use crate::engine::state::status_effects::CleanupPhase;
 use crate::engine::{
-    change_request::{ChangeRequest, ChangeType, check_len},
+    change_request::{ChangeRequestBuilder, ChangeType, check_len},
     player::{Alignment, CharacterType, roles::Role},
     state::{
         PlayerIndex, State,
@@ -27,13 +27,14 @@ impl Display for BulterMaster {
 }
 
 impl Butler {
-    fn ability(&self, player_index: PlayerIndex) -> Option<ChangeRequest> {
+    fn ability(&self, player_index: PlayerIndex) -> Option<ChangeRequestBuilder> {
         // Clean up the old butler master status effect (if there is one), prompt for another
         // player, and give them the butler master status effect
-        let message = "Prompt the butler to pick a player to be their master".to_string();
-        let change_type = ChangeType::ChoosePlayers(1);
-
-        let state_change_func = StateChangeFuncPtr::new(move |state, args| {
+        ChangeRequest::new(
+            ChangeType::ChoosePlayers(1),
+            "Prompt the butler to pick a player to be their master".to_string(),
+        )
+        .state_change_func(StateChangeFuncPtr::new(move |state, args| {
             let target_players = args.extract_player_indicies()?;
             check_len(&target_players, 1)?;
 
@@ -52,9 +53,8 @@ impl Butler {
             );
             target_player.add_status(status);
             Ok(None)
-        });
-
-        ChangeRequest::new(change_type, message, state_change_func).into()
+        }))
+        .into()
     }
 }
 
@@ -75,7 +75,7 @@ impl Role for Butler {
         &self,
         player_index: PlayerIndex,
         _state: &State,
-    ) -> Option<ChangeRequest> {
+    ) -> Option<ChangeRequestBuilder> {
         self.ability(player_index)
     }
 
@@ -83,7 +83,11 @@ impl Role for Butler {
         Some(83)
     }
 
-    fn night_ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
+    fn night_ability(
+        &self,
+        player_index: PlayerIndex,
+        state: &State,
+    ) -> Option<ChangeRequestBuilder> {
         let dead = state.get_player(player_index).dead;
         if dead {
             return None;
@@ -119,23 +123,25 @@ impl Role for Drunk {
         Some(1)
     }
 
-    fn setup_ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
+    fn setup_ability(
+        &self,
+        player_index: PlayerIndex,
+        state: &State,
+    ) -> Option<ChangeRequestBuilder> {
         // If the drunk has a role assigned, call its setup ability instead
         if let Some(role) = &self.role {
             let res = role.setup_ability(player_index, state);
             return match res {
-                Some(mut cr) => {
-                    cr.state_change_func = None;
-                    Some(cr)
-                }
+                Some(cr) => Some(cr.clear_state_change_func()),
                 None => None,
             };
         };
 
-        let description = "Select a not in play Townfolk role";
-        let change_type = ChangeType::ChooseRoles(1);
-
-        let state_change = StateChangeFuncPtr::new(move |state, args| {
+        ChangeRequest::new(
+            ChangeType::ChooseRoles(1),
+            "Select a not in play Townfolk role".into(),
+        )
+        .state_change_func(StateChangeFuncPtr::new(move |state, args| {
             let roles = args.clone().extract_roles()?;
 
             check_len(&roles, 1)?;
@@ -151,9 +157,8 @@ impl Role for Drunk {
             let drunk = state.get_player_mut(player_index);
             drunk.notify(&args);
             Ok(drunk.setup_ability(player_index, &state_snapshot))
-        });
-
-        ChangeRequest::new(change_type, description.into(), state_change).into()
+        }))
+        .into()
     }
 
     fn notify(&self, args: &ChangeArgs) -> Option<RolePtr> {
@@ -177,7 +182,11 @@ impl Role for Drunk {
         role.night_one_order()
     }
 
-    fn night_one_ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
+    fn night_one_ability(
+        &self,
+        player_index: PlayerIndex,
+        state: &State,
+    ) -> Option<ChangeRequestBuilder> {
         let role = self.role.clone()?;
 
         let res = role.night_one_ability(player_index, state);
@@ -196,16 +205,19 @@ impl Role for Drunk {
         role.night_order()
     }
 
-    fn night_ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
+    fn night_ability(
+        &self,
+        player_index: PlayerIndex,
+        state: &State,
+    ) -> Option<ChangeRequestBuilder> {
         let role = self.role.clone()?;
 
         let res = role.night_ability(player_index, state);
         return match res {
-            Some(mut cr) => {
-                cr.state_change_func = None;
-                cr.description = format!("(*Drunk*) {}", cr.description);
-                Some(cr)
-            }
+            Some(cr) => Some(
+                cr.clear_state_change_func()
+                    .change_description(|desc| format!("(*Drunk*) {}", desc)),
+            ),
             None => None,
         };
     }

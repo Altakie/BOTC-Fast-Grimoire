@@ -1,3 +1,4 @@
+use crate::ChangeRequest;
 use crate::engine::{
     change_request::{ChangeResult, FilterFuncPtr, StateChangeFuncPtr, check_len},
     player::roles::RolePtr,
@@ -5,7 +6,7 @@ use crate::engine::{
 use std::fmt::Display;
 
 use crate::engine::{
-    change_request::{ChangeError, ChangeRequest, ChangeType},
+    change_request::{ChangeError, ChangeRequestBuilder, ChangeType},
     player::{Alignment, CharacterType, roles::Role},
     state::{PlayerIndex, State},
 };
@@ -28,7 +29,11 @@ impl Role for Imp {
         Some(34)
     }
 
-    fn night_ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
+    fn night_ability(
+        &self,
+        player_index: PlayerIndex,
+        state: &State,
+    ) -> Option<ChangeRequestBuilder> {
         let dead = state.get_player(player_index).dead;
         if dead {
             return None;
@@ -42,10 +47,11 @@ impl Role for Imp {
             }
         }
 
-        let description = "Ask the Imp to point to the player they would like to kill";
-        let change_type = ChangeType::ChoosePlayers(1);
-
-        let change_func = StateChangeFuncPtr::new(move |state, args| {
+        return ChangeRequest::new(
+            ChangeType::ChoosePlayers(1),
+            "Ask the Imp to point to the player they would like to kill".into(),
+        )
+        .state_change_func(StateChangeFuncPtr::new(move |state, args| {
             let target_players = args.extract_player_indicies()?;
             check_len(&target_players, 1)?;
             let target_player_index = target_players[0];
@@ -59,55 +65,40 @@ impl Role for Imp {
             }
 
             return Ok(None);
-        });
-
-        return ChangeRequest::new(change_type, description.into(), change_func).into();
+        }))
+        .into();
     }
 }
 
 impl Imp {
     fn new_imp() -> ChangeResult {
-        let description = "Choose a new Imp";
-        let change_type = ChangeType::ChoosePlayers(1);
+        return ChangeRequest::new(ChangeType::ChoosePlayers(1), "Choose a new Imp".into())
+            .state_change_func(StateChangeFuncPtr::new(move |state, args| {
+                let target_players = args.extract_player_indicies()?;
+                check_len(&target_players, 1)?;
 
-        let filter_func = FilterFuncPtr::new(move |_, player| {
-            if player.role.get_true_character_type() == CharacterType::Minion {
-                return true;
-            }
+                let target_player_index = target_players[0];
+                let target_player = state.get_player(target_player_index);
+                if target_player.role.get_true_character_type() != CharacterType::Minion {
+                    return Err(ChangeError::InvalidSelectedPlayer {
+                        reason: "Cannot select a non-minion to become the new imp".into(),
+                    });
+                }
+                let target_player_index = target_players[0];
+                let day_num = state.day_num;
+                let target_player = state.get_player_mut(target_player_index);
 
-            false
-        });
-
-        let change_func = StateChangeFuncPtr::new(move |state, args| {
-            let target_players = args.extract_player_indicies()?;
-            check_len(&target_players, 1)?;
-
-            let target_player_index = target_players[0];
-            let target_player = state.get_player(target_player_index);
-            if target_player.role.get_true_character_type() != CharacterType::Minion {
-                return Err(ChangeError::InvalidSelectedPlayer {
-                    reason: "Cannot select a non-minion to become the new imp".into(),
+                let new_role = RolePtr::from(Imp {
+                    last_killed: Some(day_num),
                 });
-            }
-            let target_player_index = target_players[0];
-            let day_num = state.day_num;
-            let target_player = state.get_player_mut(target_player_index);
 
-            let new_role = RolePtr::from(Imp {
-                last_killed: Some(day_num),
-            });
-
-            target_player.role.reassign(new_role);
-            Ok(None)
-        });
-
-        return ChangeRequest::new_with_filter(
-            change_type,
-            description.into(),
-            filter_func,
-            change_func,
-        )
-        .into();
+                target_player.role.reassign(new_role);
+                Ok(None)
+            }))
+            .filter_func(FilterFuncPtr::new(move |_, player| {
+                player.role.get_true_character_type() == CharacterType::Minion
+            }))
+            .into();
     }
 }
 

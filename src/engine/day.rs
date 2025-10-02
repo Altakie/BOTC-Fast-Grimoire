@@ -1,5 +1,5 @@
 use crate::engine::{
-    change_request::ChangeRequest,
+    change_request::{ChangeRequest, ChangeRequestBuilder},
     state::{PlayerIndex, State, log::Event},
 };
 
@@ -43,7 +43,7 @@ impl State {
             .collect()
     }
 
-    pub(crate) fn day_ability(&self, player_index: PlayerIndex) -> Option<ChangeRequest> {
+    pub(crate) fn day_ability(&self, player_index: PlayerIndex) -> Option<ChangeRequestBuilder> {
         self.get_player(player_index)
             .day_ability(player_index, self)
     }

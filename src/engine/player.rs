@@ -2,7 +2,7 @@ use reactive_stores::Store;
 use std::fmt::{Debug, Display};
 
 use crate::engine::{
-    change_request::{ChangeArgs, ChangeRequest, ChangeResult, StateChangeFuncPtr},
+    change_request::{ChangeArgs, ChangeRequestBuilder, ChangeResult, StateChangeFuncPtr},
     player::roles::RolePtr,
     state::{
         PlayerIndex, State,
@@ -218,7 +218,7 @@ impl Player {
         &self,
         player_index: PlayerIndex,
         state: &State,
-    ) -> Option<ChangeRequest> {
+    ) -> Option<ChangeRequestBuilder> {
         self.role.setup_ability(player_index, state)
     }
 
@@ -230,7 +230,7 @@ impl Player {
         &self,
         player_index: PlayerIndex,
         state: &State,
-    ) -> Option<ChangeRequest> {
+    ) -> Option<ChangeRequestBuilder> {
         let cr = self.role.night_one_ability(player_index, state)?;
         // Check for poison or drunk effects
         let status_effect = self.get_statuses().iter().find(|se| {
@@ -261,7 +261,11 @@ impl Player {
         self.role.night_order()
     }
     /// If the role has an ability that acts during the night (not including night one), this method should be overwritten and resolve the night ability
-    pub fn night_ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
+    pub fn night_ability(
+        &self,
+        player_index: PlayerIndex,
+        state: &State,
+    ) -> Option<ChangeRequestBuilder> {
         let cr = self.role.night_ability(player_index, state)?;
         let status_effect = self.get_statuses().iter().find(|se| {
             se.status_type.behavior_type().is_some_and(|behaviors| {
@@ -290,7 +294,11 @@ impl Player {
         self.role.has_day_ability()
     }
     /// If the role has an ability that acts during the day (not including night one), this method should be overwritten and resolve the day ability
-    pub fn day_ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
+    pub fn day_ability(
+        &self,
+        player_index: PlayerIndex,
+        state: &State,
+    ) -> Option<ChangeRequestBuilder> {
         let cr = self.role.day_ability(player_index, state)?;
         let status_effect = self.get_statuses().iter().find(|se| {
             se.status_type.behavior_type().is_some_and(|behaviors| {
@@ -359,9 +367,9 @@ impl Debug for Player {
 
 fn drunkify(
     player_index: PlayerIndex,
-    mut change_request: ChangeRequest,
+    mut change_request: ChangeRequestBuilder,
     status_string: String,
-) -> ChangeRequest {
+) -> ChangeRequestBuilder {
     if let Some(state_change_func) = change_request.state_change_func {
         let status_string_clone = status_string.clone();
         let wrapper_func = StateChangeFuncPtr::new(move |state, args| {
