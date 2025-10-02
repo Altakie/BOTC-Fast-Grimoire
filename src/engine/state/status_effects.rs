@@ -125,6 +125,7 @@ impl StatusType for Poisoned {
             [
                 PlayerBehaviors::NightOneAbility,
                 PlayerBehaviors::NightAbility,
+                PlayerBehaviors::DayAbility,
             ]
             .as_ref(),
         )
@@ -145,6 +146,7 @@ impl StatusType for Drunk {
             [
                 PlayerBehaviors::NightOneAbility,
                 PlayerBehaviors::NightAbility,
+                PlayerBehaviors::DayAbility,
             ]
             .as_ref(),
         )

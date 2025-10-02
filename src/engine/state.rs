@@ -1,5 +1,8 @@
 #![allow(dead_code, clippy::needless_return)]
 pub(crate) mod log;
+
+use std::ops::{Add, Deref, Index};
+
 use log::Log;
 pub(crate) mod status_effects;
 
@@ -27,9 +30,20 @@ pub(crate) type PlayerIndex = usize;
 // }
 //
 // impl Add for PlayerIndex {
-//     type Output;
+//     type Output = PlayerIndex;
 //
 //     fn add(self, rhs: Self) -> Self::Output {
+//         Self(self.0 + rhs.0)
+//     }
+// }
+//
+// impl<T> Index<PlayerIndex> for T
+// where
+//     T: Index<usize>,
+// {
+//     type Output = T::Output;
+//
+//     fn index(&self, index: PlayerIndex) -> &Self::Output {
 //         todo!()
 //     }
 // }

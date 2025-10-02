@@ -4,7 +4,7 @@ use super::{
     player::roles::Roles,
     state::{PlayerIndex, State},
 };
-use std::{fmt::Debug, sync::Arc};
+use std::{fmt::Debug, ops::Deref, sync::Arc};
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum ChangeType {
@@ -72,9 +72,9 @@ impl Debug for ChangeRequest {
     }
 }
 
-pub type FilterFunc = dyn Fn(PlayerIndex, &Player) -> bool + Send + Sync;
+pub(crate) type FilterFunc = dyn Fn(PlayerIndex, &Player) -> bool + Send + Sync;
 #[derive(Clone)]
-pub struct FilterFuncPtr(Arc<FilterFunc>);
+pub(crate) struct FilterFuncPtr(Arc<FilterFunc>);
 impl FilterFuncPtr {
     pub fn new<F>(func: F) -> Self
     where
@@ -96,9 +96,9 @@ impl FilterFuncPtr {
 //     }
 // }
 
-pub type StateChangeFunc = dyn Fn(&mut State, ChangeArgs) -> ChangeResult + Send + Sync;
+pub(crate) type StateChangeFunc = dyn Fn(&mut State, ChangeArgs) -> ChangeResult + Send + Sync;
 #[derive(Clone)]
-pub struct StateChangeFuncPtr(Arc<StateChangeFunc>);
+pub(crate) struct StateChangeFuncPtr(Arc<StateChangeFunc>);
 
 impl StateChangeFuncPtr {
     pub fn new<F>(func: F) -> Self
@@ -110,6 +110,18 @@ impl StateChangeFuncPtr {
 
     pub fn call(&self, state: &mut State, args: ChangeArgs) -> ChangeResult {
         self.0(state, args)
+    }
+
+    pub fn reassign(&mut self, other: StateChangeFuncPtr) {
+        self.0 = other.0
+    }
+}
+
+impl Deref for StateChangeFuncPtr {
+    type Target = Arc<StateChangeFunc>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
