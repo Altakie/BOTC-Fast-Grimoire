@@ -2,7 +2,7 @@ use reactive_stores::Store;
 use std::fmt::{Debug, Display};
 
 use crate::engine::{
-    change_request::{ChangeArgs, ChangeRequest, ChangeResult},
+    change_request::{ChangeArgs, ChangeRequest, ChangeResult, StateChangeFuncPtr},
     player::roles::RolePtr,
     state::{
         PlayerIndex, State,
@@ -231,7 +231,7 @@ impl Player {
         player_index: PlayerIndex,
         state: &State,
     ) -> Option<ChangeRequest> {
-        let mut cr = self.role.night_one_ability(player_index, state)?;
+        let cr = self.role.night_one_ability(player_index, state)?;
         // Check for poison or drunk effects
         let status_effect = self.get_statuses().iter().find(|se| {
             se.status_type.behavior_type().is_some_and(|behaviors| {
@@ -248,8 +248,8 @@ impl Player {
             // }
             // FIX: This needs apply to all the crs in the chain, not just the first one (although
             // this technically disables the chain so we might need to play around that)
-            cr.state_change_func = None;
-            cr.description = format!("(*{}*) ", status_effect) + cr.description.as_str();
+            let new_cr = drunkify(player_index, cr, status_effect.to_string());
+            return new_cr.into();
         }
 
         return cr.into();
@@ -262,7 +262,7 @@ impl Player {
     }
     /// If the role has an ability that acts during the night (not including night one), this method should be overwritten and resolve the night ability
     pub fn night_ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
-        let mut cr = self.role.night_ability(player_index, state)?;
+        let cr = self.role.night_ability(player_index, state)?;
         let status_effect = self.get_statuses().iter().find(|se| {
             se.status_type.behavior_type().is_some_and(|behaviors| {
                 behaviors
@@ -276,8 +276,10 @@ impl Player {
             //     cr.state_change_func = None;
             //     cr.description = format!("(*{}*) ", status_effect) + cr.description.as_str();
             // }
-            cr.state_change_func = None;
-            cr.description = format!("(*{}*) ", status_effect) + cr.description.as_str();
+            // FIX: This needs apply to all the crs in the chain, not just the first one (although
+            // this technically disables the chain so we might need to play around that)
+            let new_cr = drunkify(player_index, cr, status_effect.to_string());
+            return new_cr.into();
         }
 
         return cr.into();
@@ -289,7 +291,27 @@ impl Player {
     }
     /// If the role has an ability that acts during the day (not including night one), this method should be overwritten and resolve the day ability
     pub fn day_ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
-        self.role.day_ability(player_index, state)
+        let cr = self.role.day_ability(player_index, state)?;
+        let status_effect = self.get_statuses().iter().find(|se| {
+            se.status_type.behavior_type().is_some_and(|behaviors| {
+                behaviors
+                    .iter()
+                    .any(|behavior| matches!(behavior, PlayerBehaviors::DayAbility))
+            })
+        });
+
+        if let Some(status_effect) = status_effect {
+            // for cr in res.iter_mut() {
+            //     cr.state_change_func = None;
+            //     cr.description = format!("(*{}*) ", status_effect) + cr.description.as_str();
+            // }
+            // FIX: This needs apply to all the crs in the chain, not just the first one (although
+            // this technically disables the chain so we might need to play around that)
+            let new_cr = drunkify(player_index, cr, status_effect.to_string());
+            return new_cr.into();
+        }
+
+        return cr.into();
     }
 
     pub fn notify(&mut self, args: &ChangeArgs) {
@@ -310,6 +332,7 @@ pub(crate) enum PlayerBehaviors {
     SetupAbility,
     NightOneAbility,
     NightAbility,
+    DayAbility,
 }
 
 impl PartialEq for Player {
@@ -332,6 +355,41 @@ impl Debug for Player {
             .field("alignment", &self.alignment)
             .finish()
     }
+}
+
+fn drunkify(
+    player_index: PlayerIndex,
+    mut change_request: ChangeRequest,
+    status_string: String,
+) -> ChangeRequest {
+    if let Some(state_change_func) = change_request.state_change_func {
+        let status_string_clone = status_string.clone();
+        let wrapper_func = StateChangeFuncPtr::new(move |state, args| {
+            let mut state_copy = state.clone();
+            let next_cr = state_change_func(&mut state_copy, args)?;
+
+            let player_role = state_copy.get_player(player_index).role.clone();
+            state
+                .get_player_mut(player_index)
+                .role
+                .reassign(player_role);
+
+            if let Some(next_cr) = next_cr {
+                let new_state_change =
+                    drunkify(player_index, next_cr, status_string_clone.to_owned());
+                return new_state_change.into();
+            }
+
+            Ok(None)
+        });
+
+        change_request.state_change_func = Some(wrapper_func);
+    }
+
+    change_request.description =
+        format!("(*{}*) ", status_string) + change_request.description.as_str();
+
+    return change_request;
 }
 
 // impl Display for Player {

@@ -747,9 +747,18 @@ impl Role for Ravenkeeper {
     }
 
     fn night_ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
-        let player = state.get_player(player_index);
+        let death_event = state.log.search_current_phase(|event| match event {
+            log::Event::Death(pi) => {
+                if *pi == player_index {
+                    Some(event)
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        });
 
-        if self.ability_used || !player.dead {
+        if death_event.is_err() || self.ability_used {
             return None;
         }
 

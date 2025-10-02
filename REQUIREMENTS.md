@@ -3,6 +3,11 @@
 
 ## Major TODOS
 
+- Add in ways to add demon bluffs and notify the demon and minions to get to know each other
+- Also remind storyteller to give out roles
+- How to trigger scarletwoman effect?
+  - Event listeners (demon death)
+  - End of game functions
 - Maybe have code cleanup?? Or at least code review where you check if stuff makes still makes sense/ can be better?
   - Do this after scarletwoman and mayor are implemented
   - Maybe I am being too strict in how I allow roles to modify the game
@@ -11,6 +16,7 @@
   - Maybe i should be passing along state a lot more than I am
   - Roles obviously should be able to be swapped out, so they must be stored within an arc, but I also want them to have interior mutability, because recreating them each time is kind of annoying (or maybe this is not an issue).
   - Rethink change requests slightly (not completely) to see if they should work a little differently. See if there are any ways to make writing roles less grueling and less boilerplate.
+  - Rework status effects slightly. Maybe the categories of what they should affect should be different
 - End of game
   - Gather win conditions at the start of the game, and also when they should be checked. Respond to log events that correspond to the win condition's trigger?
   - Win condition should have a trigger, like a death, or a day switch event?
@@ -26,6 +32,8 @@
   - Perhaps do some refactoring to do dependency injection?
   - Make state
 - Disable players/options you can't pick in the ui
+  - Partially implemented, add filters for each role
+- PlayerIndex type?
 - Enum dispatch (crate)
 
 ## Game Modes
