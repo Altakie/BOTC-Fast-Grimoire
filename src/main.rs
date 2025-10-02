@@ -20,7 +20,7 @@ use engine::{
 mod scripts;
 use scripts::*;
 
-use crate::engine::change_request::{StateChangeFuncPtr, check_len};
+use crate::engine::change_request::{ChangeRequestBuilder, StateChangeFuncPtr, check_len};
 
 const DEBUG: bool = true;
 // use leptos_router::components::*;
@@ -566,7 +566,7 @@ fn Info() -> impl IntoView {
     let change_info = move || {
         let cr = temp_state.curr_change_request().get();
         match cr {
-            Some(cr) => cr.description.clone(),
+            Some(cr) => cr.get_description(),
             // match cr.change_type {
             //     ChangeType::ChoosePlayers(num) => format!("Choose {} Players", num),
             //     ChangeType::ChooseRoles(num) => format!("Choose {} Roles", num),
@@ -670,7 +670,7 @@ fn Game() -> impl IntoView {
         if let Some(cr) = temp_state.curr_change_request().get() {
             // console_log(&format!("Curr cr is {:?}", cr));
             // Do check func and return early if it doesn't pass
-            let args = match cr.change_type {
+            let args = match cr.get_change_type() {
                 ChangeType::ChoosePlayers(_) => Some(ChangeArgs::PlayerIndices(
                     temp_state.selected_players().get(),
                 )),
@@ -683,7 +683,7 @@ fn Game() -> impl IntoView {
 
             // Only apply funcs if change_type requires action
             if let Some(args) = args {
-                if let Some(state_func) = cr.state_change_func {
+                if let Some(state_func) = cr.get_state_change_func() {
                     let next_cr = game_state
                         .try_update(|gs| state_func.call(gs, args))
                         .unwrap();
@@ -703,7 +703,7 @@ fn Game() -> impl IntoView {
 
                     if next_cr.is_some() {
                         temp_state.update(|ts| ts.clear_selected());
-                        temp_state.curr_change_request().set(next_cr);
+                        temp_state.curr_change_request().set(build(next_cr));
                         // console_log(&format!(
                         //     "New Cr set as {:?}, curr cr is now {:?}",
                         //     next_cr,
@@ -736,7 +736,7 @@ fn Game() -> impl IntoView {
                     temp_state.currently_acting_player().set(Some(p));
                     match next_cr {
                         Some(next_cr) => {
-                            temp_state.curr_change_request().set(Some(next_cr));
+                            temp_state.curr_change_request().set(Some(next_cr.build()));
                             break;
                         }
                         None => {
@@ -809,114 +809,116 @@ fn Player_Display() -> impl IntoView {
 
     view! {
         <div class="relative origin-bottom-right size-1/2 flex flex-wrap rounded-full justify-between items-between">
-        <For
-        each=move|| players.get().into_iter().enumerate()
-        key = |(i, _)| *i
-                    children = move |(i, _)| {
-                        let pos = player_positions[i];
-                        let player = Memo::new(move |_| players.get()[i].clone());
-                        console_log("New Signal Created");
-                        let selected = move || temp_state.selected_players().get().contains(&i);
+            <For
+                each=move || players.get().into_iter().enumerate()
+                key=|(i, _)| *i
+                children=move |(i, _)| {
+                    let pos = player_positions[i];
+                    let player = Memo::new(move |_| players.get()[i].clone());
+                    console_log("New Signal Created");
+                    let selected = move || temp_state.selected_players().get().contains(&i);
 
-                        view! {
-                            <div
-                                class="translate-1/2 absolute size-fit"
-                                style:right=move || { format!("calc(50% + {}%)", pos.0) }
-                                style:top=move || format!("calc(35% + {}%)", pos.1)
-                            >
-                                <p class="absolute left-1/2 -translate-x-1/2 bottom-3/5 border-solid border text-center bg-[#ffffff]">
-                                    {player.get().name}
-                                </p>
-                                <button
-                                    class="size-[5rem] rounded-full text-center border border-[#000000]"
-                                    disabled=move||{
-                                            if let Some(ChangeRequest{filter_func: Some(filter_func), ..}) = temp_state.curr_change_request().get() {
-                                                return !filter_func.call(i, &player.read());
-                                            }
-
-                                            false
-                                        }
-                                    style:border-style=move || {
-                                        if selected() { "solid" } else { "none" }
-                                    }
-                                    style:background=move || {
-                                        if let Some(selected_player) = temp_state
-                                            .currently_acting_player()
-                                            .get()
-                                        {
-                                            if selected_player == i {
-                                                return "aquamarine";
-                                            }
-                                        }
-                                        ""
-                                    }
-                                    style:color=move || {
-                                        if player.get().dead {
-                                            return "gray";
-                                        }
-                                        match player.get().alignment {
-                                            engine::player::Alignment::Good => "blue",
-                                            engine::player::Alignment::Evil => "red",
-                                            engine::player::Alignment::Any => "purple",
+                    view! {
+                        <div
+                            class="translate-1/2 absolute size-fit"
+                            style:right=move || { format!("calc(50% + {}%)", pos.0) }
+                            style:top=move || format!("calc(35% + {}%)", pos.1)
+                        >
+                            <p class="absolute left-1/2 -translate-x-1/2 bottom-3/5 border-solid border text-center bg-[#ffffff]">
+                                {player.get().name}
+                            </p>
+                            <button
+                                class="size-[5rem] rounded-full text-center border border-[#000000]"
+                                disabled=move || {
+                                    if let Some(cr) = temp_state.curr_change_request().get() {
+                                        if let Some(filter_func) = cr.get_filter_func() {
+                                            return !filter_func.call(i, &player.read());
                                         }
                                     }
-                                    on:keypress=move |ev| {
-                                        ev.prevent_default();
+                                    false
+                                }
+                                style:border-style=move || {
+                                    if selected() { "solid" } else { "none" }
+                                }
+                                style:background=move || {
+                                    if let Some(selected_player) = temp_state
+                                        .currently_acting_player()
+                                        .get()
+                                    {
+                                        if selected_player == i {
+                                            return "aquamarine";
+                                        }
                                     }
-                                    on:click=move |_| {
-                                        if temp_state.curr_change_request().read().is_none() {
+                                    ""
+                                }
+                                style:color=move || {
+                                    if player.get().dead {
+                                        return "gray";
+                                    }
+                                    match player.get().alignment {
+                                        engine::player::Alignment::Good => "blue",
+                                        engine::player::Alignment::Evil => "red",
+                                        engine::player::Alignment::Any => "purple",
+                                    }
+                                }
+                                on:keypress=move |ev| {
+                                    ev.prevent_default();
+                                }
+                                on:click=move |_| {
+                                    if temp_state.curr_change_request().read().is_none() {
+                                        currently_selected_player.set(Some(i));
+                                        return;
+                                    }
+                                    let cr = temp_state.curr_change_request().get().unwrap();
+                                    let requested_num = match cr.get_change_type() {
+                                        ChangeType::ChoosePlayers(num) => num,
+                                        _ => {
                                             currently_selected_player.set(Some(i));
                                             return;
                                         }
-                                        let cr = temp_state.curr_change_request().get().unwrap();
-                                        let requested_num = match cr.change_type {
-                                            ChangeType::ChoosePlayers(num) => num,
-                                            _ => {
-                                                currently_selected_player.set(Some(i));
-                                                return;
-                                            }
-                                        };
-                                        if selected() {
-                                            selected_players
-                                                .update(|pv| {
-                                                    let remove_index = pv
-                                                        .iter()
-                                                        .position(|pi| *pi == i)
-                                                        .unwrap();
-                                                    pv.remove(remove_index);
-                                                });
-                                            return;
-                                        }
-                                        if selected_players.read().len() >= requested_num {
-                                            return;
-                                        }
-                                        selected_players.update(|pv| pv.push(i));
+                                    };
+                                    if selected() {
+                                        selected_players
+                                            .update(|pv| {
+                                                let remove_index = pv
+                                                    .iter()
+                                                    .position(|pi| *pi == i)
+                                                    .unwrap();
+                                                pv.remove(remove_index);
+                                            });
+                                        return;
                                     }
-                                >
-                                    {move || { player.get().role.to_string() }}
-                                </button>
-                                // Status effects
-                                <div class="text-[0.5rem] flex flex-row flex-wrap justify-center items-start absolute w-fit border left-1/2 -translate-x-1/2 top-9/10 ">
-                                    {move || {
-                                        let status_effects = game_state
-                                            .with(|gs| gs.get_player(i).status_effects.clone());
-                                        status_effects
-                                            .iter()
-                                            .map(|status_effect| {
-                                                let str = status_effect.status_type.to_string();
-                                                view! {
-                                                    // TODO: Standardize effect box sizes
-                                                    <p class="size-fit text-center border border-solid m-[0%] rounded-full p-[5px] bg-[#ffff00]">
-                                                        {str}
-                                                    </p>
-                                                }
-                                            })
-                                            .collect_view()
-                                    }}
-                                </div>
+                                    if selected_players.read().len() >= requested_num {
+                                        return;
+                                    }
+                                    selected_players.update(|pv| pv.push(i));
+                                }
+                            >
+                                {move || { player.get().role.to_string() }}
+                            </button>
+                            // Status effects
+                            <div class="text-[0.5rem] flex flex-row flex-wrap justify-center items-start absolute w-fit border left-1/2 -translate-x-1/2 top-9/10 ">
+                                {move || {
+                                    let status_effects = game_state
+                                        .with(|gs| gs.get_player(i).status_effects.clone());
+                                    status_effects
+                                        .iter()
+                                        .map(|status_effect| {
+                                            let str = status_effect.status_type.to_string();
+                                            view! {
+                                                // TODO: Standardize effect box sizes
+                                                <p class="size-fit text-center border border-solid m-[0%] rounded-full p-[5px] bg-[#ffff00]">
+                                                    {str}
+                                                </p>
+                                            }
+                                        })
+                                        .collect_view()
+                                }}
                             </div>
-                        }
-            } />
+                        </div>
+                    }
+                }
+            />
         </div>
     }
 }
@@ -951,10 +953,10 @@ fn Picker_Bar() -> impl IntoView {
     let temp_state = expect_context::<Store<TempState>>();
 
     let display = move || {
-        if let Some(ChangeRequest {
-            change_type: ChangeType::ChooseRoles(_),
-            ..
-        }) = temp_state.curr_change_request().get()
+        if temp_state
+            .curr_change_request()
+            .get()
+            .is_some_and(|cr| matches!(cr.get_change_type(), ChangeType::ChoosePlayers(_)))
         {
             return RoleSelector().into_any();
         }
@@ -998,7 +1000,7 @@ fn RoleSelector() -> impl IntoView {
                                         }
                                         temp_state.curr_change_request().get().unwrap()
                                     };
-                                    let requested_num = match cr.change_type {
+                                    let requested_num = match cr.get_change_type() {
                                         ChangeType::ChooseRoles(num) => num,
                                         _ => {
                                             return;
@@ -1061,11 +1063,14 @@ fn DayAbilitySelector() -> impl IntoView {
                 Ok(None)
             });
 
-            ChangeRequest::new(change_type, description.into(), state_change_func).into()
+            ChangeRequest::new(change_type, description.into())
+                .state_change_func(state_change_func)
+                .into()
         });
 
-        let nominate_request =
-            ChangeRequest::new(change_type, description.into(), state_change_func);
+        let nominate_request = ChangeRequest::new(change_type, description.into())
+            .state_change_func(state_change_func)
+            .build();
         temp_state.curr_change_request().set(Some(nominate_request));
     };
 
@@ -1083,7 +1088,7 @@ fn DayAbilitySelector() -> impl IntoView {
                             <button on:click=move |_| {
                                 temp_state.update(|ts| ts.reset());
                                 let player_ability = state.read().day_ability(player_index);
-                                temp_state.curr_change_request().set(player_ability);
+                                temp_state.curr_change_request().set(build(player_ability));
                                 temp_state.currently_acting_player().set(Some(player_index));
                             }>{move || { format!("{} Ability", role) }}</button>
                         }
@@ -1103,5 +1108,12 @@ fn LogDisplay() -> impl IntoView {
             <h2>"Log"</h2>
             <div>{move || { format!("{:#?}", state.log().get()) }}</div>
         </div>
+    }
+}
+
+fn build(change_option: Option<ChangeRequestBuilder>) -> Option<ChangeRequest> {
+    match change_option {
+        Some(cr) => Some(cr.build()),
+        None => None,
     }
 }

@@ -3,7 +3,9 @@ use std::{fmt::Display, sync::Arc};
 
 use crate::{
     engine::{
-        change_request::{ChangeRequest, ChangeType, StateChangeFuncPtr, check_len},
+        change_request::{
+            ChangeRequest, ChangeRequestBuilder, ChangeType, StateChangeFuncPtr, check_len,
+        },
         player::{
             Alignment, CharacterType,
             roles::{Role, RolePtr, demons::Imp},
@@ -19,11 +21,8 @@ use crate::{
 #[derive(Default)]
 pub(crate) struct Spy();
 impl Spy {
-    fn ability(&self) -> Option<ChangeRequest> {
-        let change_type = ChangeType::Display;
-        let message = "Show the Spy the grimoire";
-
-        ChangeRequest::new_display(change_type, message.into()).into()
+    fn ability(&self) -> Option<ChangeRequestBuilder> {
+        ChangeRequest::new(ChangeType::Display, "Show the Spy the grimoire".into()).into()
     }
 }
 
@@ -52,7 +51,7 @@ impl Role for Spy {
         &self,
         _player_index: PlayerIndex,
         _state: &State,
-    ) -> Option<ChangeRequest> {
+    ) -> Option<ChangeRequestBuilder> {
         self.ability()
     }
 
@@ -60,7 +59,11 @@ impl Role for Spy {
         Some(84)
     }
 
-    fn night_ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
+    fn night_ability(
+        &self,
+        player_index: PlayerIndex,
+        state: &State,
+    ) -> Option<ChangeRequestBuilder> {
         let dead = state.get_player(player_index).dead;
         if dead {
             return None;
@@ -107,14 +110,15 @@ impl Display for Baron {
 pub(crate) struct Poisoner();
 
 impl Poisoner {
-    fn ability(&self, player_index: PlayerIndex) -> Option<ChangeRequest> {
+    fn ability(&self, player_index: PlayerIndex) -> Option<ChangeRequestBuilder> {
         // Clean up the old poisoned effect, prompt for another
         // player, and give them the poisoned effect
 
-        let message = "Prompt the poisoner to pick a player to poison";
-        let change_type = ChangeType::ChoosePlayers(1);
-
-        let state_change_func = StateChangeFuncPtr::new(move |state, args| {
+        ChangeRequest::new(
+            ChangeType::ChoosePlayers(1),
+            "Prompt the poisoner to pick a player to poison".to_string(),
+        )
+        .state_change_func(StateChangeFuncPtr::new(move |state, args| {
             let target_players = args.extract_player_indicies()?;
             check_len(&target_players, 1)?;
 
@@ -127,9 +131,8 @@ impl Poisoner {
             target_player.add_status(status);
 
             Ok(None)
-        });
-
-        ChangeRequest::new(change_type, message.to_string(), state_change_func).into()
+        }))
+        .into()
     }
 }
 
@@ -150,7 +153,7 @@ impl Role for Poisoner {
         &self,
         player_index: PlayerIndex,
         _state: &State,
-    ) -> Option<ChangeRequest> {
+    ) -> Option<ChangeRequestBuilder> {
         self.ability(player_index)
     }
 
@@ -158,7 +161,11 @@ impl Role for Poisoner {
         Some(12)
     }
 
-    fn night_ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
+    fn night_ability(
+        &self,
+        player_index: PlayerIndex,
+        state: &State,
+    ) -> Option<ChangeRequestBuilder> {
         let dead = state.get_player(player_index).dead;
         if dead {
             return None;
@@ -220,7 +227,11 @@ impl Role for ScarletWoman {
         true
     }
 
-    fn day_ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequest> {
+    fn day_ability(
+        &self,
+        player_index: PlayerIndex,
+        state: &State,
+    ) -> Option<ChangeRequestBuilder> {
         let demon_alive = state.get_players().iter().any(|player| {
             player.role.get_true_character_type() == CharacterType::Demon && !player.dead
         });
@@ -234,15 +245,16 @@ impl Role for ScarletWoman {
             return None;
         }
 
-        let change_type = ChangeType::NoStoryteller;
-        let description = "The Scarletwoman becomes the imp";
-        let change_func = StateChangeFuncPtr::new(move |state, args| {
+        ChangeRequest::new(
+            ChangeType::NoStoryteller,
+            "The Scarletwoman becomes the imp".into(),
+        )
+        .state_change_func(StateChangeFuncPtr::new(move |state, args| {
             let scarlet_woman = state.get_player_mut(player_index);
             scarlet_woman.role.reassign(RolePtr::new::<Imp>());
             Ok(None)
-        });
-
-        ChangeRequest::new(change_type, description.into(), change_func).into()
+        }))
+        .into()
     }
 }
 

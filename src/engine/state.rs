@@ -11,7 +11,7 @@ use reactive_stores::*;
 
 use crate::{
     engine::{
-        change_request::{ChangeRequest, ChangeResult},
+        change_request::{ChangeRequest, ChangeRequestBuilder, ChangeResult},
         player::{Player, roles::Roles},
         state::{log::Event, status_effects::CleanupPhase},
     },
@@ -233,7 +233,7 @@ impl State {
     ///
     /// * Option<ChangeRequest> : A change request if the role does something, or none if it
     ///   doesn't
-    pub(crate) fn resolve(&self, player_index: PlayerIndex) -> Option<ChangeRequest> {
+    pub(crate) fn resolve(&self, player_index: PlayerIndex) -> Option<ChangeRequestBuilder> {
         let player = self.get_player(player_index);
 
         let res = match self.step {

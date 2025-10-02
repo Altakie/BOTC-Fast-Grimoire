@@ -53,10 +53,44 @@ pub fn check_len<T>(vec: &[T], desired_len: usize) -> Result<(), ChangeError> {
 
 #[derive(Clone)]
 pub(crate) struct ChangeRequest {
-    pub(crate) change_type: ChangeType,
-    pub(crate) filter_func: Option<FilterFuncPtr>,
-    pub(crate) state_change_func: Option<StateChangeFuncPtr>,
-    pub(crate) description: String,
+    change_type: ChangeType,
+    filter_func: Option<FilterFuncPtr>,
+    state_change_func: Option<StateChangeFuncPtr>,
+    description: String,
+}
+
+impl ChangeRequest {
+    pub(crate) fn new(change_type: ChangeType, description: String) -> ChangeRequestBuilder {
+        ChangeRequestBuilder {
+            change_type,
+            filter_func: None,
+            state_change_func: None,
+            description,
+        }
+    }
+
+    pub(crate) fn get_change_type(&self) -> ChangeType {
+        self.change_type
+    }
+
+    pub(crate) fn get_description(&self) -> String {
+        self.description.clone()
+    }
+
+    // WARN: Might want to change these two
+    pub(crate) fn get_filter_func(&self) -> Option<&FilterFuncPtr> {
+        match &self.filter_func {
+            Some(filter_func) => Some(filter_func),
+            None => None,
+        }
+    }
+
+    pub(crate) fn get_state_change_func(&self) -> Option<&StateChangeFuncPtr> {
+        match &self.state_change_func {
+            Some(state_change_func) => Some(state_change_func),
+            None => None,
+        }
+    }
 }
 
 // impl ChangeRequest {
@@ -69,6 +103,53 @@ impl Debug for ChangeRequest {
             .field("change_type", &self.change_type)
             .field("description", &self.description)
             .finish()
+    }
+}
+
+pub(crate) struct ChangeRequestBuilder {
+    pub(crate) change_type: ChangeType,
+    pub(crate) filter_func: Option<FilterFuncPtr>,
+    pub(crate) state_change_func: Option<StateChangeFuncPtr>,
+    pub(crate) description: String,
+}
+
+impl ChangeRequestBuilder {
+    pub(crate) fn build(self) -> ChangeRequest {
+        ChangeRequest {
+            change_type: self.change_type,
+            filter_func: self.filter_func,
+            state_change_func: self.state_change_func,
+            description: self.description,
+        }
+    }
+
+    // This is because the description should be able to be modified after creation
+    pub(crate) fn description(mut self, description: String) -> Self {
+        self.description = description;
+        self
+    }
+
+    pub(crate) fn change_description<F>(mut self, f: F) -> Self
+    where
+        F: Fn(String) -> String,
+    {
+        self.description = f(self.description);
+        self
+    }
+
+    pub(crate) fn filter_func(mut self, filter_func: FilterFuncPtr) -> Self {
+        self.filter_func = Some(filter_func);
+        self
+    }
+
+    pub(crate) fn state_change_func(mut self, state_change_func: StateChangeFuncPtr) -> Self {
+        self.state_change_func = Some(state_change_func);
+        self
+    }
+
+    pub(crate) fn clear_state_change_func(mut self) -> Self {
+        self.state_change_func = None;
+        self
     }
 }
 
@@ -125,46 +206,6 @@ impl Deref for StateChangeFuncPtr {
     }
 }
 
-impl ChangeRequest {
-    pub(crate) fn new(
-        change_type: ChangeType,
-        description: String,
-        state_change_func: StateChangeFuncPtr,
-    ) -> Self
-where {
-        Self {
-            change_type,
-            filter_func: None,
-            state_change_func: Some(state_change_func),
-            description,
-        }
-    }
-
-    pub(crate) fn new_with_filter(
-        change_type: ChangeType,
-        description: String,
-        filter_func: FilterFuncPtr,
-        state_change_func: StateChangeFuncPtr,
-    ) -> Self
-where {
-        Self {
-            change_type,
-            filter_func: Some(filter_func),
-            state_change_func: Some(state_change_func),
-            description,
-        }
-    }
-
-    pub(crate) fn new_display(change_type: ChangeType, description: String) -> Self {
-        Self {
-            change_type,
-            filter_func: None,
-            state_change_func: None,
-            description,
-        }
-    }
-}
-
 #[derive(Clone, Debug)]
 pub enum ChangeError {
     InvalidSelectedPlayer { reason: String },
@@ -175,10 +216,10 @@ pub enum ChangeError {
     BlankArgs,
 }
 
-pub type ChangeResult = Result<Option<ChangeRequest>, ChangeError>;
+pub type ChangeResult = Result<Option<ChangeRequestBuilder>, ChangeError>;
 
-impl From<ChangeRequest> for ChangeResult {
-    fn from(value: ChangeRequest) -> Self {
+impl From<ChangeRequestBuilder> for ChangeResult {
+    fn from(value: ChangeRequestBuilder) -> Self {
         Ok(Some(value))
     }
 }
