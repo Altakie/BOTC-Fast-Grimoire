@@ -2,6 +2,7 @@ use std::fmt::Display;
 use std::sync::Arc;
 
 use crate::engine::change_request::{ChangeArgs, ChangeError, ChangeRequest, StateChangeFuncPtr};
+use crate::engine::player::Player;
 use crate::engine::player::roles::RolePtr;
 use crate::engine::state::status_effects::CleanupPhase;
 use crate::engine::{
@@ -131,10 +132,7 @@ impl Role for Drunk {
         // If the drunk has a role assigned, call its setup ability instead
         if let Some(role) = &self.role {
             let res = role.setup_ability(player_index, state);
-            return match res {
-                Some(cr) => Some(cr.clear_state_change_func()),
-                None => None,
-            };
+            return res.map(|cr| cr.clear_state_change_func());
         };
 
         ChangeRequest::new(
@@ -152,11 +150,12 @@ impl Role for Drunk {
                 });
             }
 
-            let state_snapshot = state.clone();
-
-            let drunk = state.get_player_mut(player_index);
-            drunk.notify(&args);
-            Ok(drunk.setup_ability(player_index, &state_snapshot))
+            {
+                let drunk = state.get_player_mut(player_index);
+                drunk.notify(&args);
+            }
+            let drunk = state.get_player(player_index);
+            Ok(drunk.setup_ability(player_index, state as &State))
         }))
         .into()
     }
@@ -213,13 +212,10 @@ impl Role for Drunk {
         let role = self.role.clone()?;
 
         let res = role.night_ability(player_index, state);
-        return match res {
-            Some(cr) => Some(
-                cr.clear_state_change_func()
-                    .change_description(|desc| format!("(*Drunk*) {}", desc)),
-            ),
-            None => None,
-        };
+        return res.map(|cr| {
+            cr.clear_state_change_func()
+                .change_description(|desc| format!("(*Drunk*) {}", desc))
+        });
     }
 }
 

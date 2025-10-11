@@ -65,6 +65,7 @@ impl Role for Imp {
             }
 
             return Ok(None);
+            // Link::new(state, args).extract_player_indicies().check_len(1).kill(self.player_index, self.args.)?.next_if(kill_cr.is_some(), Ok(kill_cr)).next_if(target_player_index == player_index && state.get_player(player_index).dead, Imp::new_imp()).next(Ok(None)));
         }))
         .into();
     }
@@ -84,7 +85,6 @@ impl Imp {
                         reason: "Cannot select a non-minion to become the new imp".into(),
                     });
                 }
-                let target_player_index = target_players[0];
                 let day_num = state.day_num;
                 let target_player = state.get_player_mut(target_player_index);
 
@@ -94,6 +94,14 @@ impl Imp {
 
                 target_player.role.reassign(new_role);
                 Ok(None)
+
+                // Link::new(state, args).extract_player_inicies().check_len(1).check(|player| {
+                // if target_player.role.get_true_character_type() != CharacterType::Minion {
+                //     return Err(ChangeError::InvalidSelectedPlayer {
+                //         reason: "Cannot select a non-minion to become the new imp".into(),
+                //     });
+                // }
+                // }).modify_player(pi, || pi.role)
             }))
             .filter_func(FilterFuncPtr::new(move |_, player| {
                 player.role.get_true_character_type() == CharacterType::Minion

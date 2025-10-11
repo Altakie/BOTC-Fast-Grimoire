@@ -35,15 +35,19 @@ fn washerwoman_librarian_investigator<
         format!("Select a {}", &character_type.to_string()),
     )
     .state_change_func(StateChangeFuncPtr::new(move |state, args| {
+        // let target_player_indices = args.extract_player_indicies()?.check_len(1)?;
+        // state.modify_player(target_player_indices[0], |player| player.add_status(right_status()));
         let target_player_indices = args.extract_player_indicies()?;
         check_len(&target_player_indices, 1)?;
-
-        let target_player = state.get_player_mut(target_player_indices[0]);
-        target_player.add_status(right_status());
+        state
+            .get_player_mut(target_player_indices[0])
+            .add_status(right_status());
 
         return washerwoman_librarian_investigator_wrong(player_index, right_status, wrong_status);
     }))
     .into();
+
+    // .state_change_func(if StateChangeFuncPtr::new().extract_player_indicies().check_len(1).modify_player(player_index, change_func).next(washer_wo))
 }
 
 fn washerwoman_librarian_investigator_wrong(
@@ -1045,3 +1049,4 @@ mod test {
         todo!()
     }
 }
+

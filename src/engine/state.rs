@@ -138,10 +138,10 @@ impl State {
         &self.players[player_index]
     }
 
+    // Want this to lazily evaluate changes to state, kind of like a continuation
     pub(crate) fn get_player_mut(&mut self, player_index: PlayerIndex) -> &mut Player {
         &mut self.players[player_index]
     }
-
     pub(crate) fn living_player_count(&self) -> usize {
         self.players.iter().filter(|s| !s.dead).count()
     }
