@@ -26,14 +26,14 @@ cargo install trunk
 git clone https://github.com/Altakie/BOTC-Fast-Grimoire.git
 ```
 
-5. Install tailwindcss any way you wish and modify [Trunk.toml] to point to your binary of tailwind. Don't change any of the arguments to the command.
+5. Install tailwindcss any way you wish and modify [Trunk.toml](./Trunk.toml) to point to your binary of tailwind. Don't change any of the arguments to the command.
 6. Now you can just run
 
 ```shell
 trunk serve
 ```
 
-and you should be able to access the Storyteller Assistant at [localhost:8080]  
+and you should be able to access the Storyteller Assistant at [localhost:8080](http://localhost:8080/)
 
 Apologies for the long setup process. Currently the project is in progress and I have not yet packaged it so it can be easily distributed. I plan to eventually have it hosted as a website as well, so anyone can access it.
 
