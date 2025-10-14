@@ -729,7 +729,7 @@ impl Role for Monk {
 
             Ok(None)
         }))
-        .filter_func(FilterFuncPtr::new(move |pi, _| !pi == player_index))
+        .filter_func(FilterFuncPtr::new(move |pi, _| pi != player_index))
         .into()
     }
 }
