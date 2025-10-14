@@ -272,6 +272,73 @@ impl State {
 
         return cr;
     }
+
+    pub(crate) fn describe_event(&self, event: Event) -> String {
+        match event {
+            Event::Nomination {
+                nominator_player_index,
+                target_player_index,
+            } => todo!(),
+            Event::Voting {
+                players_voted,
+                target_player_index,
+            } => {
+                let player = self.get_player(target_player_index);
+                let descriptor = match players_voted {
+                    0 => "Nobody",
+                    1 => "Person",
+                    _ => "People",
+                };
+                format!(
+                    "{} {} voted for {}({})",
+                    players_voted, descriptor, player.name, player.role
+                )
+            }
+            Event::Execution(player_index) => {
+                let player = self.get_player(player_index);
+                format!("{}({}) was executed", player.name, player.role)
+            }
+            Event::AttemptedKill {
+                attacking_player_index,
+                target_player_index,
+            } => {
+                let attacking_player = self.get_player(attacking_player_index);
+                let target_player = self.get_player(target_player_index);
+                format!(
+                    "{}({}) attemped to kill {}({})",
+                    attacking_player.name,
+                    attacking_player.role,
+                    target_player.name,
+                    target_player.role
+                )
+            }
+            Event::Death(player_index) => {
+                let player = self.get_player(player_index);
+                format!("{}({}) died", player.name, player.role)
+            }
+            Event::StatusApplied {
+                source_player_index,
+                target_player_index,
+                status_effect,
+            } => {
+                let source_player = self.get_player(source_player_index);
+                let target_player = self.get_player(target_player_index);
+                format!(
+                    "{}({}) gave {}({}) {} effect",
+                    source_player.name,
+                    source_player.role,
+                    target_player.name,
+                    target_player.role,
+                    status_effect
+                )
+            }
+            Event::InfoLearned(info) =>
+            // TODO: Include player index
+            {
+                format!("{info} was learned")
+            }
+        }
+    }
 }
 
 // #[cfg(test)]

@@ -5,7 +5,7 @@ use crate::engine::state::Step;
 use super::{PlayerIndex, status_effects::StatusEffect};
 // -- Logging --
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct DayPhaseLog {
     pub(crate) day_phase: Step,
     pub(crate) log: Vec<Event>,
@@ -31,13 +31,8 @@ pub struct Log {
 
 impl Log {
     pub fn new() -> Self {
-        let setup_phase = DayPhaseLog {
-            day_phase: Step::Setup,
-            log: vec![],
-            day_num: 0,
-        };
         Self {
-            day_phases: vec![setup_phase],
+            day_phases: vec![],
             day_num: 0,
         }
     }
@@ -64,7 +59,7 @@ impl Log {
     where
         F: Fn(&Event) -> Option<&Event>,
     {
-        let day_phase = self.get_latest_phase();
+        let day_phase = self.get_latest_phase().unwrap();
         if let Some(event) = day_phase.search(&search_func) {
             return Ok(event);
         }
@@ -74,43 +69,51 @@ impl Log {
 
     pub fn next_phase(&mut self) {
         // Check the latest day_phase
-        match self.get_mut_latest_phase().day_phase {
-            Step::Setup => {
-                // Create night one in log
-                let night_1 = DayPhaseLog {
-                    day_phase: Step::NightOne,
-                    log: vec![],
-                    day_num: 1,
-                };
-                self.day_num = 1;
-                self.day_phases.push(night_1);
-            }
-            Step::Day => {
+        match self.get_latest_phase() {
+            None => {
                 self.day_phases.push(DayPhaseLog {
-                    day_phase: Step::Night,
+                    day_phase: Step::Setup,
                     log: vec![],
                     day_num: self.day_num,
                 });
             }
-            Step::NightOne => {
-                // Only time we should increment day num
-                self.day_num += 1;
-                self.day_phases.push(DayPhaseLog {
-                    day_phase: Step::Day,
-                    log: vec![],
-                    day_num: self.day_num,
-                });
-            }
-            Step::Night => {
-                // Only time we should increment day num
-                self.day_num += 1;
-                self.day_phases.push(DayPhaseLog {
-                    day_phase: Step::Day,
-                    log: vec![],
-                    day_num: self.day_num,
-                });
-            }
-            Step::Start => panic!("Log should never have Start Phase"),
+            Some(phase) => match phase.day_phase {
+                Step::Setup => {
+                    // Create night one in log
+                    let night_1 = DayPhaseLog {
+                        day_phase: Step::NightOne,
+                        log: vec![],
+                        day_num: 1,
+                    };
+                    self.day_num = 1;
+                    self.day_phases.push(night_1);
+                }
+                Step::Day => {
+                    self.day_phases.push(DayPhaseLog {
+                        day_phase: Step::Night,
+                        log: vec![],
+                        day_num: self.day_num,
+                    });
+                }
+                Step::NightOne => {
+                    // Only time we should increment day num
+                    self.day_phases.push(DayPhaseLog {
+                        day_phase: Step::Day,
+                        log: vec![],
+                        day_num: self.day_num,
+                    });
+                }
+                Step::Night => {
+                    // Only time we should increment day num
+                    self.day_num += 1;
+                    self.day_phases.push(DayPhaseLog {
+                        day_phase: Step::Day,
+                        log: vec![],
+                        day_num: self.day_num,
+                    });
+                }
+                Step::Start => panic!("Log should never have Start Phase"),
+            },
         }
     }
 
@@ -124,11 +127,8 @@ impl Log {
         self.day_phases.get_mut(len - 2)
     }
 
-    fn get_latest_phase(&self) -> &DayPhaseLog {
-        // WARN: This should never be empty anyway, but do fix this implementation to not panic if
-        // it is
-        assert!(!self.day_phases.is_empty());
-        self.day_phases.last().unwrap()
+    fn get_latest_phase(&self) -> Option<&DayPhaseLog> {
+        self.day_phases.last()
     }
 
     fn get_mut_latest_phase(&mut self) -> &mut DayPhaseLog {
@@ -178,7 +178,8 @@ pub enum Event {
         target_player_index: PlayerIndex,
     },
     Voting {
-        players_voted: Option<usize>,
+        players_voted: usize,
+        target_player_index: PlayerIndex,
     },
     Execution(PlayerIndex),
     AttemptedKill {
@@ -187,18 +188,12 @@ pub enum Event {
     },
     Death(PlayerIndex),
     // Ability Specific Events
-    StatusApplied(StatusEffect),
+    StatusApplied {
+        source_player_index: PlayerIndex,
+        target_player_index: PlayerIndex,
+        status_effect: StatusEffect,
+    },
     InfoLearned(String),
-}
-
-impl Event {
-    pub fn get_description(&self) -> String {
-        todo!();
-    }
-
-    pub fn get_reason(&self) -> Option<String> {
-        todo!();
-    }
 }
 
 #[derive(Debug)]

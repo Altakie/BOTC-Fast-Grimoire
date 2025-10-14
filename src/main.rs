@@ -21,6 +21,7 @@ mod scripts;
 use scripts::*;
 
 use crate::engine::change_request::{ChangeRequestBuilder, StateChangeFuncPtr, check_len};
+use crate::engine::state::log;
 
 const DEBUG: bool = true;
 // use leptos_router::components::*;
@@ -60,7 +61,7 @@ fn App() -> impl IntoView {
             // Role::Monk,
             Roles::Scarletwoman,
             Roles::Poisoner,
-            Roles::Mayor,
+            Roles::Drunk,
             Roles::Imp,
         ]);
 
@@ -603,7 +604,7 @@ fn Info() -> impl IntoView {
                             });
                     }>"Toggle"</button>
                 </p>
-                <p>"Ghost Vote: "{if player.ghost_vote { "Yes" } else { "No" }}</p>
+                <p>"Ghost Vote: "{if player.dead { "Yes" } else { "No" }}</p>
                 <p>"Alignment: " {player.alignment.to_string()}</p>
             </div>
         }
@@ -635,7 +636,17 @@ fn Info() -> impl IntoView {
                         "Execute"
                     </button>
                 </p>
-                <p>"Ghost Vote: "{if player.ghost_vote { "Yes" } else { "No" }}</p>
+                <p>
+                    "Ghost Vote: "{if player.ghost_vote { "Yes" } else { "No" }}
+                    <button on:click=move |_| {
+                        game_state
+                            .players()
+                            .update(|players: &mut Vec<Player>| {
+                                let ghost_vote = &mut players[player_index].ghost_vote;
+                                *ghost_vote = !*ghost_vote;
+                            });
+                    }>"Toggle"</button>
+                </p>
                 <p>"Alignment: " {player.alignment.to_string()}</p>
             </div>
         }
@@ -838,7 +849,13 @@ fn Player_Display() -> impl IntoView {
                                     false
                                 }
                                 style:border-style=move || {
-                                    if selected() { "solid" } else { "none" }
+                                    if selected() {
+                                        "solid"
+                                    } else if !player.get().ghost_vote {
+                                        "dashed"
+                                    } else {
+                                        "none"
+                                    }
                                 }
                                 style:background=move || {
                                     if let Some(selected_player) = temp_state
@@ -956,7 +973,7 @@ fn Picker_Bar() -> impl IntoView {
         if temp_state
             .curr_change_request()
             .get()
-            .is_some_and(|cr| matches!(cr.get_change_type(), ChangeType::ChoosePlayers(_)))
+            .is_some_and(|cr| matches!(cr.get_change_type(), ChangeType::ChooseRoles(_)))
         {
             return RoleSelector().into_any();
         }
@@ -1106,10 +1123,38 @@ fn LogDisplay() -> impl IntoView {
     view! {
         <div class="border">
             <h2>"Log"</h2>
-            <div>{move || { format!("{:#?}", state.log().get()) }}</div>
+            <div>
+        // {move || { format!("{:#?}", state.log().get()) }}
+            <For
+                each= move|| state.log().get().day_phases.into_iter().enumerate()
+                key= |(i, _day_phase)| *i
+                children=move|(i,_)| {
+                    let day_phase = Memo::new(move |_| state.log().get().day_phases[i].clone());
+                view! {
+                <div class="border">
+                    <h3>{format!("{:?} {}", day_phase.get().day_phase, day_phase.get().day_num) }</h3>
+                    <For
+                        each=move|| day_phase.get().log.into_iter().enumerate()
+                        key=|(index, _)| *index
+                        children=move |(_, event)| {
+                            view! {
+                                <p>{state.read().describe_event(event)}</p>
+                            }
+                        }
+                    />
+                </div>
+                }
+                }
+            />
+        </div>
         </div>
     }
 }
+
+// #[component]
+// fn DayPhaseDisplay(day_phase: Memo<log::DayPhaseLog>) -> impl IntoView {
+//     view! {};
+// }
 
 fn build(change_option: Option<ChangeRequestBuilder>) -> Option<ChangeRequest> {
     match change_option {
