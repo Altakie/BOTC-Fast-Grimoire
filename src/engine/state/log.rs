@@ -196,6 +196,37 @@ pub enum Event {
     InfoLearned(String),
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct Nomination {
+    pub nominator_player_index: PlayerIndex,
+    pub jtarget_player_index: PlayerIndex,
+}
+#[derive(Clone, Debug, PartialEq)]
+pub struct Voting {
+    pub players_voted: usize,
+    pub target_player_index: PlayerIndex,
+}
+#[derive(Clone, Debug, PartialEq)]
+pub struct Execution(PlayerIndex);
+#[derive(Clone, Debug, PartialEq)]
+pub struct AttemptedKill {
+    pub attacking_player_index: PlayerIndex,
+    pub target_player_index: PlayerIndex,
+}
+#[derive(Clone, Debug, PartialEq)]
+pub struct Death {
+    pub player_index: PlayerIndex,
+}
+// Ability Specific Events
+#[derive(Clone, Debug, PartialEq)]
+pub struct StatusApplied {
+    pub source_player_index: PlayerIndex,
+    pub target_player_index: PlayerIndex,
+    pub status_effect: StatusEffect,
+}
+#[derive(Clone, Debug, PartialEq)]
+pub struct InfoLearned(String);
+
 #[derive(Debug)]
 pub enum SearchError {
     InvalidDayNum,

@@ -4,6 +4,7 @@ use crate::engine::{
     player::roles::RolePtr,
 };
 use std::fmt::Display;
+use std::ops::Deref;
 
 use crate::engine::{
     change_request::{ChangeError, ChangeRequestBuilder, ChangeType},
@@ -29,6 +30,10 @@ impl Role for Imp {
         Some(34)
     }
 
+    fn is_win_condition(&self) -> bool {
+        true
+    }
+
     fn night_ability(
         &self,
         player_index: PlayerIndex,
@@ -41,13 +46,13 @@ impl Role for Imp {
 
         let day_num = state.day_num;
 
-        if let Some(prev_day_num) = self.last_killed {
-            if prev_day_num == day_num {
-                return None;
-            }
+        if let Some(prev_day_num) = self.last_killed
+            && prev_day_num == day_num
+        {
+            return None;
         }
 
-        return ChangeRequest::new(
+        return ChangeRequest::new_builder(
             ChangeType::ChoosePlayers(1),
             "Ask the Imp to point to the player they would like to kill".into(),
         )
@@ -72,7 +77,7 @@ impl Role for Imp {
 
 impl Imp {
     fn new_imp() -> ChangeResult {
-        return ChangeRequest::new(ChangeType::ChoosePlayers(1), "Choose a new Imp".into())
+        return ChangeRequest::new_builder(ChangeType::ChoosePlayers(1), "Choose a new Imp".into())
             .state_change_func(StateChangeFuncPtr::new(move |state, args| {
                 let target_players = args.extract_player_indicies()?;
                 check_len(&target_players, 1)?;

@@ -23,6 +23,7 @@ impl State {
         let target_player = self.get_player_mut(target_player_index);
 
         target_player.execute();
+        self.handle_death(target_player_index);
         self.log.log_event(Event::Execution(target_player_index));
 
         // After a player is executed, immediately go to night

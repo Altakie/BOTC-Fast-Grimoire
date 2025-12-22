@@ -30,7 +30,7 @@ fn washerwoman_librarian_investigator<
     let wrong_status =
         move || StatusEffect::new(std::sync::Arc::new(WE::default()), player_index, None);
 
-    return ChangeRequest::new(
+    return ChangeRequest::new_builder(
         ChangeType::ChoosePlayers(1),
         format!("Select a {}", &character_type.to_string()),
     )
@@ -51,7 +51,7 @@ fn washerwoman_librarian_investigator_wrong(
     right_status: impl Fn() -> StatusEffect + Send + Sync + 'static,
     wrong_status: impl Fn() -> StatusEffect + Send + Sync + 'static,
 ) -> ChangeResult {
-    return ChangeRequest::new(
+    return ChangeRequest::new_builder(
         ChangeType::ChoosePlayers(1),
         "Select a different player".into(),
     )
@@ -142,7 +142,7 @@ impl Role for Washerwoman {
         state: &State,
     ) -> Option<ChangeRequestBuilder> {
         let player = state.get_player(player_index);
-        ChangeRequest::new(
+        ChangeRequest::new_builder(
             ChangeType::Display,
             format!("Show the {} the correct roles", player.role),
         )
@@ -238,7 +238,7 @@ impl Role for Librarian {
             })
             .count();
 
-        ChangeRequest::new(ChangeType::Display, {
+        ChangeRequest::new_builder(ChangeType::Display, {
             if outsider_count == 0 {
                 "Show the Librarian there are no outsiders in play".to_string()
             } else {
@@ -311,7 +311,7 @@ impl Role for Investigator {
     ) -> Option<ChangeRequestBuilder> {
         let player = state.get_player(player_index);
 
-        ChangeRequest::new(
+        ChangeRequest::new_builder(
             ChangeType::Display,
             format!("Show the {} the correct roles", player.role),
         )
@@ -360,7 +360,7 @@ impl Role for Chef {
             })
             .count();
 
-        ChangeRequest::new(
+        ChangeRequest::new_builder(
             ChangeType::Display,
             format!(
                 "Show the chef that there are {} pairs of evil players",
@@ -393,7 +393,7 @@ impl Empath {
             count += 1;
         }
 
-        ChangeRequest::new(
+        ChangeRequest::new_builder(
             ChangeType::Display,
             format!("Empath has {} evil neighbors", count),
         )
@@ -463,7 +463,7 @@ impl Fortuneteller {
             return None;
         }
 
-        ChangeRequest::new(
+        ChangeRequest::new_builder(
             ChangeType::ChoosePlayers(2),
             "Prompt the FortuneTeller to point to two players".into(),
         )
@@ -490,7 +490,7 @@ impl Fortuneteller {
                         && se.to_string() == FortunetellerRedHerring().to_string()
                 })
             });
-            ChangeRequest::new(
+            ChangeRequest::new_builder(
                 ChangeType::Display,
                 format!(
                     "Show the Fortuneteller a {}",
@@ -526,7 +526,7 @@ impl Role for Fortuneteller {
     ) -> Option<ChangeRequestBuilder> {
         // Get storyteller input on who red-herring is
         // Add a red-herring through status effects
-        ChangeRequest::new(
+        ChangeRequest::new_builder(
             ChangeType::ChoosePlayers(1),
             "Select a red-herring for the Fortune Teller".to_string(),
         )
@@ -621,7 +621,7 @@ impl Role for Undertaker {
 
         let executed_role = state.get_player(executed_player_index).role.clone();
 
-        ChangeRequest::new(
+        ChangeRequest::new_builder(
             ChangeType::Display,
             format!(
                 "Show the undertaker that the {} was executed yesterday",
@@ -701,7 +701,7 @@ impl Role for Monk {
         if dead {
             return None;
         }
-        ChangeRequest::new(
+        ChangeRequest::new_builder(
             ChangeType::ChoosePlayers(1),
             "Have the monk select a player to protect".into(),
         )
@@ -781,7 +781,7 @@ impl Role for Ravenkeeper {
             return None;
         }
 
-        ChangeRequest::new(
+        ChangeRequest::new_builder(
             ChangeType::ChoosePlayers(1),
             "Prompt the Ravenkeeper to point to a player".into(),
         )
@@ -797,7 +797,7 @@ impl Role for Ravenkeeper {
             let target_player = state.get_player(target_player_indices[0]);
 
             // Create a new change request using the role of the target player
-            ChangeRequest::new(
+            ChangeRequest::new_builder(
                 ChangeType::Display,
                 format!(
                     "Show the Ravenkeeper that they selected the {}",
@@ -831,6 +831,16 @@ impl Role for Virgin {
     }
 
     // TODO: Want to make this method more idiomatic
+    // Maybe just make this a change request instead (might make more sense)
+    // Or an event listener
+    // Drunkify problem
+    // Want to isolate a certain kind of change (not just disable state change func)
+    // Maybe inject some code or something, where each call to the state is wrapped in a type
+    // Could be a use case for monads (or monadic code)
+    // For now, cloning is sufficient
+    // Brute force (pass in a boolean and check for every call whether that boolean is true or
+    // not). If it isn't, then don't actually query the state
+    // Or just only call the part of the code that triggers the ability usage
     fn nominated(
         &self,
         nominating_player_index: PlayerIndex,
@@ -889,7 +899,7 @@ impl Role for Slayer {
         // If it is a demon, kill the demon, otherwise do nothing
         // Either way, use your ability
 
-        ChangeRequest::new(
+        ChangeRequest::new_builder(
             ChangeType::ChoosePlayers(1),
             "Prompt the slayer to point to a player".into(),
         )
@@ -973,7 +983,7 @@ impl Role for Mayor {
         _state: &State,
     ) -> Option<ChangeResult> {
         Some(
-            ChangeRequest::new(
+            ChangeRequest::new_builder(
                 ChangeType::ChoosePlayers(1),
                 "Choose a player to die (the mayor may bounce a kill)".into(),
             )

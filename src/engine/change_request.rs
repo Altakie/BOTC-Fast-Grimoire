@@ -56,11 +56,15 @@ pub(crate) struct ChangeRequest {
     change_type: ChangeType,
     filter_func: Option<FilterFuncPtr>,
     state_change_func: Option<StateChangeFuncPtr>,
+    // on_success: Option<SuccessFunc>
     description: String,
 }
 
 impl ChangeRequest {
-    pub(crate) fn new(change_type: ChangeType, description: String) -> ChangeRequestBuilder {
+    pub(crate) fn new_builder(
+        change_type: ChangeType,
+        description: String,
+    ) -> ChangeRequestBuilder {
         ChangeRequestBuilder {
             change_type,
             filter_func: None,

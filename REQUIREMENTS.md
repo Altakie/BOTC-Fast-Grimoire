@@ -3,6 +3,9 @@
 
 ## Major TODOS
 
+- Event listeners
+  - Want an idiomatic way to add and remove event listeners
+- Move day state to player type (day 1, setup)
 - Add in ways to add demon bluffs and notify the demon and minions to get to know each other
 - Also remind storyteller to give out roles
 - How to trigger scarletwoman effect?

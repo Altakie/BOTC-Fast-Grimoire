@@ -30,7 +30,7 @@ impl Butler {
     fn ability(&self, player_index: PlayerIndex) -> Option<ChangeRequestBuilder> {
         // Clean up the old butler master status effect (if there is one), prompt for another
         // player, and give them the butler master status effect
-        ChangeRequest::new(
+        ChangeRequest::new_builder(
             ChangeType::ChoosePlayers(1),
             "Prompt the butler to pick a player to be their master".to_string(),
         )
@@ -107,8 +107,6 @@ pub(crate) struct Drunk {
     role: Option<RolePtr>,
 }
 
-impl Drunk {}
-
 impl Role for Drunk {
     fn get_default_alignment(&self) -> Alignment {
         Alignment::Good
@@ -131,13 +129,11 @@ impl Role for Drunk {
         // If the drunk has a role assigned, call its setup ability instead
         if let Some(role) = &self.role {
             let res = role.setup_ability(player_index, state);
-            return match res {
-                Some(cr) => Some(cr.clear_state_change_func()),
-                None => None,
-            };
+            return res.map(|cr| cr.clear_state_change_func());
         };
 
-        ChangeRequest::new(
+        // Otherwise assign a role to the drunk
+        ChangeRequest::new_builder(
             ChangeType::ChooseRoles(1),
             "Select a not in play Townfolk role".into(),
         )
@@ -155,26 +151,12 @@ impl Role for Drunk {
             let state_snapshot = state.clone();
 
             let drunk = state.get_player_mut(player_index);
-            drunk.notify(&args);
+            drunk.role.reassign(RolePtr::from(Drunk {
+                role: Some(roles[0].convert()),
+            }));
             Ok(drunk.setup_ability(player_index, &state_snapshot))
         }))
         .into()
-    }
-
-    fn notify(&self, args: &ChangeArgs) -> Option<RolePtr> {
-        match &self.role {
-            Some(role) => return role.notify(args),
-            None => {
-                if let ChangeArgs::Roles(roles) = args {
-                    let role = roles[0];
-                    return Some(RolePtr::from(Self {
-                        role: Some(role.convert()),
-                    }));
-                } else {
-                    return None;
-                }
-            }
-        }
     }
 
     fn night_one_order(&self) -> Option<usize> {

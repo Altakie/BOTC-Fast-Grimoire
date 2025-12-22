@@ -61,7 +61,7 @@ fn App() -> impl IntoView {
             // Role::Monk,
             Roles::Scarletwoman,
             Roles::Poisoner,
-            Roles::Drunk,
+            Roles::Imp,
             Roles::Imp,
         ]);
 
@@ -693,35 +693,35 @@ fn Game() -> impl IntoView {
             };
 
             // Only apply funcs if change_type requires action
-            if let Some(args) = args {
-                if let Some(state_func) = cr.get_state_change_func() {
-                    let next_cr = game_state
-                        .try_update(|gs| state_func.call(gs, args))
-                        .unwrap();
+            if let Some(args) = args
+                && let Some(state_func) = cr.get_state_change_func()
+            {
+                let next_cr = game_state
+                    .try_update(|gs| state_func.call(gs, args))
+                    .unwrap();
 
-                    let next_cr = match next_cr {
-                        Ok(cr) => cr,
-                        // TODO: Actually inform the player what went wrong using the result
-                        Err(e) => {
-                            console_log(format!("Error: {:?}", e).as_str());
-                            console_log(format!("TempState: {:#?}", temp_state.get()).as_str());
-                            return;
-                        }
-                    };
-
-                    // console_log(&format!("{:?}", next_cr));
-                    // Set the next cr
-
-                    if next_cr.is_some() {
-                        temp_state.update(|ts| ts.clear_selected());
-                        temp_state.curr_change_request().set(build(next_cr));
-                        // console_log(&format!(
-                        //     "New Cr set as {:?}, curr cr is now {:?}",
-                        //     next_cr,
-                        //     temp_state.curr_change_request().get()
-                        // ));
+                let next_cr = match next_cr {
+                    Ok(cr) => cr,
+                    // TODO: Actually inform the player what went wrong using the result
+                    Err(e) => {
+                        console_log(format!("Error: {:?}", e).as_str());
+                        console_log(format!("TempState: {:#?}", temp_state.get()).as_str());
                         return;
                     }
+                };
+
+                // console_log(&format!("{:?}", next_cr));
+                // Set the next cr
+
+                if next_cr.is_some() {
+                    temp_state.update(|ts| ts.clear_selected());
+                    temp_state.curr_change_request().set(build(next_cr));
+                    // console_log(&format!(
+                    //     "New Cr set as {:?}, curr cr is now {:?}",
+                    //     next_cr,
+                    //     temp_state.curr_change_request().get()
+                    // ));
+                    return;
                 }
             }
         }
@@ -841,11 +841,10 @@ fn Player_Display() -> impl IntoView {
                             <button
                                 class="size-[5rem] rounded-full text-center border border-[#000000]"
                                 disabled=move || {
-                                    if let Some(cr) = temp_state.curr_change_request().get() {
-                                        if let Some(filter_func) = cr.get_filter_func() {
+                                    if let Some(cr) = temp_state.curr_change_request().get() && let Some(filter_func) = cr.get_filter_func() {
                                             return !filter_func.call(i, &player.read());
                                         }
-                                    }
+
                                     false
                                 }
                                 style:border-style=move || {
@@ -860,12 +859,10 @@ fn Player_Display() -> impl IntoView {
                                 style:background=move || {
                                     if let Some(selected_player) = temp_state
                                         .currently_acting_player()
-                                        .get()
-                                    {
-                                        if selected_player == i {
+                                        .get() && selected_player == i {
                                             return "aquamarine";
                                         }
-                                    }
+
                                     ""
                                 }
                                 style:color=move || {
@@ -1080,12 +1077,12 @@ fn DayAbilitySelector() -> impl IntoView {
                 Ok(None)
             });
 
-            ChangeRequest::new(change_type, description.into())
+            ChangeRequest::new_builder(change_type, description.into())
                 .state_change_func(state_change_func)
                 .into()
         });
 
-        let nominate_request = ChangeRequest::new(change_type, description.into())
+        let nominate_request = ChangeRequest::new_builder(change_type, description.into())
             .state_change_func(state_change_func)
             .build();
         temp_state.curr_change_request().set(Some(nominate_request));

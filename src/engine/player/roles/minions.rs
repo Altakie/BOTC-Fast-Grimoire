@@ -11,7 +11,7 @@ use crate::{
             roles::{Role, RolePtr, demons::Imp},
         },
         state::{
-            PlayerIndex, State,
+            EventListener, PlayerIndex, State, log,
             status_effects::{CleanupPhase, Poisoned, StatusEffect},
         },
     },
@@ -22,7 +22,7 @@ use crate::{
 pub(crate) struct Spy();
 impl Spy {
     fn ability(&self) -> Option<ChangeRequestBuilder> {
-        ChangeRequest::new(ChangeType::Display, "Show the Spy the grimoire".into()).into()
+        ChangeRequest::new_builder(ChangeType::Display, "Show the Spy the grimoire".into()).into()
     }
 }
 
@@ -114,7 +114,7 @@ impl Poisoner {
         // Clean up the old poisoned effect, prompt for another
         // player, and give them the poisoned effect
 
-        ChangeRequest::new(
+        ChangeRequest::new_builder(
             ChangeType::ChoosePlayers(1),
             "Prompt the poisoner to pick a player to poison".to_string(),
         )
@@ -192,6 +192,33 @@ impl Role for ScarletWoman {
         CharacterType::Minion
     }
 
+    fn initialize(&self, player_index: PlayerIndex, state: &mut State) {
+        let scarlet_listener = EventListener::new(
+            player_index,
+            |event_listener_state, state, death_event: log::Death| {
+                let dead_player = state.get_player(death_event.player_index);
+                if dead_player.role.get_true_character_type() != CharacterType::Demon
+                    || state
+                        .get_players()
+                        .iter()
+                        .filter(|player| !player.dead)
+                        .count()
+                        < 4
+                {
+                    return state;
+                }
+
+                state
+                    .get_player_mut(event_listener_state.source_player_index)
+                    .role = dead_player.role.clone();
+
+                state
+            },
+        );
+
+        state.death_listeners.push(scarlet_listener);
+    }
+
     // fn night_order(&self) -> Option<usize> {
     //     Some(28)
     // }
@@ -245,7 +272,7 @@ impl Role for ScarletWoman {
             return None;
         }
 
-        ChangeRequest::new(
+        ChangeRequest::new_builder(
             ChangeType::NoStoryteller,
             "The Scarletwoman becomes the imp".into(),
         )

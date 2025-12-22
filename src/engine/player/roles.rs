@@ -1,3 +1,4 @@
+use leptos::prelude::StorageAccess;
 use serde_derive::{Deserialize, Serialize};
 use std::fmt::{Debug, Display};
 use std::ops::Deref;
@@ -143,6 +144,8 @@ pub(crate) trait Role: Display + Send + Sync {
         false
     }
 
+    fn initialize(&self, _player_index: PlayerIndex, _state: &mut State) {}
+
     /// A kill condition for this role
     /// # Return
     ///     * Returns a ChangeResult based on whether or not the role overwrites the default kill behavior of
@@ -241,13 +244,6 @@ pub(crate) trait Role: Display + Send + Sync {
         _player_index: PlayerIndex,
         _state: &State,
     ) -> Option<ChangeRequestBuilder> {
-        None
-    }
-
-    /// Does nothing by default, used, by the game engine to pass args back to the role if needed.
-    /// Since roles are immutable, if this notification changes the role in any way, this will
-    /// return Some(RolePtr) with the new role data
-    fn notify(&self, _args: &ChangeArgs) -> Option<RolePtr> {
         None
     }
 }

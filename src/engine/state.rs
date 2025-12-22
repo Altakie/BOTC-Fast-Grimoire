@@ -1,7 +1,11 @@
 #![allow(dead_code, clippy::needless_return)]
 pub(crate) mod log;
 
-use std::ops::{Add, Deref, Index};
+use std::{
+    collections::HashMap,
+    ops::{Add, Deref, Index},
+    sync::Arc,
+};
 
 use log::Log;
 pub(crate) mod status_effects;
@@ -69,6 +73,43 @@ pub enum Step {
     // DisplayPlayers,
 }
 
+#[derive(Clone)]
+pub(crate) struct EventListener<EventType> {
+    state: EventListenerState,
+    listener: Arc<
+        dyn for<'a> Fn(&mut EventListenerState, &'a mut State, EventType) -> &'a mut State
+            + 'static
+            + Send
+            + Sync,
+    >,
+}
+
+#[derive(Clone)]
+pub(crate) struct EventListenerState {
+    pub(crate) source_player_index: PlayerIndex,
+}
+
+impl<EventType> EventListener<EventType> {
+    pub(crate) fn new<F>(source_player_index: PlayerIndex, listener: F) -> Self
+    where
+        F: for<'a> Fn(&mut EventListenerState, &'a mut State, EventType) -> &'a mut State
+            + 'static
+            + Send
+            + Sync,
+    {
+        Self {
+            state: EventListenerState {
+                source_player_index,
+            },
+            listener: Arc::new(listener),
+        }
+    }
+
+    fn call<'a>(&mut self, state: &'a mut State, event: EventType) -> &'a mut State {
+        (self.listener)(&mut self.state, state, event)
+    }
+}
+
 #[derive(Clone, Store)]
 pub(crate) struct State {
     players: Vec<Player>,
@@ -77,6 +118,10 @@ pub(crate) struct State {
     pub(crate) log: Log,
     script: Script,
     pub(crate) step: Step,
+
+    pub(crate) nomination_listeners: Vec<EventListener<log::Nomination>>,
+    pub(crate) attempted_kill_listeners: Vec<EventListener<log::AttemptedKill>>,
+    pub(crate) death_listeners: Vec<EventListener<log::Death>>,
 }
 
 impl State {
@@ -104,23 +149,64 @@ impl State {
             players.push(player);
         }
 
-        assert!(
-            players.iter().filter(|p| p.role.is_win_condition()).count() <= 1,
-            "Shouldn't have more than one win condition when game starts"
+        let win_cond_index = players
+            .iter()
+            .position(|player| player.role.is_win_condition())
+            .unwrap();
+
+        let demon_listener = EventListener::new(
+            win_cond_index,
+            |listener, state, death_event: log::Death| {
+                if death_event.player_index == listener.source_player_index {
+                    let win_cond_index = state
+                        .players
+                        .iter()
+                        .position(|player| player.role.is_win_condition() && !player.dead);
+                    match win_cond_index {
+                        Some(win_cond_index) => listener.source_player_index = win_cond_index,
+                        None => {
+                            // FIX: For now just setting all players to dead to indicate the game
+                            // is over
+                            state
+                                .players
+                                .iter_mut()
+                                .for_each(|player| player.dead = true);
+                        }
+                    }
+                }
+
+                state
+            },
         );
+
+        // assert!(
+        //     players.iter().filter(|p| p.role.is_win_condition()).count() <= 1,
+        //     "Shouldn't have more than one win condition when game starts"
+        // );
 
         let win_cond_i = players.iter().position(|p| p.role.is_win_condition());
 
         let log = Log::new();
 
-        return Ok(Self {
+        let mut state = Self {
             players,
             win_cond_i,
             day_num: 1,
             log,
             script,
             step: Step::default(),
-        });
+
+            nomination_listeners: vec![],
+            attempted_kill_listeners: vec![],
+            // TODO: Maybe add a listener for demon death?
+            death_listeners: vec![],
+        };
+
+        for (player_index, player) in state.players.clone().iter().enumerate() {
+            player.role.initialize(player_index, &mut state);
+        }
+
+        return Ok(state);
     }
 
     pub(crate) fn get_player_index(&self, player: &Player) -> PlayerIndex {
@@ -266,11 +352,22 @@ impl State {
 
         let dead = self.get_player(target_player_index).dead;
         if dead {
-            self.cleanup_player_statuses(target_player_index);
-            self.log.log_event(Event::Death(target_player_index));
+            self.handle_death(target_player_index);
         }
 
         return cr;
+    }
+
+    pub(crate) fn handle_death(&mut self, player_index: PlayerIndex) {
+        let mut state = self;
+        state.log.log_event(Event::Death(player_index));
+        let mut death_listeners = std::mem::take(&mut state.death_listeners);
+        for listener in death_listeners.iter_mut() {
+            state = listener.call(state, log::Death { player_index });
+        }
+
+        state.death_listeners = death_listeners;
+        state.cleanup_player_statuses(player_index);
     }
 
     pub(crate) fn describe_event(&self, event: Event) -> String {

@@ -128,14 +128,13 @@ impl Player {
                         .iter()
                         .any(|behavior| matches!(behavior, PlayerBehaviors::Kill))
                 })
-            {
-                if let Some(false) = status_effect.status_type.kill(
+                && let Some(false) = status_effect.status_type.kill(
                     attacking_player_index,
                     target_player_index,
                     state,
-                ) {
-                    return Ok(None);
-                }
+                )
+            {
+                return Ok(None);
             }
         }
 
@@ -169,10 +168,9 @@ impl Player {
                         .iter()
                         .any(|behavior| matches!(behavior, PlayerBehaviors::Execute))
                 })
+                && let Some(false) = status_effect.status_type.execute()
             {
-                if let Some(false) = status_effect.status_type.execute() {
-                    dead = false;
-                }
+                dead = false;
             }
         }
 
@@ -320,13 +318,6 @@ impl Player {
         }
 
         return cr.into();
-    }
-
-    pub fn notify(&mut self, args: &ChangeArgs) {
-        let role_change = self.role.notify(args);
-        if let Some(role_change) = role_change {
-            self.role.reassign(role_change);
-        }
     }
 }
 
