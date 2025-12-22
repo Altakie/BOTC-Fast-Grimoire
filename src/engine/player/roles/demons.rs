@@ -12,7 +12,7 @@ use crate::engine::{
 
 #[derive(Default, Debug, Clone)]
 pub(crate) struct Imp {
-    last_killed: Option<usize>,
+    pub(crate) last_killed: Option<usize>,
 }
 
 impl Role for Imp {
@@ -61,6 +61,16 @@ impl Role for Imp {
             let kill_cr = state.kill(player_index, target_player_index)?;
             if kill_cr.is_some() {
                 return Ok(kill_cr);
+            }
+
+            if let Roles::Imp(Imp {
+                last_killed: Some(day_num),
+                ..
+            }) = &state.get_player(player_index).role
+            {
+                if *day_num == state.day_num {
+                    return Ok(None);
+                }
             }
 
             if target_player_index == player_index && state.get_player(player_index).dead {

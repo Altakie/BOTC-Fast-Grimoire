@@ -208,9 +208,18 @@ impl Role for ScarletWoman {
                     return state;
                 }
 
-                state
-                    .get_player_mut(event_listener_state.source_player_index)
-                    .role = dead_player.role.clone();
+                let day_num = state.day_num;
+                let dead_player = &mut state.get_player_mut(death_event.player_index);
+                if let Roles::Imp(imp_data) = &mut dead_player.role {
+                    imp_data.last_killed = Some(day_num);
+                }
+
+                let dead_role = dead_player.role.clone();
+
+                let scarlet_player =
+                    &mut state.get_player_mut(event_listener_state.source_player_index);
+
+                scarlet_player.role = dead_role;
 
                 state
             },
@@ -250,39 +259,39 @@ impl Role for ScarletWoman {
     // }
 
     // FIX: Very temporary so that scarlet woman can work somehow
-    fn has_day_ability(&self) -> bool {
-        true
-    }
-
-    fn day_ability(
-        &self,
-        player_index: PlayerIndex,
-        state: &State,
-    ) -> Option<ChangeRequestBuilder> {
-        let demon_alive = state.get_players().iter().any(|player| {
-            player.role.get_true_character_type() == CharacterType::Demon && !player.dead
-        });
-        let living_player_count = state
-            .get_players()
-            .iter()
-            .filter(|player| !player.dead)
-            .count();
-
-        if living_player_count < 4 || demon_alive {
-            return None;
-        }
-
-        ChangeRequest::new_builder(
-            ChangeType::NoStoryteller,
-            "The Scarletwoman becomes the imp".into(),
-        )
-        .state_change_func(StateChangeFuncPtr::new(move |state, args| {
-            let scarlet_woman = state.get_player_mut(player_index);
-            scarlet_woman.role = Roles::new(&RoleNames::Imp);
-            Ok(None)
-        }))
-        .into()
-    }
+    // fn has_day_ability(&self) -> bool {
+    //     true
+    // }
+    //
+    // fn day_ability(
+    //     &self,
+    //     player_index: PlayerIndex,
+    //     state: &State,
+    // ) -> Option<ChangeRequestBuilder> {
+    //     let demon_alive = state.get_players().iter().any(|player| {
+    //         player.role.get_true_character_type() == CharacterType::Demon && !player.dead
+    //     });
+    //     let living_player_count = state
+    //         .get_players()
+    //         .iter()
+    //         .filter(|player| !player.dead)
+    //         .count();
+    //
+    //     if living_player_count < 4 || demon_alive {
+    //         return None;
+    //     }
+    //
+    //     ChangeRequest::new_builder(
+    //         ChangeType::NoStoryteller,
+    //         "The Scarletwoman becomes the imp".into(),
+    //     )
+    //     .state_change_func(StateChangeFuncPtr::new(move |state, args| {
+    //         let scarlet_woman = state.get_player_mut(player_index);
+    //         scarlet_woman.role = Roles::new(&RoleNames::Imp);
+    //         Ok(None)
+    //     }))
+    //     .into()
+    // }
 }
 
 impl Display for ScarletWoman {
