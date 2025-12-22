@@ -190,9 +190,6 @@ fn PlayerInputer(
                 players.update(|pv| pv.push(name.get()));
                 name.set(String::from(""));
             }>"Add Player"</button>
-            // TODO: Implement this button
-            // TODO: Make sure you can't click this button unless you have at least 5 players
-            // Because this is not handled, this button will throw an error
             <button
                 on:click=move |_| {
                     if players.get().len() >= 5 {
@@ -211,8 +208,6 @@ fn PlayerInputer(
 fn PlayerSetupList(player_names: RwSignal<Vec<String>>) -> impl IntoView {
     view! {
         <ol>
-            // WARN: Should probably use this for loop for this and make it work, but for now other
-            // option is fine
             <For
                 each=move || player_names.get()
                 key=|pn| pn.clone()

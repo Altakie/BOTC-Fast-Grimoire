@@ -49,32 +49,3 @@ impl State {
             .day_ability(player_index, self)
     }
 }
-// pub(crate) fn nominate_player(
-//     &mut self,
-//     source_player_index: PlayerIndex,
-//     target_player_index: PlayerIndex,
-// ) {
-//
-// }
-//
-// pub(crate) fn execute_player(&mut self, target_player_index: PlayerIndex) -> bool {
-//     // WARNING: There may be shared code between here and kill_player
-//
-//     // Check if there is something that stops the player's death
-//     if self
-//         .get_afflicted_statuses(target_player_index)
-//         .iter()
-//         .any(|s| matches!(s.status_type, StatusEffects::DeathProtected))
-//     {
-//         return true;
-//     }
-//
-//     // Execute a player
-//     let target_player = &mut self.players[target_player_index];
-//     target_player.dead = true;
-//
-//     // TODO: Handle player death based on their role and time of day
-//
-//     // End the day
-//     return true;
-// }

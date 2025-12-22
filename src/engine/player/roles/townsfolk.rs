@@ -17,18 +17,15 @@ use crate::engine::{
     },
 };
 
-fn washerwoman_librarian_investigator<
-    RE: StatusType + Default + 'static,
-    WE: StatusType + Default + 'static,
->(
+fn washerwoman_librarian_investigator(
     player_index: PlayerIndex,
     character_type: CharacterType,
+    right_status: StatusType,
+    wrong_status: StatusType,
 ) -> Option<ChangeRequestBuilder> {
-    let right_status =
-        move || StatusEffect::new(std::sync::Arc::new(RE::default()), player_index, None);
+    let right_status = move || StatusEffect::new(right_status, player_index, None);
 
-    let wrong_status =
-        move || StatusEffect::new(std::sync::Arc::new(WE::default()), player_index, None);
+    let wrong_status = move || StatusEffect::new(wrong_status, player_index, None);
 
     return ChangeRequest::new_builder(
         ChangeType::ChoosePlayers(1),
@@ -90,24 +87,6 @@ fn washerwoman_librarian_investigator_wrong(
 #[derive(Default, Debug, Clone)]
 pub(crate) struct Washerwoman();
 
-#[derive(Default)]
-struct WasherwomanTownsfolk();
-impl StatusType for WasherwomanTownsfolk {}
-impl Display for WasherwomanTownsfolk {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("Washerwoman Townsfolk")
-    }
-}
-
-#[derive(Default)]
-struct WasherwomanWrong();
-impl StatusType for WasherwomanWrong {}
-impl Display for WasherwomanWrong {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("Washerwoman Wrong")
-    }
-}
-
 impl Role for Washerwoman {
     fn get_default_alignment(&self) -> Alignment {
         Alignment::Good
@@ -126,9 +105,11 @@ impl Role for Washerwoman {
         player_index: crate::engine::state::PlayerIndex,
         _state: &State,
     ) -> Option<ChangeRequestBuilder> {
-        washerwoman_librarian_investigator::<WasherwomanTownsfolk, WasherwomanWrong>(
+        washerwoman_librarian_investigator(
             player_index,
             CharacterType::Townsfolk,
+            StatusType::WasherwomanTownsfolk,
+            StatusType::WasherwomanWrong,
         )
     }
 
@@ -158,24 +139,6 @@ impl Display for Washerwoman {
 
 #[derive(Default, Debug, Clone)]
 pub(crate) struct Librarian();
-
-#[derive(Default)]
-struct LibrarianOutsider();
-impl StatusType for LibrarianOutsider {}
-impl Display for LibrarianOutsider {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("Librarian Outsider")
-    }
-}
-
-#[derive(Default)]
-struct LibrarianWrong();
-impl StatusType for LibrarianWrong {}
-impl Display for LibrarianWrong {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("Librarian Wrong")
-    }
-}
 
 impl Role for Librarian {
     fn get_default_alignment(&self) -> Alignment {
@@ -207,9 +170,11 @@ impl Role for Librarian {
             .count();
 
         if outsider_count > 0 {
-            return washerwoman_librarian_investigator::<LibrarianOutsider, LibrarianWrong>(
+            return washerwoman_librarian_investigator(
                 player_index,
                 CharacterType::Outsider,
+                StatusType::LibrarianOutsider,
+                StatusType::LibrarianWrong,
             );
         }
 
@@ -258,24 +223,6 @@ impl Display for Librarian {
 #[derive(Default, Clone, Debug)]
 pub(crate) struct Investigator();
 
-#[derive(Default)]
-struct InvestigatorMinion();
-impl StatusType for InvestigatorMinion {}
-impl Display for InvestigatorMinion {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("Investigator Minion")
-    }
-}
-
-#[derive(Default)]
-struct InvestigatorWrong();
-impl StatusType for InvestigatorWrong {}
-impl Display for InvestigatorWrong {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("Investigator Wrong")
-    }
-}
-
 impl Role for Investigator {
     fn get_default_alignment(&self) -> Alignment {
         Alignment::Good
@@ -294,9 +241,11 @@ impl Role for Investigator {
         player_index: crate::engine::state::PlayerIndex,
         _state: &State,
     ) -> Option<ChangeRequestBuilder> {
-        washerwoman_librarian_investigator::<InvestigatorMinion, InvestigatorWrong>(
+        washerwoman_librarian_investigator(
             player_index,
             CharacterType::Minion,
+            StatusType::InvestigatorMinion,
+            StatusType::InvestigatorWrong,
         )
     }
 
@@ -448,14 +397,6 @@ impl Display for Empath {
 #[derive(Default, Debug, Clone)]
 pub(crate) struct Fortuneteller();
 
-struct FortunetellerRedHerring();
-impl StatusType for FortunetellerRedHerring {}
-impl Display for FortunetellerRedHerring {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("Fortuneteller Red Herring")
-    }
-}
-
 impl Fortuneteller {
     fn ability(&self, player_index: PlayerIndex, state: &State) -> Option<ChangeRequestBuilder> {
         let dead = state.get_player(player_index).dead;
@@ -487,7 +428,7 @@ impl Fortuneteller {
                     CharacterType::Demon | CharacterType::Any
                 ) || player.get_statuses().iter().any(|se| {
                     se.source_player_index == player_index
-                        && se.to_string() == FortunetellerRedHerring().to_string()
+                        && matches!(se.status_type, StatusType::FortuneTellerRedHerring)
                 })
             });
             ChangeRequest::new_builder(
@@ -543,7 +484,7 @@ impl Role for Fortuneteller {
 
             let target_player_index = target_player_indices[0];
             let target_player = state.get_player_mut(target_player_index);
-            let status = StatusEffect::new(Arc::new(FortunetellerRedHerring()), player_index, None);
+            let status = StatusEffect::new(StatusType::FortuneTellerRedHerring, player_index, None);
             target_player.add_status(status);
 
             Ok(None)
@@ -641,44 +582,6 @@ impl Display for Undertaker {
 #[derive(Default, Debug, Clone)]
 pub(crate) struct Monk();
 
-struct DemonProtected {
-    behaviors: Vec<PlayerBehaviors>,
-}
-
-impl Default for DemonProtected {
-    fn default() -> Self {
-        Self {
-            behaviors: vec![PlayerBehaviors::Kill],
-        }
-    }
-}
-
-impl StatusType for DemonProtected {
-    fn behavior_type(&self) -> Option<&[crate::engine::player::PlayerBehaviors]> {
-        Some(&self.behaviors)
-    }
-
-    fn kill(
-        &self,
-        attacking_player_index: PlayerIndex,
-        _target_player_index: PlayerIndex,
-        state: &State,
-    ) -> Option<bool> {
-        let attacking_player = state.get_player(attacking_player_index);
-        if attacking_player.role.get_true_character_type() == CharacterType::Demon {
-            return Some(false);
-        }
-
-        return None;
-    }
-}
-
-impl Display for DemonProtected {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("Demon Protected")
-    }
-}
-
 impl Role for Monk {
     fn get_default_alignment(&self) -> Alignment {
         Alignment::Good
@@ -721,7 +624,7 @@ impl Role for Monk {
 
             let target_player = state.get_player_mut(target_player_indices[0]);
             let status = StatusEffect::new(
-                Arc::new(DemonProtected::default()),
+                StatusType::DemonProtected,
                 player_index,
                 CleanupPhase::Dawn.into(),
             );
@@ -828,7 +731,7 @@ impl Role for Virgin {
         CharacterType::Townsfolk
     }
 
-    // TODO: Want to make this method more idiomatic
+    // TODO: Want to make this method more idiomatic (change to event listener)
     // Maybe just make this a change request instead (might make more sense)
     // Or an event listener
     // Drunkify problem
@@ -970,6 +873,7 @@ impl Role for Mayor {
         CharacterType::Townsfolk
     }
 
+    // TODO: Change to event listener
     fn kill(
         &self,
         attacking_player_index: PlayerIndex,

@@ -122,6 +122,8 @@ pub(crate) struct State {
     script: Script,
     pub(crate) step: Step,
 
+    change_request_stack: Vec<ChangeRequestBuilder>,
+
     pub(crate) nomination_listeners: Vec<EventListener<log::Nomination>>,
     pub(crate) attempted_kill_listeners: Vec<EventListener<log::AttemptedKill>>,
     pub(crate) death_listeners: Vec<EventListener<log::Death>>,
@@ -198,6 +200,8 @@ impl State {
             log,
             script,
             step: Step::default(),
+
+            change_request_stack: vec![],
 
             nomination_listeners: vec![],
             attempted_kill_listeners: vec![],
@@ -345,7 +349,9 @@ impl State {
             attacking_player_index,
             target_player_index,
         });
-        let state_snapshot = self.clone();
+
+        // Go through all kill listeners (can maybe set a change request up to go)
+        // Go through all status effects (also can maybe do a change request?)
 
         let cr = self.get_player_mut(target_player_index).kill(
             attacking_player_index,

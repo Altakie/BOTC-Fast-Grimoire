@@ -12,7 +12,7 @@ use crate::{
         },
         state::{
             EventListener, PlayerIndex, State, log,
-            status_effects::{CleanupPhase, Poisoned, StatusEffect},
+            status_effects::{CleanupPhase, StatusEffect, StatusType},
         },
     },
     initialization::CharacterTypeCounts,
@@ -124,7 +124,7 @@ impl Poisoner {
 
             let target_player = state.get_player_mut(target_players[0]);
             let status = StatusEffect::new(
-                Arc::new(Poisoned {}),
+                StatusType::Poisoned,
                 player_index,
                 CleanupPhase::Dusk.into(),
             );

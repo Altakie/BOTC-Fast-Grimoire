@@ -194,20 +194,6 @@ impl Player {
         self.role.get_character_type()
     }
 
-    // TODO: Figure out if you want to implement this
-    pub(crate) fn nominate(
-        &self,
-        nominating_player_index: PlayerIndex,
-        target_player_index: PlayerIndex,
-        state: &mut State,
-    ) {
-        self.role
-            .nominated(nominating_player_index, target_player_index, state);
-    }
-
-    // TODO: Figure out if you want to implement this
-    pub(crate) fn vote(&self) {}
-
     pub(crate) fn setup_order(&self) -> Option<usize> {
         self.role.setup_order()
     }
@@ -230,13 +216,11 @@ impl Player {
         state: &State,
     ) -> Option<ChangeRequestBuilder> {
         let cr = self.role.night_one_ability(player_index, state)?;
-        // Check for poison or drunk effects
+        // Check for poison or drunk effects (for now the only ones that can affect abilities)
         let status_effect = self.get_statuses().iter().find(|se| {
-            se.status_type.behavior_type().is_some_and(|behaviors| {
-                behaviors
-                    .iter()
-                    .any(|behavior| matches!(behavior, PlayerBehaviors::NightAbility))
-            })
+            se.behavior_types
+                .iter()
+                .any(|behavior| matches!(behavior, PlayerBehaviors::NightOneAbility))
         });
 
         if let Some(status_effect) = status_effect {
@@ -266,11 +250,9 @@ impl Player {
     ) -> Option<ChangeRequestBuilder> {
         let cr = self.role.night_ability(player_index, state)?;
         let status_effect = self.get_statuses().iter().find(|se| {
-            se.status_type.behavior_type().is_some_and(|behaviors| {
-                behaviors
-                    .iter()
-                    .any(|behavior| matches!(behavior, PlayerBehaviors::NightOneAbility))
-            })
+            se.behavior_types
+                .iter()
+                .any(|behavior| matches!(behavior, PlayerBehaviors::NightAbility))
         });
 
         if let Some(status_effect) = status_effect {
@@ -299,11 +281,9 @@ impl Player {
     ) -> Option<ChangeRequestBuilder> {
         let cr = self.role.day_ability(player_index, state)?;
         let status_effect = self.get_statuses().iter().find(|se| {
-            se.status_type.behavior_type().is_some_and(|behaviors| {
-                behaviors
-                    .iter()
-                    .any(|behavior| matches!(behavior, PlayerBehaviors::DayAbility))
-            })
+            se.behavior_types
+                .iter()
+                .any(|behavior| matches!(behavior, PlayerBehaviors::NightAbility))
         });
 
         if let Some(status_effect) = status_effect {

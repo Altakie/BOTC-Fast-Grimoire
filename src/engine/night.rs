@@ -16,8 +16,6 @@ impl State {
         };
         let mut next_player: Option<(PlayerIndex, usize)> = None;
 
-        // TODO: Check for special roles
-
         let players = self.get_players();
         for (player_index, player) in players.iter().enumerate() {
             let order = player.role.night_one_order();
@@ -77,8 +75,6 @@ impl State {
             }
         };
         let mut next_player: Option<(PlayerIndex, usize)> = None;
-
-        // TODO: Check for special roles
 
         let players = self.get_players();
         for (player_index, player) in players.iter().enumerate() {

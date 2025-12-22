@@ -16,16 +16,6 @@ use crate::engine::{
 #[derive(Default, Debug, Clone)]
 pub(crate) struct Butler();
 
-struct BulterMaster();
-
-impl StatusType for BulterMaster {}
-
-impl Display for BulterMaster {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("Butler Master")
-    }
-}
-
 impl Butler {
     fn ability(&self, player_index: PlayerIndex) -> Option<ChangeRequestBuilder> {
         // Clean up the old butler master status effect (if there is one), prompt for another
@@ -47,7 +37,7 @@ impl Butler {
 
             let target_player = state.get_player_mut(target_players[0]);
             let status = StatusEffect::new(
-                Arc::new(BulterMaster {}),
+                StatusType::ButlerMaster,
                 player_index,
                 CleanupPhase::Dusk.into(),
             );

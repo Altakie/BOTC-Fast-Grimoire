@@ -81,7 +81,6 @@ impl ChangeRequest {
         self.description.clone()
     }
 
-    // WARN: Might want to change these two
     pub(crate) fn get_filter_func(&self) -> Option<&FilterFuncPtr> {
         match &self.filter_func {
             Some(filter_func) => Some(filter_func),

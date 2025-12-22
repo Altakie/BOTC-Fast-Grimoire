@@ -203,39 +203,6 @@ pub(crate) trait Role: Display + Send + Sync {
 
     fn initialize(&self, _player_index: PlayerIndex, _state: &mut State) {}
 
-    /// A kill condition for this role
-    /// # Return
-    ///     * Returns a ChangeResult based on whether or not the role overwrites the default kill behavior of
-    ///     the player. By default, it does not do anything and returns None. If there is special
-    ///     behavior when the player dies, then it will return Some(ChangeRequestBuilder)
-    fn kill(
-        &self,
-        _attacking_player_index: PlayerIndex,
-        _target_player_index: PlayerIndex,
-        _state: &State,
-    ) -> Option<ChangeResult> {
-        // WARN: Potentially needs to change back to ChangeRequestBuilder
-        return None;
-    }
-
-    /// A execute condition for this role
-    /// # Return
-    ///     * Returns a Option<bool> based on whether or not the role overwrites the default execution behavior of
-    ///     the player. By default, it does not do anything and returns None. A true indicates the
-    ///     player should die.
-    fn execute(&self) -> Option<bool> {
-        return None;
-    }
-
-    /// An action the role performs on being nominated, if any
-    fn nominated(
-        &self,
-        _nominating_player_index: PlayerIndex,
-        _attacking_player_index: PlayerIndex,
-        _state: &mut State,
-    ) {
-    }
-
     /// If the role being in the game affects character type counts, overwrite this method. The
     /// CharacterTypeCounts returned from this function will be added to the ones currently in the
     /// game
