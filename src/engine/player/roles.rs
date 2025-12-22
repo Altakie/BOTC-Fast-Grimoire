@@ -1,3 +1,4 @@
+use enum_dispatch::enum_dispatch;
 use leptos::prelude::StorageAccess;
 use serde_derive::{Deserialize, Serialize};
 use std::fmt::{Debug, Display};
@@ -19,10 +20,7 @@ use crate::{
 
 #[derive(Clone, Copy, Hash, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub(crate) enum Roles {
-    // Special Roles that are in every game
-    // DEMON,
-    // MINION,
+pub(crate) enum RoleNames {
     // Normal Roles
     Investigator,
     Empath,
@@ -45,78 +43,137 @@ pub(crate) enum Roles {
     Recluse,
     Spy,
     Baron,
-    Scarletwoman,
+    ScarletWoman,
     Poisoner,
     Imp,
 }
 
-impl Display for Roles {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+#[enum_dispatch(Role)]
+#[derive(Clone)]
+pub(crate) enum Roles {
+    // Normal Roles
+    Investigator,
+    Empath,
+    Washerwoman,
+    Librarian,
+    Chef,
+    Fortuneteller,
+    Undertaker,
+    Virgin,
+    Soldier,
+    Slayer,
+    Mayor,
+    Monk,
+    Ravenkeeper,
+    Drunk,
+    Saint,
+    Butler,
+    Recluse,
+    Spy,
+    Baron,
+    ScarletWoman,
+    Poisoner,
+    Imp,
+}
+
+impl Roles {
+    fn new(role_name: &RoleNames) -> Self {
+        match role_name {
+            RoleNames::Investigator => Self::Investigator(Investigator::default()),
+            RoleNames::Empath => Self::Empath(Empath::default()),
+            // RoleNames::Gossip => todo!(),
+            // RoleNames::Innkeeper => todo!(),
+            RoleNames::Washerwoman => Self::Washerwoman(Washerwoman::default()),
+            RoleNames::Librarian => Self::Librarian(Librarian::default()),
+            RoleNames::Chef => Self::Chef(Chef::default()),
+            RoleNames::Fortuneteller => Self::Fortuneteller(Fortuneteller::default()),
+            RoleNames::Undertaker => Self::Undertaker(Undertaker::default()),
+            RoleNames::Virgin => Self::Virgin(Virgin::default()),
+            RoleNames::Soldier => Self::Soldier(Soldier::default()),
+            RoleNames::Slayer => Self::Slayer(Slayer::default()),
+            RoleNames::Mayor => Self::Mayor(Mayor::default()),
+            RoleNames::Monk => Self::Monk(Monk::default()),
+            RoleNames::Ravenkeeper => Self::Ravenkeeper(Ravenkeeper::default()),
+            RoleNames::Drunk => Self::Drunk(Drunk::default()),
+            RoleNames::Saint => Self::Saint(Saint::default()),
+            RoleNames::Butler => Self::Butler(Butler::default()),
+            RoleNames::Recluse => Self::Recluse(Recluse::default()),
+            RoleNames::Spy => Self::Spy(Spy::default()),
+            RoleNames::Baron => Self::Baron(Baron::default()),
+            RoleNames::ScarletWoman => Self::ScarletWoman(ScarletWoman::default()),
+            RoleNames::Poisoner => Self::Poisoner(Poisoner::default()),
+            RoleNames::Imp => Self::Imp(Imp::default()),
+            _ => todo!(),
+        }
+    }
+
+    fn to_role_name(&self) -> RoleNames {
         match self {
-            Roles::Investigator => write!(f, "Investigator"),
-            Roles::Empath => write!(f, "Empath"),
-            Roles::Gossip => write!(f, "Gossip"),
-            Roles::Innkeeper => write!(f, "Innkeeper"),
-            Roles::Washerwoman => write!(f, "Washerwoman"),
-            Roles::Librarian => write!(f, "Librarian"),
-            Roles::Chef => write!(f, "Chef"),
-            Roles::Fortuneteller => write!(f, "Fortuneteller"),
-            Roles::Undertaker => write!(f, "Undertaker"),
-            Roles::Virgin => write!(f, "Virgin"),
-            Roles::Soldier => write!(f, "Soldier"),
-            Roles::Slayer => write!(f, "Slayer"),
-            Roles::Mayor => write!(f, "Mayor"),
-            Roles::Monk => write!(f, "Monk"),
-            Roles::Ravenkeeper => write!(f, "Ravenkeeper"),
-            Roles::Drunk => write!(f, "Drunk"),
-            Roles::Saint => write!(f, "Saint"),
-            Roles::Butler => write!(f, "Butler"),
-            Roles::Recluse => write!(f, "Recluse"),
-            Roles::Spy => write!(f, "Spy"),
-            Roles::Baron => write!(f, "Baron"),
-            Roles::Scarletwoman => write!(f, "Scarletwoman"),
-            Roles::Poisoner => write!(f, "Poisoner"),
-            Roles::Imp => write!(f, "Imp"),
+            Roles::Investigator(_) => RoleNames::Investigator,
+            Roles::Empath(_) => RoleNames::Empath,
+            Roles::Washerwoman(_) => RoleNames::Washerwoman,
+            Roles::Librarian(_) => RoleNames::Librarian,
+            Roles::Chef(_) => RoleNames::Chef,
+            Roles::Fortuneteller(_) => RoleNames::Fortuneteller,
+            Roles::Undertaker(_) => RoleNames::Undertaker,
+            Roles::Virgin(_) => RoleNames::Virgin,
+            Roles::Soldier(_) => RoleNames::Soldier,
+            Roles::Slayer(_) => RoleNames::Slayer,
+            Roles::Mayor(_) => RoleNames::Mayor,
+            Roles::Monk(_) => RoleNames::Monk,
+            Roles::Ravenkeeper(_) => RoleNames::Ravenkeeper,
+            Roles::Drunk(_) => RoleNames::Drunk,
+            Roles::Saint(_) => RoleNames::Saint,
+            Roles::Butler(_) => RoleNames::Butler,
+            Roles::Recluse(_) => RoleNames::Recluse,
+            Roles::Spy(_) => RoleNames::Spy,
+            Roles::Baron(_) => RoleNames::Baron,
+            Roles::ScarletWoman(_) => RoleNames::ScarletWoman,
+            Roles::Poisoner(_) => RoleNames::Poisoner,
+            Roles::Imp(_) => RoleNames::Imp,
         }
     }
 }
 
-pub(crate) struct RolePtr(Arc<dyn Role>);
-
-impl RolePtr {
-    pub fn new<R: Role + Default + 'static>() -> Self {
-        Self(Arc::new(R::default()))
-    }
-
-    pub fn from<R: Role + 'static>(role: R) -> Self {
-        Self(Arc::new(role))
-    }
-
-    pub fn reassign(&mut self, other: RolePtr) {
-        self.0 = other.0
-    }
-}
-
-impl Deref for RolePtr {
-    type Target = dyn Role;
-
-    fn deref(&self) -> &Self::Target {
-        self.0.deref()
-    }
-}
-
-impl Clone for RolePtr {
-    fn clone(&self) -> Self {
-        Self(self.0.clone())
-    }
-}
-
-impl Display for RolePtr {
+impl Display for Roles {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
+        std::fmt::Display::fmt(&self.to_role_name(), f)
     }
 }
 
+impl Display for RoleNames {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RoleNames::Investigator => write!(f, "Investigator"),
+            RoleNames::Empath => write!(f, "Empath"),
+            RoleNames::Gossip => write!(f, "Gossip"),
+            RoleNames::Innkeeper => write!(f, "Innkeeper"),
+            RoleNames::Washerwoman => write!(f, "Washerwoman"),
+
+            RoleNames::Librarian => write!(f, "Librarian"),
+            RoleNames::Chef => write!(f, "Chef"),
+            RoleNames::Fortuneteller => write!(f, "Fortuneteller"),
+            RoleNames::Undertaker => write!(f, "Undertaker"),
+            RoleNames::Virgin => write!(f, "Virgin"),
+            RoleNames::Soldier => write!(f, "Soldier"),
+            RoleNames::Slayer => write!(f, "Slayer"),
+            RoleNames::Mayor => write!(f, "Mayor"),
+            RoleNames::Monk => write!(f, "Monk"),
+            RoleNames::Ravenkeeper => write!(f, "Ravenkeeper"),
+            RoleNames::Drunk => write!(f, "Drunk"),
+            RoleNames::Saint => write!(f, "Saint"),
+            RoleNames::Butler => write!(f, "Butler"),
+            RoleNames::Recluse => write!(f, "Recluse"),
+            RoleNames::Spy => write!(f, "Spy"),
+            RoleNames::Baron => write!(f, "Baron"),
+            RoleNames::ScarletWoman => write!(f, "Scarletwoman"),
+            RoleNames::Poisoner => write!(f, "Poisoner"),
+            RoleNames::Imp => write!(f, "Imp"),
+        }
+    }
+}
+
+#[enum_dispatch]
 pub(crate) trait Role: Display + Send + Sync {
     fn name(&self) -> String {
         self.to_string()
@@ -248,35 +305,10 @@ pub(crate) trait Role: Display + Send + Sync {
     }
 }
 
-impl Roles {
-    pub(crate) fn convert(&self) -> RolePtr {
+impl RoleNames {
+    pub(crate) fn convert(&self) -> Roles {
         // TODO: Make classes to roles and resolve them here
-        match self {
-            Roles::Investigator => RolePtr::new::<Investigator>(),
-            Roles::Empath => RolePtr::new::<Empath>(),
-            Roles::Gossip => todo!(),
-            Roles::Innkeeper => todo!(),
-            Roles::Washerwoman => RolePtr::new::<Washerwoman>(),
-            Roles::Librarian => RolePtr::new::<Librarian>(),
-            Roles::Chef => RolePtr::new::<Chef>(),
-            Roles::Fortuneteller => RolePtr::new::<Fortuneteller>(),
-            Roles::Undertaker => RolePtr::new::<Undertaker>(),
-            Roles::Virgin => RolePtr::new::<Virgin>(),
-            Roles::Soldier => RolePtr::new::<Soldier>(),
-            Roles::Slayer => RolePtr::new::<Slayer>(),
-            Roles::Mayor => RolePtr::new::<Mayor>(),
-            Roles::Monk => RolePtr::new::<Monk>(),
-            Roles::Ravenkeeper => RolePtr::new::<Ravenkeeper>(),
-            Roles::Drunk => RolePtr::new::<Drunk>(),
-            Roles::Saint => RolePtr::new::<Saint>(),
-            Roles::Butler => RolePtr::new::<Butler>(),
-            Roles::Recluse => RolePtr::new::<Recluse>(),
-            Roles::Spy => RolePtr::new::<Spy>(),
-            Roles::Baron => RolePtr::new::<Baron>(),
-            Roles::Scarletwoman => RolePtr::new::<ScarletWoman>(),
-            Roles::Poisoner => RolePtr::new::<Poisoner>(),
-            Roles::Imp => RolePtr::new::<Imp>(),
-        }
+        Roles::new(self)
     }
 
     pub(crate) fn get_default_alignment(&self) -> Alignment {
@@ -288,26 +320,28 @@ impl Roles {
 
     pub(crate) fn get_type(&self) -> CharacterType {
         match *self {
-            Roles::Investigator
-            | Roles::Empath
-            | Roles::Gossip
-            | Roles::Innkeeper
-            | Roles::Washerwoman
-            | Roles::Librarian
-            | Roles::Chef
-            | Roles::Fortuneteller
-            | Roles::Undertaker
-            | Roles::Virgin
-            | Roles::Soldier
-            | Roles::Slayer
-            | Roles::Mayor
-            | Roles::Monk
-            | Roles::Ravenkeeper => CharacterType::Townsfolk,
-            Roles::Drunk | Roles::Saint | Roles::Butler | Roles::Recluse => CharacterType::Outsider,
-            Roles::Spy | Roles::Baron | Roles::Scarletwoman | Roles::Poisoner => {
+            RoleNames::Investigator
+            | RoleNames::Empath
+            | RoleNames::Gossip
+            | RoleNames::Innkeeper
+            | RoleNames::Washerwoman
+            | RoleNames::Librarian
+            | RoleNames::Chef
+            | RoleNames::Fortuneteller
+            | RoleNames::Undertaker
+            | RoleNames::Virgin
+            | RoleNames::Soldier
+            | RoleNames::Slayer
+            | RoleNames::Mayor
+            | RoleNames::Monk
+            | RoleNames::Ravenkeeper => CharacterType::Townsfolk,
+            RoleNames::Drunk | RoleNames::Saint | RoleNames::Butler | RoleNames::Recluse => {
+                CharacterType::Outsider
+            }
+            RoleNames::Spy | RoleNames::Baron | RoleNames::ScarletWoman | RoleNames::Poisoner => {
                 CharacterType::Minion
             }
-            Roles::Imp => CharacterType::Demon,
+            RoleNames::Imp => CharacterType::Demon,
         }
     }
 

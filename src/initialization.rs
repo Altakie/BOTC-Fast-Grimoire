@@ -1,6 +1,7 @@
+use crate::engine::player::roles::Role;
 use std::ops::{Add, AddAssign, Sub, SubAssign};
 
-use crate::engine::player::{CharacterType, roles::Roles};
+use crate::engine::player::{CharacterType, roles::RoleNames};
 
 use serde_derive::{Deserialize, Serialize};
 
@@ -16,7 +17,7 @@ struct Metadata {
 #[serde(untagged)]
 enum ScriptEntry {
     Metadata(Metadata),
-    Role(Roles),
+    Role(RoleNames),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -24,12 +25,12 @@ pub(crate) struct ScriptJson(Vec<ScriptEntry>);
 
 #[derive(Clone)]
 pub(crate) struct Script {
-    pub(crate) roles: Vec<Roles>,
+    pub(crate) roles: Vec<RoleNames>,
 }
 
 impl Script {
     pub(crate) fn new_from_json(json: ScriptJson) -> Self {
-        let mut roles: Vec<Roles> = vec![];
+        let mut roles: Vec<RoleNames> = vec![];
         for entry in json.0 {
             match entry {
                 ScriptEntry::Metadata(_metadata) => (),
@@ -127,14 +128,14 @@ impl CharacterTypeCounts {
         Self::default()
     }
 
-    pub(crate) fn on_choose(&mut self, role: Roles) {
+    pub(crate) fn on_choose(&mut self, role: RoleNames) {
         let delta = role.convert().initialization_effect();
         if let Some(delta) = delta {
             *self += delta
         }
     }
 
-    pub(crate) fn on_remove(&mut self, role: Roles) {
+    pub(crate) fn on_remove(&mut self, role: RoleNames) {
         let delta = role.convert().initialization_effect();
         if let Some(delta) = delta {
             *self -= delta

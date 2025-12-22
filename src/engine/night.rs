@@ -1,5 +1,5 @@
 use crate::engine::{
-    player::roles::Roles,
+    player::roles::{Role, RoleNames},
     state::{PlayerIndex, State},
 };
 
@@ -448,7 +448,7 @@ impl State {
     //     // Undertaker
     // }
 
-    fn get_role_order_night1(role: Roles) -> usize {
+    fn get_role_order_night1(role: RoleNames) -> usize {
         match role {
             // Role::DUSK => 0,
             // Role::Lordoftyphon => 1,
@@ -476,7 +476,7 @@ impl State {
             // Role::Lilmonsta => 23,
             // Role::Lleech => 24,
             // Role::Xaan => 25,
-            Roles::Poisoner => 26,
+            RoleNames::Poisoner => 26,
             // Role::Widow => 27,
             // Role::Courtier => 28,
             // Role::Wizard => 29,
@@ -495,13 +495,13 @@ impl State {
             // Role::Huntsman => 42,
             // Role::Damsel => 43,
             // Role::Amnesiac => 44,
-            Roles::Washerwoman => 45,
-            Roles::Librarian => 46,
-            Roles::Investigator => 47,
-            Roles::Chef => 48,
-            Roles::Empath => 49,
-            Roles::Fortuneteller => 50,
-            Roles::Butler => 51,
+            RoleNames::Washerwoman => 45,
+            RoleNames::Librarian => 46,
+            RoleNames::Investigator => 47,
+            RoleNames::Chef => 48,
+            RoleNames::Empath => 49,
+            RoleNames::Fortuneteller => 50,
+            RoleNames::Butler => 51,
             // Role::Grandmother => 52,
             // Role::Clockmaker => 53,
             // Role::Dreamer => 54,
@@ -515,7 +515,7 @@ impl State {
             // Role::Bountyhunter => 62,
             // Role::Nightwatchman => 63,
             // Role::Cultleader => 64,
-            Roles::Spy => 65,
+            RoleNames::Spy => 65,
             // Role::Ogre => 66,
             // Role::Highpriestess => 67,
             // Role::General => 68,

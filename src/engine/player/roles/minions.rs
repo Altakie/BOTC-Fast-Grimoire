@@ -8,7 +8,7 @@ use crate::{
         },
         player::{
             Alignment, CharacterType,
-            roles::{Role, RolePtr, demons::Imp},
+            roles::{Role, RoleNames, Roles, demons::Imp},
         },
         state::{
             EventListener, PlayerIndex, State, log,
@@ -18,7 +18,7 @@ use crate::{
     initialization::CharacterTypeCounts,
 };
 
-#[derive(Default)]
+#[derive(Default, Debug, Clone)]
 pub(crate) struct Spy();
 impl Spy {
     fn ability(&self) -> Option<ChangeRequestBuilder> {
@@ -78,7 +78,7 @@ impl Display for Spy {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug, Clone)]
 pub(crate) struct Baron();
 
 impl Role for Baron {
@@ -106,7 +106,7 @@ impl Display for Baron {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug, Clone)]
 pub(crate) struct Poisoner();
 
 impl Poisoner {
@@ -180,7 +180,7 @@ impl Display for Poisoner {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug, Clone)]
 pub(crate) struct ScarletWoman();
 
 impl Role for ScarletWoman {
@@ -278,7 +278,7 @@ impl Role for ScarletWoman {
         )
         .state_change_func(StateChangeFuncPtr::new(move |state, args| {
             let scarlet_woman = state.get_player_mut(player_index);
-            scarlet_woman.role.reassign(RolePtr::new::<Imp>());
+            scarlet_woman.role = Roles::new(&RoleNames::Imp);
             Ok(None)
         }))
         .into()

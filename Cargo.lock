@@ -103,6 +103,7 @@ name = "botc"
 version = "0.1.0"
 dependencies = [
  "console_error_panic_hook",
+ "enum_dispatch",
  "getrandom 0.3.3",
  "leptos",
  "macros",
@@ -298,6 +299,18 @@ checksum = "216d23e0ec69759a17f05e1c553f3a6870e5ec73420fbb07807a6f34d5d1d5a4"
 dependencies = [
  "paste",
  "pin-project-lite",
+]
+
+[[package]]
+name = "enum_dispatch"
+version = "0.3.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aa18ce2bc66555b3218614519ac839ddb759a7d6720732f979ef8d13be147ecd"
+dependencies = [
+ "once_cell",
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

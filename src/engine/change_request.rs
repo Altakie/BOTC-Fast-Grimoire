@@ -1,7 +1,7 @@
 use crate::engine::player::Player;
 
 use super::{
-    player::roles::Roles,
+    player::roles::RoleNames,
     state::{PlayerIndex, State},
 };
 use std::{fmt::Debug, ops::Deref, sync::Arc};
@@ -19,7 +19,7 @@ pub(crate) enum ChangeType {
 #[derive(Debug, Clone)]
 pub(crate) enum ChangeArgs {
     PlayerIndices(Vec<PlayerIndex>),
-    Roles(Vec<Roles>),
+    Roles(Vec<RoleNames>),
     Blank,
 }
 
@@ -31,7 +31,7 @@ impl ChangeArgs {
         }
     }
 
-    pub fn extract_roles(self) -> Result<Vec<Roles>, ChangeError> {
+    pub fn extract_roles(self) -> Result<Vec<RoleNames>, ChangeError> {
         match self {
             ChangeArgs::Roles(items) => Ok(items.to_owned()),
             _ => Err(ChangeError::WrongArgType),

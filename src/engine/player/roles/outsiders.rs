@@ -2,7 +2,7 @@ use std::fmt::Display;
 use std::sync::Arc;
 
 use crate::engine::change_request::{ChangeArgs, ChangeError, ChangeRequest, StateChangeFuncPtr};
-use crate::engine::player::roles::RolePtr;
+use crate::engine::player::roles::Roles;
 use crate::engine::state::status_effects::CleanupPhase;
 use crate::engine::{
     change_request::{ChangeRequestBuilder, ChangeType, check_len},
@@ -13,7 +13,7 @@ use crate::engine::{
     },
 };
 
-#[derive(Default)]
+#[derive(Default, Debug, Clone)]
 pub(crate) struct Butler();
 
 struct BulterMaster();
@@ -102,9 +102,10 @@ impl Display for Butler {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub(crate) struct Drunk {
-    role: Option<RolePtr>,
+    // WARN: Why can we use boxes here. Isn't this not thread safe?
+    role: Option<Box<Roles>>,
 }
 
 impl Role for Drunk {
@@ -151,9 +152,9 @@ impl Role for Drunk {
             let state_snapshot = state.clone();
 
             let drunk = state.get_player_mut(player_index);
-            drunk.role.reassign(RolePtr::from(Drunk {
-                role: Some(roles[0].convert()),
-            }));
+            drunk.role = Roles::Drunk(Drunk {
+                role: Some(Box::new(roles[0].convert())),
+            });
             Ok(drunk.setup_ability(player_index, &state_snapshot))
         }))
         .into()
@@ -215,7 +216,7 @@ impl Display for Drunk {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug, Clone)]
 pub(crate) struct Recluse();
 
 impl Role for Recluse {
@@ -238,7 +239,7 @@ impl Display for Recluse {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug, Clone)]
 pub(crate) struct Saint();
 // TODO:
 // Saint is technically a win condition, figure out how winning the game actually comes about

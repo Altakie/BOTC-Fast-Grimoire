@@ -1,35 +1,35 @@
-use crate::{Roles, Script};
+use crate::{RoleNames, Script};
 
 pub(crate) fn trouble_brewing() -> Script {
     Script {
         roles: {
             vec![
                 // Townsfolk
-                Roles::Washerwoman,
-                Roles::Librarian,
-                Roles::Investigator,
-                Roles::Chef,
-                Roles::Empath,
-                Roles::Fortuneteller,
-                Roles::Undertaker,
-                Roles::Monk,
-                Roles::Ravenkeeper,
-                Roles::Virgin,
-                Roles::Slayer,
-                Roles::Soldier,
-                Roles::Mayor,
+                RoleNames::Washerwoman,
+                RoleNames::Librarian,
+                RoleNames::Investigator,
+                RoleNames::Chef,
+                RoleNames::Empath,
+                RoleNames::Fortuneteller,
+                RoleNames::Undertaker,
+                RoleNames::Monk,
+                RoleNames::Ravenkeeper,
+                RoleNames::Virgin,
+                RoleNames::Slayer,
+                RoleNames::Soldier,
+                RoleNames::Mayor,
                 // Outsiders
-                Roles::Butler,
-                Roles::Drunk,
-                Roles::Recluse,
-                Roles::Saint,
+                RoleNames::Butler,
+                RoleNames::Drunk,
+                RoleNames::Recluse,
+                RoleNames::Saint,
                 // Minions
-                Roles::Poisoner,
-                Roles::Spy,
-                Roles::Scarletwoman,
-                Roles::Baron,
+                RoleNames::Poisoner,
+                RoleNames::Spy,
+                RoleNames::ScarletWoman,
+                RoleNames::Baron,
                 // Demons
-                Roles::Imp,
+                RoleNames::Imp,
             ]
         },
     }

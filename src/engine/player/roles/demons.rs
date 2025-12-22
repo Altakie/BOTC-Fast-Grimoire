@@ -1,8 +1,6 @@
 use crate::ChangeRequest;
-use crate::engine::{
-    change_request::{ChangeResult, FilterFuncPtr, StateChangeFuncPtr, check_len},
-    player::roles::RolePtr,
-};
+use crate::engine::change_request::{ChangeResult, FilterFuncPtr, StateChangeFuncPtr, check_len};
+use crate::engine::player::roles::Roles;
 use std::fmt::Display;
 use std::ops::Deref;
 
@@ -12,7 +10,7 @@ use crate::engine::{
     state::{PlayerIndex, State},
 };
 
-#[derive(Default)]
+#[derive(Default, Debug, Clone)]
 pub(crate) struct Imp {
     last_killed: Option<usize>,
 }
@@ -93,11 +91,11 @@ impl Imp {
                 let day_num = state.day_num;
                 let target_player = state.get_player_mut(target_player_index);
 
-                let new_role = RolePtr::from(Imp {
+                let new_role = Roles::Imp(Imp {
                     last_killed: Some(day_num),
                 });
 
-                target_player.role.reassign(new_role);
+                target_player.role = new_role;
                 Ok(None)
             }))
             .filter_func(FilterFuncPtr::new(move |_, player| {

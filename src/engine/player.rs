@@ -3,7 +3,7 @@ use std::fmt::{Debug, Display};
 
 use crate::engine::{
     change_request::{ChangeArgs, ChangeRequestBuilder, ChangeResult, StateChangeFuncPtr},
-    player::roles::RolePtr,
+    player::roles::{Role, Roles},
     state::{
         PlayerIndex, State,
         status_effects::{CleanupPhase, StatusEffect},
@@ -56,7 +56,7 @@ impl Display for CharacterType {
 #[derive(Clone, Store)]
 pub(crate) struct Player {
     pub(crate) name: String,
-    pub(crate) role: RolePtr,
+    pub(crate) role: Roles,
     pub(crate) dead: bool,
     pub(crate) ghost_vote: bool,
     pub(crate) alignment: Alignment,
@@ -64,7 +64,7 @@ pub(crate) struct Player {
 }
 
 impl Player {
-    pub(crate) fn new(name: String, role: RolePtr) -> Self {
+    pub(crate) fn new(name: String, role: Roles) -> Self {
         let alignment = role.get_default_alignment();
         Self {
             name,
@@ -368,10 +368,7 @@ fn drunkify(
             let next_cr = state_change_func(&mut state_copy, args)?;
 
             let player_role = state_copy.get_player(player_index).role.clone();
-            state
-                .get_player_mut(player_index)
-                .role
-                .reassign(player_role);
+            state.get_player_mut(player_index).role = player_role;
 
             if let Some(next_cr) = next_cr {
                 let new_state_change =

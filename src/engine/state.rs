@@ -16,7 +16,10 @@ use reactive_stores::*;
 use crate::{
     engine::{
         change_request::{ChangeRequest, ChangeRequestBuilder, ChangeResult},
-        player::{Player, roles::Roles},
+        player::{
+            Player,
+            roles::{Role, RoleNames},
+        },
         state::{log::Event, status_effects::CleanupPhase},
     },
     initialization::Script,
@@ -126,7 +129,7 @@ pub(crate) struct State {
 
 impl State {
     pub(crate) fn new(
-        mut roles: Vec<Roles>,
+        mut roles: Vec<RoleNames>,
         player_names: Vec<String>,
         script: Script,
     ) -> Result<Self, ()> {

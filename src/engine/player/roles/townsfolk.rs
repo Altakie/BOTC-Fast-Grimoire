@@ -8,7 +8,7 @@ use crate::engine::{
     },
     player::{
         Alignment, CharacterType, PlayerBehaviors,
-        roles::{Role, RolePtr},
+        roles::{Role, Roles},
     },
     state::{
         PlayerIndex, State,
@@ -87,7 +87,7 @@ fn washerwoman_librarian_investigator_wrong(
     .into();
 }
 
-#[derive(Default)]
+#[derive(Default, Debug, Clone)]
 pub(crate) struct Washerwoman();
 
 #[derive(Default)]
@@ -156,7 +156,7 @@ impl Display for Washerwoman {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug, Clone)]
 pub(crate) struct Librarian();
 
 #[derive(Default)]
@@ -255,7 +255,7 @@ impl Display for Librarian {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone, Debug)]
 pub(crate) struct Investigator();
 
 #[derive(Default)]
@@ -325,7 +325,7 @@ impl Display for Investigator {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug, Clone)]
 pub(crate) struct Chef();
 
 impl Role for Chef {
@@ -377,7 +377,7 @@ impl Display for Chef {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug, Clone)]
 pub(crate) struct Empath();
 
 impl Empath {
@@ -445,7 +445,7 @@ impl Display for Empath {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug, Clone)]
 pub(crate) struct Fortuneteller();
 
 struct FortunetellerRedHerring();
@@ -582,7 +582,7 @@ impl Display for Fortuneteller {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug, Clone)]
 pub(crate) struct Undertaker();
 
 impl Role for Undertaker {
@@ -638,7 +638,7 @@ impl Display for Undertaker {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug, Clone)]
 pub(crate) struct Monk();
 
 struct DemonProtected {
@@ -740,7 +740,7 @@ impl Display for Monk {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug, Clone)]
 pub(crate) struct Ravenkeeper {
     ability_used: bool,
 }
@@ -789,10 +789,8 @@ impl Role for Ravenkeeper {
             let target_player_indices = args.extract_player_indicies()?;
             check_len(&target_player_indices, 1)?;
 
-            state
-                .get_player_mut(player_index)
-                .role
-                .reassign(RolePtr::from(Ravenkeeper { ability_used: true }));
+            state.get_player_mut(player_index).role =
+                Roles::Ravenkeeper(Ravenkeeper { ability_used: true });
 
             let target_player = state.get_player(target_player_indices[0]);
 
@@ -816,7 +814,7 @@ impl Display for Ravenkeeper {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug, Clone)]
 pub(crate) struct Virgin {
     ability_used: bool,
 }
@@ -852,9 +850,7 @@ impl Role for Virgin {
         }
 
         let player = state.get_player_mut(target_player_index);
-        player
-            .role
-            .reassign(RolePtr::from(Virgin { ability_used: true }));
+        player.role = Roles::Virgin(Virgin { ability_used: true });
         // FIX: Doesn't account for drunkness or poisoned (bad account for drunkness)
         let nominator = state.get_player_mut(nominating_player_index);
         if nominator.role.get_true_character_type() == CharacterType::Townsfolk {
@@ -868,7 +864,7 @@ impl Display for Virgin {
         f.write_str("Virgin")
     }
 }
-#[derive(Default)]
+#[derive(Default, Debug, Clone)]
 pub(crate) struct Slayer {
     ability_used: bool,
 }
@@ -908,9 +904,7 @@ impl Role for Slayer {
             check_len(&target_player_indices, 1)?;
 
             let slayer = state.get_player_mut(player_index);
-            slayer
-                .role
-                .reassign(RolePtr::from(Self { ability_used: true }));
+            slayer.role = Roles::Slayer(Self { ability_used: true });
 
             let target_player = state.get_player_mut(target_player_indices[0]);
 
@@ -930,7 +924,7 @@ impl Display for Slayer {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug, Clone)]
 pub(crate) struct Soldier();
 
 impl Role for Soldier {
@@ -964,7 +958,7 @@ impl Display for Soldier {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug, Clone)]
 pub(crate) struct Mayor();
 
 impl Role for Mayor {
@@ -1014,11 +1008,11 @@ impl Display for Mayor {
 
 #[cfg(test)]
 mod test {
-    use crate::{engine::player::roles::Roles, scripts::trouble_brewing};
+    use crate::{engine::player::roles::RoleNames, scripts::trouble_brewing};
 
     use super::*;
 
-    fn setup_test_state(roles: Vec<Roles>) -> State {
+    fn setup_test_state(roles: Vec<RoleNames>) -> State {
         let player_names = roles
             .iter()
             .map(|role| role.convert().to_string())
@@ -1029,14 +1023,14 @@ mod test {
     #[test]
     fn test_undertaker_ability() {
         let roles = vec![
-            Roles::Undertaker,
-            Roles::Virgin,
-            Roles::Soldier,
-            Roles::Spy,
-            Roles::Imp,
+            RoleNames::Undertaker,
+            RoleNames::Virgin,
+            RoleNames::Soldier,
+            RoleNames::Spy,
+            RoleNames::Imp,
         ];
         let mut state = setup_test_state(roles);
-        let undertaker_role = RolePtr::new::<Undertaker>();
+        let undertaker_role = Roles::new(&RoleNames::Undertaker);
         let undertaker_index = state
             .get_players()
             .iter()
