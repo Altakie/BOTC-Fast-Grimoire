@@ -1,5 +1,7 @@
 use std::fmt::Display;
 
+use leptos::leptos_dom::logging::console_log;
+
 use crate::engine::{
     change_request::{
         ChangeError, ChangeRequest, ChangeRequestBuilder, ChangeResult, ChangeType, FilterFuncPtr,
@@ -10,8 +12,8 @@ use crate::engine::{
         roles::{Role, Roles},
     },
     state::{
-        PlayerIndex, State,
-        log::Event,
+        EventListener, PlayerIndex, State,
+        log::{AttemptedKill, Event, Nomination},
         status_effects::{CleanupPhase, StatusEffect, StatusType},
     },
 };
@@ -729,9 +731,7 @@ impl Display for Ravenkeeper {
 }
 
 #[derive(Default, Debug, Clone)]
-pub(crate) struct Virgin {
-    ability_used: bool,
-}
+pub(crate) struct Virgin {}
 
 impl Role for Virgin {
     fn get_default_alignment(&self) -> Alignment {
@@ -742,35 +742,38 @@ impl Role for Virgin {
         CharacterType::Townsfolk
     }
 
-    // TODO: Want to make this method more idiomatic (change to event listener)
-    // Maybe just make this a change request instead (might make more sense)
-    // Or an event listener
-    // Drunkify problem
-    // Want to isolate a certain kind of change (not just disable state change func)
-    // Maybe inject some code or something, where each call to the state is wrapped in a type
-    // Could be a use case for monads (or monadic code)
-    // For now, cloning is sufficient
-    // Brute force (pass in a boolean and check for every call whether that boolean is true or
-    // not). If it isn't, then don't actually query the state
-    // Or just only call the part of the code that triggers the ability usage
-    // fn nominated(
-    //     &self,
-    //     nominating_player_index: PlayerIndex,
-    //     target_player_index: PlayerIndex,
-    //     state: &mut State,
-    // ) {
-    //     if self.ability_used {
-    //         return;
-    //     }
-    //
-    //     let player = state.get_player_mut(target_player_index);
-    //     player.role = Roles::Virgin(Virgin { ability_used: true });
-    //     // FIX: Doesn't account for drunkness or poisoned (bad account for drunkness)
-    //     let nominator = state.get_player_mut(nominating_player_index);
-    //     if nominator.role.get_true_character_type() == CharacterType::Townsfolk {
-    //         state.execute_player(nominating_player_index);
-    //     }
-    // }
+    fn initialize(&self, player_index: PlayerIndex, state: &mut State) {
+        let virgin_listener = EventListener::new(
+            player_index,
+            |event_listener_state, state, nomination_event: Nomination| {
+                if nomination_event.target_player_index != event_listener_state.source_player_index
+                {
+                    return state;
+                }
+
+                let source_player_index = event_listener_state.source_player_index;
+                state.change_request_queue.push_back(
+                    ChangeRequest::new_builder(ChangeType::NoStoryteller, String::new())
+                        .state_change_func(StateChangeFuncPtr::new(move |state, _| {
+                            // FIX: Doesn't account for drunkness or poisoned (bad account for drunkness)
+                            let nominator =
+                                state.get_player_mut(nomination_event.nominator_player_index);
+                            if nominator.role.get_true_character_type() == CharacterType::Townsfolk
+                            {
+                                state.execute_player(nomination_event.nominator_player_index);
+                            }
+                            state.cleanup_event_listeners(source_player_index);
+                            Ok(())
+                        })),
+                );
+
+                state
+            },
+        );
+
+        console_log("I was called");
+        state.nomination_listeners.push(virgin_listener);
+    }
 }
 
 impl Display for Virgin {
@@ -884,35 +887,48 @@ impl Role for Mayor {
         CharacterType::Townsfolk
     }
 
-    // TODO: Change to event listener
-    // fn kill(
-    //     &self,
-    //     attacking_player_index: PlayerIndex,
-    //     player_index: PlayerIndex,
-    //     _state: &State,
-    // ) -> Option<ChangeResult> {
-    //     Some(
-    //         ChangeRequest::new_builder(
-    //             ChangeType::ChoosePlayers(1),
-    //             "Choose a player to die (the mayor may bounce a kill)".into(),
-    //         )
-    //         .state_change_func(StateChangeFuncPtr::new(move |state, args| {
-    //             let target_player_indices = args.extract_player_indicies()?;
-    //             check_len(&target_player_indices, 1)?;
-    //
-    //             let target_player_index = target_player_indices[0];
-    //
-    //             // Stop infinite loop of mayor bouncing kills
-    //             if target_player_index == player_index {
-    //                 state.get_player_mut(player_index).dead = true;
-    //                 return Ok(None);
-    //             }
-    //
-    //             return state.kill(attacking_player_index, target_player_index);
-    //         }))
-    //         .into(),
-    //     )
-    // }
+    // TODO: Test this
+    fn initialize(&self, player_index: PlayerIndex, state: &mut State) {
+        let mayor_listener = EventListener::new(
+            player_index,
+            move |event_listener_state, state, attempted_kill_event: AttemptedKill| {
+                if attempted_kill_event.target_player_index
+                    != event_listener_state.source_player_index
+                {
+                    return state;
+                }
+
+                ChangeRequest::new_builder(
+                    ChangeType::ChoosePlayers(1),
+                    "Choose a player to die (the mayor may bounce a kill)".into(),
+                )
+                .state_change_func(StateChangeFuncPtr::new(move |state, args| {
+                    let target_player_indices = args.extract_player_indicies()?;
+                    check_len(&target_player_indices, 1)?;
+
+                    let target_player_index = target_player_indices[0];
+
+                    // Stop infinite loop of mayor bouncing kills
+                    if target_player_index == player_index {
+                        state.get_player_mut(player_index).dead = true;
+                        state.handle_death(player_index);
+                        return Ok(());
+                    }
+
+                    state.kill(
+                        attempted_kill_event.attacking_player_index,
+                        target_player_index,
+                    );
+
+                    Ok(())
+                }));
+
+                state
+            },
+        );
+
+        state.attempted_kill_listeners.push(mayor_listener);
+    }
 }
 
 impl Display for Mayor {

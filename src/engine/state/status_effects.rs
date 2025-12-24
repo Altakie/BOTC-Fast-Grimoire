@@ -2,6 +2,8 @@ use std::fmt::{Debug, Display};
 use std::ops::Deref;
 use std::sync::Arc;
 
+use leptos::leptos_dom::logging::{console_error, console_log};
+
 use crate::engine::player::Player;
 use crate::engine::{
     player::PlayerBehaviors,
@@ -117,22 +119,6 @@ impl PartialEq for StatusEffect {
     fn eq(&self, other: &Self) -> bool {
         self.status_type.name() == other.status_type.name()
             && self.source_player_index == other.source_player_index
-    }
-}
-
-/// Status Effects can either be visual (just for the storyteller) and do nothing or they can
-/// overwrite player behaviors
-impl State {
-    pub(crate) fn cleanup_player_statuses(&mut self, source_player_index: PlayerIndex) {
-        for player in self.players.iter_mut() {
-            player.remove_players_statuses(source_player_index);
-        }
-    }
-
-    pub(crate) fn cleanup_statuses(&mut self, cleanup_phase: CleanupPhase) {
-        for player in self.players.iter_mut() {
-            player.cleanup_statuses(cleanup_phase);
-        }
     }
 }
 

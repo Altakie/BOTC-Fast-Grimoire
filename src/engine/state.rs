@@ -1,6 +1,7 @@
 #![allow(dead_code, clippy::needless_return)]
 pub(crate) mod log;
 
+use leptos::leptos_dom::logging::console_log;
 use log::Log;
 use std::{
     collections::{HashMap, VecDeque},
@@ -121,7 +122,7 @@ impl<EventType> EventListener<EventType> {
     }
 }
 
-#[derive(Store, Debug)]
+#[derive(Store, Debug, Clone)]
 pub(crate) struct State {
     players: Vec<Player>,
     win_cond_i: Option<PlayerIndex>,
@@ -225,6 +226,7 @@ impl State {
             player.role.initialize(player_index, &mut state);
         }
 
+        console_log(format!("Listeners: {:#?}", state.nomination_listeners).as_str());
         return Ok(state);
     }
 
@@ -359,12 +361,22 @@ impl State {
         attacking_player_index: PlayerIndex,
         target_player_index: PlayerIndex,
     ) {
-        self.log.log_event(Event::AttemptedKill {
+        // Go through all kill listeners (can maybe set a change request up to go)
+        let mut state = self;
+        state.log.log_event(Event::AttemptedKill {
             attacking_player_index,
             target_player_index,
         });
-
-        // Go through all kill listeners (can maybe set a change request up to go)
+        let mut attempted_kill_listeners = std::mem::take(&mut state.attempted_kill_listeners);
+        for listener in attempted_kill_listeners.iter_mut() {
+            state = listener.call(
+                state,
+                log::AttemptedKill {
+                    attacking_player_index,
+                    target_player_index,
+                },
+            );
+        }
         // Go through all status effects (also can maybe do a change request?)
 
         // let cr = self.get_player_mut(target_player_index).kill(
@@ -372,12 +384,12 @@ impl State {
         //     target_player_index,
         //     &state_snapshot,
         // );
-        self.get_player_mut(target_player_index).dead = true;
-        self.log.log_event(Event::Death(target_player_index));
+        // FIX: Shouldn't always successfully kill
+        state.get_player_mut(target_player_index).dead = true;
 
-        let dead = self.get_player(target_player_index).dead;
+        let dead = state.get_player(target_player_index).dead;
         if dead {
-            self.handle_death(target_player_index);
+            state.handle_death(target_player_index);
         }
     }
 
@@ -390,6 +402,7 @@ impl State {
         }
 
         state.death_listeners = death_listeners;
+        state.cleanup_event_listeners(player_index);
         state.cleanup_player_statuses(player_index);
     }
 
@@ -398,7 +411,13 @@ impl State {
             Event::Nomination {
                 nominator_player_index,
                 target_player_index,
-            } => todo!(),
+            } => {
+                format!(
+                    "{} nominated {} for execution",
+                    self.get_player(nominator_player_index).name,
+                    self.get_player(target_player_index).name
+                )
+            }
             Event::Voting {
                 players_voted,
                 target_player_index,
@@ -465,13 +484,21 @@ impl State {
         source_player_index: PlayerIndex,
         target_player_index: PlayerIndex,
     ) {
-        // Execute the nominated player's effect on the state
-        let target_player = self.get_player(target_player_index).clone();
-
-        // FIX: Make it go through nomination listeners
         // target_player.nominate(source_player_index, target_player_index, self);
+        let mut state = self;
+        let mut nomination_listeners = std::mem::take(&mut state.nomination_listeners);
+        for listener in nomination_listeners.iter_mut() {
+            state = listener.call(
+                state,
+                log::Nomination {
+                    nominator_player_index: source_player_index,
+                    target_player_index,
+                },
+            );
+        }
+        state.nomination_listeners = nomination_listeners;
 
-        self.log.log_event(Event::Nomination {
+        state.log.log_event(Event::Nomination {
             nominator_player_index: source_player_index,
             target_player_index,
         });
@@ -480,7 +507,7 @@ impl State {
     pub(crate) fn execute_player(&mut self, target_player_index: PlayerIndex) {
         let target_player = self.get_player_mut(target_player_index);
 
-        // FIX: Make this work properly again
+        // FIX: Make this work properly again and prevent defaults
         // target_player.execute();
         target_player.dead = true;
         // TODO: Call execute listeners
@@ -711,6 +738,33 @@ impl State {
             // Role::Vizier => 73
             _ => 0,
         }
+    }
+}
+
+/// Status Effects can either be visual (just for the storyteller) and do nothing or they can
+/// overwrite player behaviors
+impl State {
+    pub(crate) fn cleanup_player_statuses(&mut self, source_player_index: PlayerIndex) {
+        for player in self.players.iter_mut() {
+            player.remove_players_statuses(source_player_index);
+        }
+    }
+
+    pub(crate) fn cleanup_statuses(&mut self, cleanup_phase: CleanupPhase) {
+        for player in self.players.iter_mut() {
+            player.cleanup_statuses(cleanup_phase);
+        }
+    }
+
+    pub(crate) fn cleanup_event_listeners(&mut self, player_index: PlayerIndex) {
+        console_log(format!("Cleanup for the {}", self.get_player_mut(player_index).role).as_str());
+        console_log(format!("Event Listeners are: {:#?}", self.death_listeners).as_str());
+        self.nomination_listeners
+            .retain(|listener| listener.state.source_player_index != player_index);
+        self.attempted_kill_listeners
+            .retain(|listener| listener.state.source_player_index != player_index);
+        self.death_listeners
+            .retain(|listener| listener.state.source_player_index != player_index);
     }
 }
 

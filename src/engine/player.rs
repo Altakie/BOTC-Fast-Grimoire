@@ -109,8 +109,8 @@ impl Player {
 
     // Player Behaviors
 
-    /// Default behavior is that the player dies. If the player does not die, it should be because
-    /// of their role or status effects.
+    // Default behavior is that the player dies. If the player does not die, it should be because
+    // of their role or status effects.
     // pub(crate) fn kill(
     //     &mut self,
     //     attacking_player_index: PlayerIndex,
@@ -153,39 +153,6 @@ impl Player {
     //     Ok(None)
     // }
     //
-    /// Default behavior is that the player dies. If the player does not die, it should be because
-    /// of their role or status effects
-    // pub(crate) fn execute(&mut self) {
-    //     // Status Effects
-    //     // Basically go through each status, see if any prevent the player from dying
-    //     // If any do, prevent the player from dying
-    //     let mut dead = true;
-    //     for status_effect in self.status_effects.iter() {
-    //         if status_effect
-    //             .status_type
-    //             .behavior_type()
-    //             .is_some_and(|behaviors| {
-    //                 behaviors
-    //                     .iter()
-    //                     .any(|behavior| matches!(behavior, PlayerBehaviors::Execute))
-    //             })
-    //             && let Some(false) = status_effect.status_type.execute()
-    //         {
-    //             dead = false;
-    //         }
-    //     }
-    //
-    //     if !dead {
-    //         return;
-    //     }
-    //
-    //     if let Some(dead) = self.role.execute() {
-    //         self.dead = dead;
-    //         return;
-    //     }
-    //     // Default Behavior
-    //     self.dead = true;
-    // }
 
     pub(crate) fn get_alignment(&self) -> Alignment {
         self.role.get_alignment()
@@ -348,27 +315,37 @@ fn drunkify(
     mut change_request: ChangeRequestBuilder,
     status_string: String,
 ) -> ChangeRequestBuilder {
-    // FIX: Make drunkify work again
-    // if let Some(state_change_func) = change_request.state_change_func {
-    //     let status_string_clone = status_string.clone();
-    //     let wrapper_func = StateChangeFuncPtr::new(move |state, args| {
-    //         let mut state_copy = state.clone();
-    //         let next_cr = state_change_func(&mut state_copy, args)?;
-    //
-    //         let player_role = state_copy.get_player(player_index).role.clone();
-    //         state.get_player_mut(player_index).role = player_role;
-    //
-    //         if let Some(next_cr) = next_cr {
-    //             let new_state_change =
-    //                 drunkify(player_index, next_cr, status_string_clone.to_owned());
-    //             return new_state_change.into();
-    //         }
-    //
-    //         Ok(None)
-    //     });
-    //
-    //     change_request.state_change_func = Some(wrapper_func);
-    // }
+    if let Some(state_change_func) = change_request.state_change_func {
+        let status_string_clone = status_string.clone();
+        let wrapper_func = StateChangeFuncPtr::new(move |state, args| {
+            let mut state_copy = state.clone();
+            state_change_func(&mut state_copy, args)?;
+
+            let player_role = state_copy.get_player(player_index).role.clone();
+            state.get_player_mut(player_index).role = player_role;
+
+            let state_queue_len = state.change_request_queue.len();
+            if state_copy.change_request_queue.len() > state_queue_len {
+                let mut extra_reqs = state_copy.change_request_queue.split_off(state_queue_len);
+                // WARN: May affect things that don't have to do with the drunk player
+                loop {
+                    let next_cr = match extra_reqs.pop_front() {
+                        Some(cr) => cr,
+                        None => break,
+                    };
+                    let status_string_clone = status_string_clone.clone();
+                    state.change_request_queue.push_back(drunkify(
+                        player_index,
+                        next_cr,
+                        status_string_clone,
+                    ));
+                }
+            }
+            Ok(())
+        });
+
+        change_request.state_change_func = Some(wrapper_func);
+    }
 
     change_request.description =
         format!("(*{}*) ", status_string) + change_request.description.as_str();

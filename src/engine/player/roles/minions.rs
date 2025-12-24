@@ -1,6 +1,8 @@
 #![allow(unused_variables)]
 use std::fmt::Display;
 
+use leptos::leptos_dom::logging::console_log;
+
 use crate::{
     engine::{
         change_request::{
@@ -209,27 +211,33 @@ impl Role for ScarletWoman {
                     return state;
                 }
 
-                let day_num = state.day_num;
-                let dead_player = &mut state.get_player_mut(death_event.player_index);
-                if let Roles::Imp(imp_data) = &mut dead_player.role {
-                    imp_data.last_killed = Some(day_num);
-                }
+                let source_player_index = event_listener_state.source_player_index;
 
-                let dead_role = dead_player.role.clone();
+                state.change_request_queue.push_back(
+                    ChangeRequest::new_builder(ChangeType::NoStoryteller, String::new())
+                        .state_change_func(StateChangeFuncPtr::new(move |state, _| {
+                            let day_num = state.day_num;
+                            let dead_player = &mut state.get_player_mut(death_event.player_index);
+                            if let Roles::Imp(imp_data) = &mut dead_player.role {
+                                imp_data.last_killed = Some(day_num);
+                            }
 
-                let scarlet_player = state.get_player_mut(event_listener_state.source_player_index);
+                            let dead_role = dead_player.role.clone();
+                            state.cleanup_event_listeners(source_player_index);
 
-                scarlet_player.role = dead_role;
+                            let scarlet_player = state.get_player_mut(source_player_index);
+                            scarlet_player.role = dead_role;
 
-                let scarlet_player_string = state
-                    .get_player(event_listener_state.source_player_index)
-                    .role
-                    .to_string();
+                            Ok(())
+                        })),
+                );
+                let dead_player_string =
+                    state.get_player(death_event.player_index).role.to_string();
                 state
                     .change_request_queue
                     .push_back(ChangeRequest::new_builder(
                         ChangeType::Display,
-                        format!("The Scarletwoman becomes the {}", scarlet_player_string),
+                        format!("The Scarletwoman becomes the {}", dead_player_string),
                     ));
 
                 state

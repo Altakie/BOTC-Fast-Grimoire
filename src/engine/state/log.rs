@@ -199,7 +199,7 @@ pub enum Event {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Nomination {
     pub nominator_player_index: PlayerIndex,
-    pub jtarget_player_index: PlayerIndex,
+    pub target_player_index: PlayerIndex,
 }
 #[derive(Clone, Debug, PartialEq)]
 pub struct Voting {
