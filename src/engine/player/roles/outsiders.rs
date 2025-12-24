@@ -1,5 +1,4 @@
 use std::fmt::Display;
-use std::sync::Arc;
 
 use crate::engine::change_request::{ChangeArgs, ChangeError, ChangeRequest, StateChangeFuncPtr};
 use crate::engine::player::roles::Roles;
@@ -42,7 +41,7 @@ impl Butler {
                 CleanupPhase::Dusk.into(),
             );
             target_player.add_status(status);
-            Ok(None)
+            Ok(())
         }))
         .into()
     }
@@ -129,7 +128,7 @@ impl Role for Drunk {
             "Select a not in play Townfolk role".into(),
         )
         .state_change_func(StateChangeFuncPtr::new(move |state, args| {
-            let roles = args.clone().extract_roles()?;
+            let roles = args.extract_roles()?;
 
             check_len(&roles, 1)?;
 
@@ -139,13 +138,17 @@ impl Role for Drunk {
                 });
             }
 
-            let state_snapshot = state.clone();
-
             let drunk = state.get_player_mut(player_index);
             drunk.role = Roles::Drunk(Drunk {
                 role: Some(Box::new(roles[0].convert())),
             });
-            Ok(drunk.setup_ability(player_index, &state_snapshot))
+
+            let drunk = state.get_player(player_index);
+            if let Some(ability) = drunk.setup_ability(player_index, state) {
+                state.change_request_queue.push_back(ability);
+            }
+
+            Ok(())
         }))
         .into()
     }
@@ -198,7 +201,7 @@ impl Role for Drunk {
 
 impl Display for Drunk {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let role = self.role.clone();
+        let role = &self.role;
         match role {
             Some(role) => write!(f, "The Drunk {}", role),
             None => f.write_str("The Drunk"),

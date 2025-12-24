@@ -48,7 +48,7 @@ pub fn check_len<T>(vec: &[T], desired_len: usize) -> Result<(), ChangeError> {
         });
     }
 
-    return Ok(());
+    Ok(())
 }
 
 #[derive(Clone)]
@@ -109,6 +109,7 @@ impl Debug for ChangeRequest {
     }
 }
 
+#[derive(Clone, Debug)]
 pub(crate) struct ChangeRequestBuilder {
     pub(crate) change_type: ChangeType,
     pub(crate) filter_func: Option<FilterFuncPtr>,
@@ -172,6 +173,12 @@ impl FilterFuncPtr {
     }
 }
 
+impl Debug for FilterFuncPtr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("FilterFuncPtr").finish()
+    }
+}
+
 // impl From<Arc<CheckFunc>> for CheckFuncPtr {
 //     fn from
 //         value: Arc<dyn Fn(&State, &ChangeArgs) -> Result<bool, ChangeError> + Send + Sync>,
@@ -209,6 +216,12 @@ impl Deref for StateChangeFuncPtr {
     }
 }
 
+impl Debug for StateChangeFuncPtr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("StateChangeFuncPtr").finish()
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum ChangeError {
     InvalidSelectedPlayer { reason: String },
@@ -219,10 +232,10 @@ pub enum ChangeError {
     BlankArgs,
 }
 
-pub type ChangeResult = Result<Option<ChangeRequestBuilder>, ChangeError>;
+pub type ChangeResult = Result<(), ChangeError>;
 
-impl From<ChangeRequestBuilder> for ChangeResult {
-    fn from(value: ChangeRequestBuilder) -> Self {
-        Ok(Some(value))
-    }
-}
+// impl From<ChangeRequestBuilder> for ChangeResult {
+//     fn from(value: ChangeRequestBuilder) -> Self {
+//         Ok(Some(value))
+//     }
+// }

@@ -1,5 +1,4 @@
 use std::fmt::Display;
-use std::sync::Arc;
 
 use crate::engine::{
     change_request::{
@@ -38,7 +37,15 @@ fn washerwoman_librarian_investigator(
         let target_player = state.get_player_mut(target_player_indices[0]);
         target_player.add_status(right_status());
 
-        return washerwoman_librarian_investigator_wrong(player_index, right_status, wrong_status);
+        state
+            .change_request_queue
+            .push_back(washerwoman_librarian_investigator_wrong(
+                player_index,
+                right_status,
+                wrong_status,
+            ));
+
+        Ok(())
     }))
     .into();
 }
@@ -47,7 +54,7 @@ fn washerwoman_librarian_investigator_wrong(
     player_index: PlayerIndex,
     right_status: impl Fn() -> StatusEffect + Send + Sync + 'static,
     wrong_status: impl Fn() -> StatusEffect + Send + Sync + 'static,
-) -> ChangeResult {
+) -> ChangeRequestBuilder {
     return ChangeRequest::new_builder(
         ChangeType::ChoosePlayers(1),
         "Select a different player".into(),
@@ -79,9 +86,8 @@ fn washerwoman_librarian_investigator_wrong(
         let target_player = state.get_player_mut(target_player_indices[0]);
         target_player.add_status(wrong_status());
 
-        Ok(None)
-    }))
-    .into();
+        Ok(())
+    }));
 }
 
 #[derive(Default, Debug, Clone)]
@@ -431,17 +437,19 @@ impl Fortuneteller {
                         && matches!(se.status_type, StatusType::FortuneTellerRedHerring)
                 })
             });
-            ChangeRequest::new_builder(
-                ChangeType::Display,
-                format!(
-                    "Show the Fortuneteller a {}",
-                    match demon_found {
-                        true => "Thumbs Up",
-                        false => "Thumbs Down",
-                    }
-                ),
-            )
-            .into()
+            state
+                .change_request_queue
+                .push_back(ChangeRequest::new_builder(
+                    ChangeType::Display,
+                    format!(
+                        "Show the Fortuneteller a {}",
+                        match demon_found {
+                            true => "Thumbs Up",
+                            false => "Thumbs Down",
+                        }
+                    ),
+                ));
+            Ok(())
         }))
         .into()
     }
@@ -487,7 +495,7 @@ impl Role for Fortuneteller {
             let status = StatusEffect::new(StatusType::FortuneTellerRedHerring, player_index, None);
             target_player.add_status(status);
 
-            Ok(None)
+            Ok(())
         }))
         .into()
     }
@@ -630,7 +638,7 @@ impl Role for Monk {
             );
             target_player.add_status(status);
 
-            Ok(None)
+            Ok(())
         }))
         .filter_func(FilterFuncPtr::new(move |pi, _| pi != player_index))
         .into()
@@ -698,14 +706,17 @@ impl Role for Ravenkeeper {
             let target_player = state.get_player(target_player_indices[0]);
 
             // Create a new change request using the role of the target player
-            ChangeRequest::new_builder(
-                ChangeType::Display,
-                format!(
-                    "Show the Ravenkeeper that they selected the {}",
-                    target_player.role
-                ),
-            )
-            .into()
+            state
+                .change_request_queue
+                .push_back(ChangeRequest::new_builder(
+                    ChangeType::Display,
+                    format!(
+                        "Show the Ravenkeeper that they selected the {}",
+                        target_player.role
+                    ),
+                ));
+
+            Ok(())
         }))
         .into()
     }
@@ -742,24 +753,24 @@ impl Role for Virgin {
     // Brute force (pass in a boolean and check for every call whether that boolean is true or
     // not). If it isn't, then don't actually query the state
     // Or just only call the part of the code that triggers the ability usage
-    fn nominated(
-        &self,
-        nominating_player_index: PlayerIndex,
-        target_player_index: PlayerIndex,
-        state: &mut State,
-    ) {
-        if self.ability_used {
-            return;
-        }
-
-        let player = state.get_player_mut(target_player_index);
-        player.role = Roles::Virgin(Virgin { ability_used: true });
-        // FIX: Doesn't account for drunkness or poisoned (bad account for drunkness)
-        let nominator = state.get_player_mut(nominating_player_index);
-        if nominator.role.get_true_character_type() == CharacterType::Townsfolk {
-            state.execute_player(nominating_player_index);
-        }
-    }
+    // fn nominated(
+    //     &self,
+    //     nominating_player_index: PlayerIndex,
+    //     target_player_index: PlayerIndex,
+    //     state: &mut State,
+    // ) {
+    //     if self.ability_used {
+    //         return;
+    //     }
+    //
+    //     let player = state.get_player_mut(target_player_index);
+    //     player.role = Roles::Virgin(Virgin { ability_used: true });
+    //     // FIX: Doesn't account for drunkness or poisoned (bad account for drunkness)
+    //     let nominator = state.get_player_mut(nominating_player_index);
+    //     if nominator.role.get_true_character_type() == CharacterType::Townsfolk {
+    //         state.execute_player(nominating_player_index);
+    //     }
+    // }
 }
 
 impl Display for Virgin {
@@ -812,10 +823,10 @@ impl Role for Slayer {
             let target_player = state.get_player_mut(target_player_indices[0]);
 
             if target_player.get_character_type() == CharacterType::Demon {
-                return state.kill(player_index, target_player_indices[0]);
+                state.kill(player_index, target_player_indices[0]);
             }
 
-            Ok(None)
+            Ok(())
         }))
         .into()
     }
@@ -840,19 +851,19 @@ impl Role for Soldier {
     }
 
     // Overwrite kill method for Soldier so they can't be killed by a demon
-    fn kill(
-        &self,
-        attacking_player_index: PlayerIndex,
-        _target_player_index: PlayerIndex,
-        state: &State,
-    ) -> Option<ChangeResult> {
-        let attacking_player = state.get_player(attacking_player_index);
-        if attacking_player.role.get_true_character_type() == CharacterType::Demon {
-            return Some(Ok(None));
-        }
-
-        None
-    }
+    // fn kill(
+    //     &self,
+    //     attacking_player_index: PlayerIndex,
+    //     _target_player_index: PlayerIndex,
+    //     state: &State,
+    // ) -> Option<ChangeResult> {
+    //     let attacking_player = state.get_player(attacking_player_index);
+    //     if attacking_player.role.get_true_character_type() == CharacterType::Demon {
+    //         return Some(Ok(None));
+    //     }
+    //
+    //     None
+    // }
 }
 
 impl Display for Soldier {
@@ -874,34 +885,34 @@ impl Role for Mayor {
     }
 
     // TODO: Change to event listener
-    fn kill(
-        &self,
-        attacking_player_index: PlayerIndex,
-        player_index: PlayerIndex,
-        _state: &State,
-    ) -> Option<ChangeResult> {
-        Some(
-            ChangeRequest::new_builder(
-                ChangeType::ChoosePlayers(1),
-                "Choose a player to die (the mayor may bounce a kill)".into(),
-            )
-            .state_change_func(StateChangeFuncPtr::new(move |state, args| {
-                let target_player_indices = args.extract_player_indicies()?;
-                check_len(&target_player_indices, 1)?;
-
-                let target_player_index = target_player_indices[0];
-
-                // Stop infinite loop of mayor bouncing kills
-                if target_player_index == player_index {
-                    state.get_player_mut(player_index).dead = true;
-                    return Ok(None);
-                }
-
-                return state.kill(attacking_player_index, target_player_index);
-            }))
-            .into(),
-        )
-    }
+    // fn kill(
+    //     &self,
+    //     attacking_player_index: PlayerIndex,
+    //     player_index: PlayerIndex,
+    //     _state: &State,
+    // ) -> Option<ChangeResult> {
+    //     Some(
+    //         ChangeRequest::new_builder(
+    //             ChangeType::ChoosePlayers(1),
+    //             "Choose a player to die (the mayor may bounce a kill)".into(),
+    //         )
+    //         .state_change_func(StateChangeFuncPtr::new(move |state, args| {
+    //             let target_player_indices = args.extract_player_indicies()?;
+    //             check_len(&target_player_indices, 1)?;
+    //
+    //             let target_player_index = target_player_indices[0];
+    //
+    //             // Stop infinite loop of mayor bouncing kills
+    //             if target_player_index == player_index {
+    //                 state.get_player_mut(player_index).dead = true;
+    //                 return Ok(None);
+    //             }
+    //
+    //             return state.kill(attacking_player_index, target_player_index);
+    //         }))
+    //         .into(),
+    //     )
+    // }
 }
 
 impl Display for Mayor {

@@ -76,6 +76,22 @@ pub(crate) enum Roles {
     Imp,
 }
 
+struct RoleData {
+    // Maybe keep name here?
+    name: String,
+    default_alignment: Alignment,
+    true_character_type: CharacterType,
+    // character_type: Option<CharacterType>,
+    // initialization_effect: Option<CharacterTypeCounts>,
+    // setup_order: Option<usize>,
+    // night_one_order: Option<usize>,
+    // night_order: Option<usize>,
+
+    // setup_ability: fn() -> Option<ChangeArgs, Option<fn()>>,
+    // night_one_ability: fn(),
+    // night_ability: fn(),
+}
+
 impl Roles {
     fn new(role_name: &RoleNames) -> Self {
         match role_name {
@@ -137,7 +153,10 @@ impl Roles {
 
 impl Display for Roles {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Display::fmt(&self.to_role_name(), f)
+        match self {
+            Self::Drunk(drunk) => std::fmt::Display::fmt(&drunk, f),
+            _ => std::fmt::Display::fmt(&self.to_role_name(), f),
+        }
     }
 }
 
@@ -149,7 +168,6 @@ impl Display for RoleNames {
             RoleNames::Gossip => write!(f, "Gossip"),
             RoleNames::Innkeeper => write!(f, "Innkeeper"),
             RoleNames::Washerwoman => write!(f, "Washerwoman"),
-
             RoleNames::Librarian => write!(f, "Librarian"),
             RoleNames::Chef => write!(f, "Chef"),
             RoleNames::Fortuneteller => write!(f, "Fortuneteller"),

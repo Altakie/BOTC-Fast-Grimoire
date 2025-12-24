@@ -23,7 +23,7 @@ enum ScriptEntry {
 #[derive(Debug, Serialize, Deserialize)]
 pub(crate) struct ScriptJson(Vec<ScriptEntry>);
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(crate) struct Script {
     pub(crate) roles: Vec<RoleNames>,
 }

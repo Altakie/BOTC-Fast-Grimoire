@@ -1,13 +1,13 @@
 #![allow(dead_code, clippy::needless_return)]
 pub(crate) mod log;
 
-use std::{
-    collections::HashMap,
-    ops::{Add, Deref, Index},
-    sync::Arc,
-};
-
 use log::Log;
+use std::{
+    collections::{HashMap, VecDeque},
+    fmt::Debug,
+    ops::{Add, Deref, Index},
+    sync::{Arc, Mutex, RwLock},
+};
 pub(crate) mod status_effects;
 
 use rand::{self, seq::SliceRandom};
@@ -87,7 +87,15 @@ pub(crate) struct EventListener<EventType> {
     >,
 }
 
-#[derive(Clone)]
+impl<EventType> Debug for EventListener<EventType> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("EventListener")
+            .field("state", &self.state)
+            .finish()
+    }
+}
+
+#[derive(Clone, Debug)]
 pub(crate) struct EventListenerState {
     pub(crate) source_player_index: PlayerIndex,
 }
@@ -113,7 +121,7 @@ impl<EventType> EventListener<EventType> {
     }
 }
 
-#[derive(Clone, Store)]
+#[derive(Store, Debug)]
 pub(crate) struct State {
     players: Vec<Player>,
     win_cond_i: Option<PlayerIndex>,
@@ -122,8 +130,9 @@ pub(crate) struct State {
     script: Script,
     pub(crate) step: Step,
 
-    pub(crate) curr_args: Option<ChangeArgs>,
-    pub(crate) curr_description: Option<String>,
+    // pub(crate) curr_args: Option<ChangeArgs>,
+    // pub(crate) curr_description: Option<String>,
+    pub(crate) change_request_queue: VecDeque<ChangeRequestBuilder>,
 
     pub(crate) nomination_listeners: Vec<EventListener<log::Nomination>>,
     pub(crate) attempted_kill_listeners: Vec<EventListener<log::AttemptedKill>>,
@@ -160,7 +169,7 @@ impl State {
             .position(|player| player.role.is_win_condition())
             .unwrap();
 
-        let demon_listener = EventListener::new(
+        let _demon_listener = EventListener::new(
             win_cond_index,
             |listener, state, death_event: log::Death| {
                 if death_event.player_index == listener.source_player_index {
@@ -202,8 +211,9 @@ impl State {
             script,
             step: Step::default(),
 
-            curr_args: None,
-            curr_description: None,
+            // curr_args: None,
+            // curr_description: None,
+            change_request_queue: VecDeque::new(),
 
             nomination_listeners: vec![],
             attempted_kill_listeners: vec![],
@@ -328,7 +338,7 @@ impl State {
     ///
     /// * Option<ChangeRequest> : A change request if the role does something, or none if it
     ///   doesn't
-    pub(crate) fn resolve(&self, player_index: PlayerIndex) -> Option<ChangeRequestBuilder> {
+    pub(crate) fn resolve(&mut self, player_index: PlayerIndex) {
         let player = self.get_player(player_index);
 
         let res = match self.step {
@@ -338,7 +348,9 @@ impl State {
             _ => None,
         };
 
-        return res;
+        if let Some(cr) = res {
+            self.change_request_queue.push_back(cr);
+        }
         // TODO: Log events that happen in the setup
     }
 
@@ -346,7 +358,7 @@ impl State {
         &mut self,
         attacking_player_index: PlayerIndex,
         target_player_index: PlayerIndex,
-    ) -> ChangeResult {
+    ) {
         self.log.log_event(Event::AttemptedKill {
             attacking_player_index,
             target_player_index,
@@ -355,18 +367,18 @@ impl State {
         // Go through all kill listeners (can maybe set a change request up to go)
         // Go through all status effects (also can maybe do a change request?)
 
-        let cr = self.get_player_mut(target_player_index).kill(
-            attacking_player_index,
-            target_player_index,
-            &state_snapshot,
-        );
+        // let cr = self.get_player_mut(target_player_index).kill(
+        //     attacking_player_index,
+        //     target_player_index,
+        //     &state_snapshot,
+        // );
+        self.get_player_mut(target_player_index).dead = true;
+        self.log.log_event(Event::Death(target_player_index));
 
         let dead = self.get_player(target_player_index).dead;
         if dead {
             self.handle_death(target_player_index);
         }
-
-        return cr;
     }
 
     pub(crate) fn handle_death(&mut self, player_index: PlayerIndex) {
@@ -456,7 +468,9 @@ impl State {
         // Execute the nominated player's effect on the state
         let target_player = self.get_player(target_player_index).clone();
 
-        target_player.nominate(source_player_index, target_player_index, self);
+        // FIX: Make it go through nomination listeners
+        // target_player.nominate(source_player_index, target_player_index, self);
+
         self.log.log_event(Event::Nomination {
             nominator_player_index: source_player_index,
             target_player_index,
@@ -466,7 +480,11 @@ impl State {
     pub(crate) fn execute_player(&mut self, target_player_index: PlayerIndex) {
         let target_player = self.get_player_mut(target_player_index);
 
-        target_player.execute();
+        // FIX: Make this work properly again
+        // target_player.execute();
+        target_player.dead = true;
+        // TODO: Call execute listeners
+        // Resolve their change requests (right away if possible)
         self.handle_death(target_player_index);
         self.log.log_event(Event::Execution(target_player_index));
 

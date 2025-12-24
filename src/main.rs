@@ -21,7 +21,7 @@ mod scripts;
 use scripts::*;
 
 use crate::engine::change_request::{ChangeRequestBuilder, StateChangeFuncPtr, check_len};
-use crate::engine::state::log;
+use crate::engine::state::{self, log};
 
 const DEBUG: bool = true;
 // use leptos_router::components::*;
@@ -490,13 +490,14 @@ impl TempState {
     fn clear_selected(&mut self) {
         self.selected_players.clear();
         self.selected_roles.clear();
-        self.curr_change_request = None
+        self.curr_change_request = None;
+        self.selected_player = None;
     }
     fn reset(&mut self) {
-        self.selected_player = None;
         self.selected_players.clear();
-        self.curr_change_request = None;
         self.selected_roles.clear();
+        self.curr_change_request = None;
+        self.selected_player = None;
         self.currently_acting_player = None;
     }
 }
@@ -676,101 +677,129 @@ fn Game() -> impl IntoView {
     let game_state = expect_context::<Store<State>>();
     let temp_state = expect_context::<Store<TempState>>();
     let next_button = move || {
-        // If there is a change request in the queue, process it
-        if let Some(cr) = temp_state.curr_change_request().get() {
-            // console_log(&format!("Curr cr is {:?}", cr));
-            // Do check func and return early if it doesn't pass
-            let args = match cr.get_change_type() {
-                ChangeType::ChoosePlayers(_) => Some(ChangeArgs::PlayerIndices(
-                    temp_state.selected_players().get(),
-                )),
-                ChangeType::ChooseRoles(_) => {
-                    Some(ChangeArgs::Roles(temp_state.selected_roles().get()))
-                }
-                ChangeType::NoStoryteller => Some(ChangeArgs::Blank),
-                _ => None,
-            };
+        // Ways we can start a next button
+        // No currently_acting_player and no current_cr -> when we just started a step, get the
+        // next currently_acting_player, load up their crs
+        // A currently_acting_player but no current_cr -> Shouldn't actually happen. needs to be
+        // handled within the loop (skipped in a loop)
+        // A currently_acting_player and a cr -> Need to just handle the cr and load up the next
+        // cr, if there no next cr, we move onto the next player, if there is no next_player, we
+        // know the step is over and we call next step
+        // No currently_acting_player but a cr -> this should never happen
+        // If current cr is None, load up a cr and get args for it
 
-            // Only apply funcs if change_type requires action
-            if let Some(args) = args
-                && let Some(state_func) = cr.get_state_change_func()
-            {
-                let next_cr = game_state
-                    .try_update(|gs| state_func.call(gs, args))
-                    .unwrap();
+        let cr = temp_state.curr_change_request().get();
+        let mut currently_acting_player = temp_state.currently_acting_player().get();
 
-                let next_cr = match next_cr {
-                    Ok(cr) => cr,
-                    // TODO: Actually inform the player what went wrong using the result
-                    Err(e) => {
-                        console_log(format!("Error: {:?}", e).as_str());
+        if let Some(cr) = cr {
+            // Resolve Cr
+            loop {
+                let args = match cr.get_change_type() {
+                    ChangeType::ChoosePlayers(_) => Some(ChangeArgs::PlayerIndices(
+                        temp_state.selected_players().get(),
+                    )),
+                    ChangeType::ChooseRoles(_) => {
+                        Some(ChangeArgs::Roles(temp_state.selected_roles().get()))
+                    }
+                    ChangeType::NoStoryteller => Some(ChangeArgs::Blank),
+                    _ => None,
+                };
+
+                if let Some(args) = args
+                    && let Some(state_func) = cr.get_state_change_func()
+                {
+                    let err = game_state
+                        .try_update(|gs| state_func.call(gs, args))
+                        .unwrap();
+                    if let Err(err) = err {
+                        console_error(format!("Error: {:?}", err).as_str());
                         console_log(format!("TempState: {:#?}", temp_state.get()).as_str());
                         return;
                     }
-                };
+                }
+                temp_state.update(|ts| ts.clear_selected());
 
-                // console_log(&format!("{:?}", next_cr));
-                // Set the next cr
-
-                if next_cr.is_some() {
-                    temp_state.update(|ts| ts.clear_selected());
-                    temp_state.curr_change_request().set(build(next_cr));
-                    // console_log(&format!(
-                    //     "New Cr set as {:?}, curr cr is now {:?}",
-                    //     next_cr,
-                    //     temp_state.curr_change_request().get()
-                    // ));
+                // Get next cr
+                let cr = game_state
+                    .try_update(|gs| gs.change_request_queue.pop_front())
+                    .unwrap();
+                if let Some(cr) = cr {
+                    let cr = cr.build();
+                    let change_type = cr.get_change_type();
+                    temp_state.curr_change_request().set(Some(cr));
+                    if matches!(change_type, ChangeType::NoStoryteller) {
+                        continue;
+                    }
                     return;
                 }
+                break;
             }
         }
 
-        console_log("Moving to next player");
+        loop {
+            // At this point we know that the change_request_queue has no change_requests in it
+            // TODO: Can maybe be just a loop
+            while game_state.read().change_request_queue.is_empty()
+                && let Some(acting_player) = currently_acting_player
+            {
+                let next_player = game_state
+                    .read()
+                    .get_next_active_player(Some(acting_player));
+
+                console_log(format!("Next Player is {:?}", next_player).as_str());
+
+                if let Some(next_player) = next_player {
+                    game_state.update(|gs| gs.resolve(next_player));
+                    if let Some(cr) = game_state
+                        .try_update(|gs| gs.change_request_queue.pop_front())
+                        .unwrap()
+                    {
+                        temp_state.currently_acting_player().set(Some(next_player));
+                        temp_state.curr_change_request().set(Some(cr.build()));
+                        return;
+                    }
+                }
+                currently_acting_player = next_player;
+            }
+
+            // This means the next_player is None
+            temp_state.update(|ts| ts.reset());
+            game_state.update(|gs| gs.next_step());
+
+            if matches!(game_state.read().step, Step::Day) {
+                return;
+            }
+            if currently_acting_player.is_none() {
+                let next_player = game_state.read().get_next_active_player(None);
+                currently_acting_player = next_player;
+                // Advance currently_acting_player by one, if they have something to do, load their
+                // change request and let it be that, if not, then go on to the next loop
+                if let Some(next_player) = next_player {
+                    game_state.update(|gs| gs.resolve(next_player));
+                    if let Some(cr) = game_state
+                        .change_request_queue()
+                        .try_update(|queue| queue.pop_front())
+                        .unwrap()
+                    {
+                        temp_state.curr_change_request().set(Some(cr.build()));
+                        temp_state.currently_acting_player().set(Some(next_player));
+                        return;
+                    }
+                }
+            } else {
+                console_error("Curr player should be none");
+            }
+        }
+        // console_log("Moving to next player");
+        // console_log(
+        //     format!(
+        //         "Cr stack is currently {:#?}",
+        //         game_state.change_request_queue().read()
+        //     )
+        //     .as_str(),
+        // );
 
         // Only get the next player's change requests if the current change request queue is empty
-
-        // Get next active player based off of current player
-        let mut loop_break = false;
-        loop {
-            let currently_acting_player = temp_state.read().currently_acting_player;
-            let has_curr_cr = temp_state.get().curr_change_request.is_some();
-            temp_state.update(|ts| ts.reset());
-            // Check for next active player
-            let next_player = game_state
-                .read()
-                .get_next_active_player(currently_acting_player);
-            console_log(format!("Next Player is {:?}", next_player).as_str());
-            match next_player {
-                Some(p) => {
-                    let next_cr = game_state.read().resolve(p);
-                    temp_state.currently_acting_player().set(Some(p));
-                    match next_cr {
-                        Some(next_cr) => {
-                            temp_state.curr_change_request().set(Some(next_cr.build()));
-                            break;
-                        }
-                        None => {
-                            // If there is a player with no change request, just skip them
-                            console_error("Next Change Request is none");
-                            continue;
-                        }
-                    }
-                }
-                // Switch to next step when get next active player yields None
-                None => {
-                    if loop_break {
-                        break;
-                    }
-                    console_log(&format!("has curr cr{}", has_curr_cr));
-                    if game_state.step().get() == Step::Day && has_curr_cr {
-                        // Don't want to accidentally move to next step during day
-                        break;
-                    }
-                    game_state.update(|gs| gs.next_step());
-                    loop_break = true;
-                }
-            }
-        }
     };
 
     let game_element: NodeRef<leptos::html::Div> = NodeRef::new();
@@ -1059,7 +1088,7 @@ fn DayAbilitySelector() -> impl IntoView {
         let description = "Select the nominating player";
         let change_type = ChangeType::ChoosePlayers(1);
 
-        let state_change_func = StateChangeFuncPtr::new(move |_, args| {
+        let state_change_func = StateChangeFuncPtr::new(move |state, args| {
             let nominating_players = args.extract_player_indicies()?;
             check_len(&nominating_players, 1)?;
 
@@ -1073,12 +1102,15 @@ fn DayAbilitySelector() -> impl IntoView {
 
                 let nominated_player = target_players[0];
                 state.nominate_player(nominating_player, nominated_player);
-                Ok(None)
+                Ok(())
             });
 
-            ChangeRequest::new_builder(change_type, description.into())
-                .state_change_func(state_change_func)
-                .into()
+            state.change_request_queue.push_back(
+                ChangeRequest::new_builder(change_type, description.into())
+                    .state_change_func(state_change_func),
+            );
+
+            Ok(())
         });
 
         let nominate_request = ChangeRequest::new_builder(change_type, description.into())

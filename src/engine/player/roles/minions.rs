@@ -1,10 +1,11 @@
 #![allow(unused_variables)]
-use std::{fmt::Display, sync::Arc};
+use std::fmt::Display;
 
 use crate::{
     engine::{
         change_request::{
-            ChangeRequest, ChangeRequestBuilder, ChangeType, StateChangeFuncPtr, check_len,
+            ChangeError, ChangeRequest, ChangeRequestBuilder, ChangeType, StateChangeFuncPtr,
+            check_len,
         },
         player::{
             Alignment, CharacterType,
@@ -130,7 +131,7 @@ impl Poisoner {
             );
             target_player.add_status(status);
 
-            Ok(None)
+            Ok(())
         }))
         .into()
     }
@@ -216,10 +217,20 @@ impl Role for ScarletWoman {
 
                 let dead_role = dead_player.role.clone();
 
-                let scarlet_player =
-                    &mut state.get_player_mut(event_listener_state.source_player_index);
+                let scarlet_player = state.get_player_mut(event_listener_state.source_player_index);
 
                 scarlet_player.role = dead_role;
+
+                let scarlet_player_string = state
+                    .get_player(event_listener_state.source_player_index)
+                    .role
+                    .to_string();
+                state
+                    .change_request_queue
+                    .push_back(ChangeRequest::new_builder(
+                        ChangeType::Display,
+                        format!("The Scarletwoman becomes the {}", scarlet_player_string),
+                    ));
 
                 state
             },

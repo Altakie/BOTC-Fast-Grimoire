@@ -1,5 +1,6 @@
-use reactive_stores::Store;
 use std::fmt::{Debug, Display};
+
+use reactive_stores::Store;
 
 use crate::engine::{
     change_request::{ChangeArgs, ChangeRequestBuilder, ChangeResult, StateChangeFuncPtr},
@@ -110,81 +111,81 @@ impl Player {
 
     /// Default behavior is that the player dies. If the player does not die, it should be because
     /// of their role or status effects.
-    pub(crate) fn kill(
-        &mut self,
-        attacking_player_index: PlayerIndex,
-        target_player_index: PlayerIndex,
-        state: &State,
-    ) -> ChangeResult {
-        // Status Effects
-        // Basically go through each status, see if any prevent the player from dying
-        // If any do, prevent the player from dying
-        for status_effect in self.status_effects.iter() {
-            if status_effect
-                .status_type
-                .behavior_type()
-                .is_some_and(|behaviors| {
-                    behaviors
-                        .iter()
-                        .any(|behavior| matches!(behavior, PlayerBehaviors::Kill))
-                })
-                && let Some(false) = status_effect.status_type.kill(
-                    attacking_player_index,
-                    target_player_index,
-                    state,
-                )
-            {
-                return Ok(None);
-            }
-        }
-
-        // Roles
-        if let Some(cr) = self
-            .role
-            .kill(attacking_player_index, target_player_index, state)
-        {
-            return cr;
-        }
-
-        // Default behavior
-        self.dead = true;
-
-        Ok(None)
-    }
-
+    // pub(crate) fn kill(
+    //     &mut self,
+    //     attacking_player_index: PlayerIndex,
+    //     target_player_index: PlayerIndex,
+    //     state: &State,
+    // ) -> ChangeResult {
+    //     // Status Effects
+    //     // Basically go through each status, see if any prevent the player from dying
+    //     // If any do, prevent the player from dying
+    //     for status_effect in self.status_effects.iter() {
+    //         if status_effect
+    //             .status_type
+    //             .behavior_type()
+    //             .is_some_and(|behaviors| {
+    //                 behaviors
+    //                     .iter()
+    //                     .any(|behavior| matches!(behavior, PlayerBehaviors::Kill))
+    //             })
+    //             && let Some(false) = status_effect.status_type.kill(
+    //                 attacking_player_index,
+    //                 target_player_index,
+    //                 state,
+    //             )
+    //         {
+    //             return Ok(None);
+    //         }
+    //     }
+    //
+    //     // Roles
+    //     if let Some(cr) = self
+    //         .role
+    //         .kill(attacking_player_index, target_player_index, state)
+    //     {
+    //         return cr;
+    //     }
+    //
+    //     // Default behavior
+    //     self.dead = true;
+    //
+    //     Ok(None)
+    // }
+    //
     /// Default behavior is that the player dies. If the player does not die, it should be because
     /// of their role or status effects
-    pub(crate) fn execute(&mut self) {
-        // Status Effects
-        // Basically go through each status, see if any prevent the player from dying
-        // If any do, prevent the player from dying
-        let mut dead = true;
-        for status_effect in self.status_effects.iter() {
-            if status_effect
-                .status_type
-                .behavior_type()
-                .is_some_and(|behaviors| {
-                    behaviors
-                        .iter()
-                        .any(|behavior| matches!(behavior, PlayerBehaviors::Execute))
-                })
-                && let Some(false) = status_effect.status_type.execute()
-            {
-                dead = false;
-            }
-        }
-
-        if !dead {
-            return;
-        }
-
-        if let Some(dead) = self.role.execute() {
-            self.dead = dead;
-            return;
-        }
-        // Default Behavior
-        self.dead = true;
-    }
+    // pub(crate) fn execute(&mut self) {
+    //     // Status Effects
+    //     // Basically go through each status, see if any prevent the player from dying
+    //     // If any do, prevent the player from dying
+    //     let mut dead = true;
+    //     for status_effect in self.status_effects.iter() {
+    //         if status_effect
+    //             .status_type
+    //             .behavior_type()
+    //             .is_some_and(|behaviors| {
+    //                 behaviors
+    //                     .iter()
+    //                     .any(|behavior| matches!(behavior, PlayerBehaviors::Execute))
+    //             })
+    //             && let Some(false) = status_effect.status_type.execute()
+    //         {
+    //             dead = false;
+    //         }
+    //     }
+    //
+    //     if !dead {
+    //         return;
+    //     }
+    //
+    //     if let Some(dead) = self.role.execute() {
+    //         self.dead = dead;
+    //         return;
+    //     }
+    //     // Default Behavior
+    //     self.dead = true;
+    // }
 
     pub(crate) fn get_alignment(&self) -> Alignment {
         self.role.get_alignment()
@@ -218,9 +219,11 @@ impl Player {
         let cr = self.role.night_one_ability(player_index, state)?;
         // Check for poison or drunk effects (for now the only ones that can affect abilities)
         let status_effect = self.get_statuses().iter().find(|se| {
-            se.behavior_types
-                .iter()
-                .any(|behavior| matches!(behavior, PlayerBehaviors::NightOneAbility))
+            se.behavior_types.as_ref().is_some_and(|behaviors| {
+                behaviors
+                    .iter()
+                    .any(|behavior| matches!(behavior, PlayerBehaviors::NightOneAbility))
+            })
         });
 
         if let Some(status_effect) = status_effect {
@@ -250,9 +253,11 @@ impl Player {
     ) -> Option<ChangeRequestBuilder> {
         let cr = self.role.night_ability(player_index, state)?;
         let status_effect = self.get_statuses().iter().find(|se| {
-            se.behavior_types
-                .iter()
-                .any(|behavior| matches!(behavior, PlayerBehaviors::NightAbility))
+            se.behavior_types.as_ref().is_some_and(|behaviors| {
+                behaviors
+                    .iter()
+                    .any(|behavior| matches!(behavior, PlayerBehaviors::NightAbility))
+            })
         });
 
         if let Some(status_effect) = status_effect {
@@ -281,9 +286,11 @@ impl Player {
     ) -> Option<ChangeRequestBuilder> {
         let cr = self.role.day_ability(player_index, state)?;
         let status_effect = self.get_statuses().iter().find(|se| {
-            se.behavior_types
-                .iter()
-                .any(|behavior| matches!(behavior, PlayerBehaviors::NightAbility))
+            se.behavior_types.as_ref().is_some_and(|behaviors| {
+                behaviors
+                    .iter()
+                    .any(|behavior| matches!(behavior, PlayerBehaviors::NightAbility))
+            })
         });
 
         if let Some(status_effect) = status_effect {
@@ -341,26 +348,27 @@ fn drunkify(
     mut change_request: ChangeRequestBuilder,
     status_string: String,
 ) -> ChangeRequestBuilder {
-    if let Some(state_change_func) = change_request.state_change_func {
-        let status_string_clone = status_string.clone();
-        let wrapper_func = StateChangeFuncPtr::new(move |state, args| {
-            let mut state_copy = state.clone();
-            let next_cr = state_change_func(&mut state_copy, args)?;
-
-            let player_role = state_copy.get_player(player_index).role.clone();
-            state.get_player_mut(player_index).role = player_role;
-
-            if let Some(next_cr) = next_cr {
-                let new_state_change =
-                    drunkify(player_index, next_cr, status_string_clone.to_owned());
-                return new_state_change.into();
-            }
-
-            Ok(None)
-        });
-
-        change_request.state_change_func = Some(wrapper_func);
-    }
+    // FIX: Make drunkify work again
+    // if let Some(state_change_func) = change_request.state_change_func {
+    //     let status_string_clone = status_string.clone();
+    //     let wrapper_func = StateChangeFuncPtr::new(move |state, args| {
+    //         let mut state_copy = state.clone();
+    //         let next_cr = state_change_func(&mut state_copy, args)?;
+    //
+    //         let player_role = state_copy.get_player(player_index).role.clone();
+    //         state.get_player_mut(player_index).role = player_role;
+    //
+    //         if let Some(next_cr) = next_cr {
+    //             let new_state_change =
+    //                 drunkify(player_index, next_cr, status_string_clone.to_owned());
+    //             return new_state_change.into();
+    //         }
+    //
+    //         Ok(None)
+    //     });
+    //
+    //     change_request.state_change_func = Some(wrapper_func);
+    // }
 
     change_request.description =
         format!("(*{}*) ", status_string) + change_request.description.as_str();

@@ -1,7 +1,10 @@
-use crate::ChangeRequest;
-use crate::engine::change_request::{FilterFuncPtr, StateChangeFuncPtr, check_len};
+use crate::{ChangeRequest, extract_player_indicies};
+use crate::engine::change_request::{
+    ChangeArgs, ChangeResult, FilterFuncPtr, StateChangeFuncPtr, check_len,
+};
 use crate::engine::player::roles::Roles;
 use std::fmt::Display;
+use std::ops::Deref;
 
 use crate::engine::{
     change_request::{ChangeError, ChangeRequestBuilder, ChangeType},
@@ -54,21 +57,24 @@ impl Role for Imp {
             "Ask the Imp to point to the player they would like to kill".into(),
         )
         .state_change_func(StateChangeFuncPtr::new(move |state, args| {
-            let target_players = args.extract_player_indicies()?;
+            let target_players = match args {
+                ChangeArgs::PlayerIndices(pi) => pi,
+                _ => return Some(ChangeError::WrongArgType),
+            };
             check_len(&target_players, 1)?;
             let target_player_index = target_players[0];
             state.kill(player_index, target_player_index);
             state.change_request_queue.push_back(
                 // WARN: Unused description
                 ChangeRequest::new_builder(ChangeType::NoStoryteller, String::new())
-                    .state_change_func(StateChangeFuncPtr::new(move |state, _| {
+                    .state_change_func(StateChangeFuncPtr::new(|state, args| {
                         if let Roles::Imp(Imp {
                             last_killed: Some(day_num),
                             ..
                         }) = &state.get_player(player_index).role
                         {
                             if *day_num == state.day_num {
-                                return Ok(());
+                                return;
                             }
                         }
 
@@ -78,11 +84,11 @@ impl Role for Imp {
                             state.change_request_queue.push_back(Imp::new_imp());
                         }
 
-                        Ok(())
+                        None
                     })),
             );
 
-            Ok(())
+            None
         }))
         .into();
     }
@@ -92,13 +98,14 @@ impl Imp {
     fn new_imp() -> ChangeRequestBuilder {
         return ChangeRequest::new_builder(ChangeType::ChoosePlayers(1), "Choose a new Imp".into())
             .state_change_func(StateChangeFuncPtr::new(move |state, args| {
-                let target_players = args.extract_player_indicies()?;
+                let target_players = extract_player_indicies!(args);
+                };
                 check_len(&target_players, 1)?;
 
                 let target_player_index = target_players[0];
                 let target_player = state.get_player(target_player_index);
                 if target_player.role.get_true_character_type() != CharacterType::Minion {
-                    return Err(ChangeError::InvalidSelectedPlayer {
+                    return Some(ChangeError::InvalidSelectedPlayer {
                         reason: "Cannot select a non-minion to become the new imp".into(),
                     });
                 }
@@ -111,7 +118,7 @@ impl Imp {
                 });
 
                 target_player.role = new_role;
-                Ok(())
+                None
             }))
             .filter_func(FilterFuncPtr::new(move |_, player| {
                 player.role.get_true_character_type() == CharacterType::Minion
