@@ -1,6 +1,7 @@
 #![allow(dead_code, clippy::needless_return)]
 pub(crate) mod log;
 
+use crate::console_error;
 use leptos::leptos_dom::logging::console_log;
 use log::Log;
 use std::{collections::VecDeque, fmt::Debug, sync::Arc};
@@ -16,7 +17,10 @@ use crate::{
             Player,
             roles::{Role, RoleNames},
         },
-        state::{log::Event, status_effects::CleanupPhase},
+        state::{
+            log::Event,
+            status_effects::{CleanupPhase, StatusType},
+        },
     },
     initialization::Script,
 };
@@ -367,6 +371,14 @@ impl State {
         });
         let mut attempted_kill_listeners = std::mem::take(&mut state.attempted_kill_listeners);
         for listener in attempted_kill_listeners.iter_mut() {
+            if state.players[listener.state.source_player_index]
+                .status_effects
+                .iter_mut()
+                .any(|se| matches!(se.status_type, StatusType::Poisoned | StatusType::Drunk))
+            {
+                continue;
+            }
+
             state = listener.call(
                 state,
                 log::AttemptedKill {
@@ -383,6 +395,13 @@ impl State {
         }
 
         state.attempted_kill_listeners = attempted_kill_listeners;
+        console_error(
+            format!(
+                "Kill attempted and prevent_default {:?}",
+                state.prevent_kill_default
+            )
+            .as_str(),
+        );
         if state.prevent_kill_default {
             return;
         }
@@ -409,6 +428,13 @@ impl State {
         state.log.log_event(Event::Death(player_index));
         let mut death_listeners = std::mem::take(&mut state.death_listeners);
         for listener in death_listeners.iter_mut() {
+            if state.players[listener.state.source_player_index]
+                .status_effects
+                .iter_mut()
+                .any(|se| matches!(se.status_type, StatusType::Poisoned | StatusType::Drunk))
+            {
+                continue;
+            }
             state = listener.call(state, log::Death { player_index });
         }
 
@@ -499,6 +525,13 @@ impl State {
         let mut state = self;
         let mut nomination_listeners = std::mem::take(&mut state.nomination_listeners);
         for listener in nomination_listeners.iter_mut() {
+            if state.players[listener.state.source_player_index]
+                .status_effects
+                .iter_mut()
+                .any(|se| matches!(se.status_type, StatusType::Poisoned | StatusType::Drunk))
+            {
+                continue;
+            }
             state = listener.call(
                 state,
                 log::Nomination {

@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use leptos::leptos_dom::logging::console_log;
+use leptos::leptos_dom::logging::{console_error, console_log};
 
 use crate::engine::{
     change_request::{
@@ -891,7 +891,7 @@ impl Role for Mayor {
         let mayor_listener = EventListener::new(
             player_index,
             move |event_listener_state, state, attempted_kill_event: AttemptedKill| {
-                console_log("I was called");
+                console_error("I was called");
                 if attempted_kill_event.target_player_index
                     != event_listener_state.source_player_index
                 {
