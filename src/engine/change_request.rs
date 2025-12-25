@@ -6,7 +6,7 @@ use super::{
 };
 use std::{fmt::Debug, ops::Deref, sync::Arc};
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) enum ChangeType {
     ChoosePlayers(usize),
     ChooseRoles(usize),

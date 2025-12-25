@@ -61,7 +61,7 @@ fn App() -> impl IntoView {
             // Role::Monk,
             RoleNames::ScarletWoman,
             RoleNames::Poisoner,
-            RoleNames::Imp,
+            RoleNames::Mayor,
             RoleNames::Imp,
         ]);
 
@@ -689,6 +689,7 @@ fn Game() -> impl IntoView {
         // If current cr is None, load up a cr and get args for it
 
         let apply_cr = || {
+            let mut applied_cr = false;
             loop {
                 let cr = temp_state.curr_change_request().get();
                 if let Some(cr) = cr {
@@ -716,8 +717,9 @@ fn Game() -> impl IntoView {
                             console_log(format!("cr: {:#?}", cr).as_str());
                             console_error(format!("Error: {:?}", err).as_str());
                             // console_log(format!("TempState: {:#?}", temp_state.get()).as_str());
-                            return true;
+                            return (true, applied_cr);
                         }
+                        applied_cr = true;
                     }
                     temp_state.update(|ts| ts.clear_selected());
 
@@ -732,7 +734,7 @@ fn Game() -> impl IntoView {
                         if matches!(change_type, ChangeType::NoStoryteller) {
                             continue;
                         }
-                        return true;
+                        return (true, applied_cr);
                     }
                     break;
                 }
@@ -741,10 +743,10 @@ fn Game() -> impl IntoView {
                 break;
             }
 
-            false
+            (false, applied_cr)
         };
 
-        let ret = apply_cr();
+        let (ret, mut applied_cr) = apply_cr();
         if ret {
             return;
         }
@@ -769,8 +771,9 @@ fn Game() -> impl IntoView {
                         temp_state.curr_change_request().set(Some(cr));
                         temp_state.currently_acting_player().set(Some(next_player));
 
-                        if matches!(change_type, ChangeType::NoStoryteller) {
-                            let ret = apply_cr();
+                        if change_type == ChangeType::NoStoryteller {
+                            let (ret, app_cr) = apply_cr();
+                            applied_cr = app_cr;
                             if ret {
                                 return;
                             }
@@ -802,8 +805,9 @@ fn Game() -> impl IntoView {
                         temp_state.curr_change_request().set(Some(cr));
                         temp_state.currently_acting_player().set(Some(next_player));
 
-                        if matches!(change_type, ChangeType::NoStoryteller) {
-                            let ret = apply_cr();
+                        if change_type == ChangeType::NoStoryteller {
+                            let (ret, app_cr) = apply_cr();
+                            applied_cr = app_cr;
                             if ret {
                                 return;
                             }
@@ -817,6 +821,10 @@ fn Game() -> impl IntoView {
 
             // This means the next_player is None
             temp_state.update(|ts| ts.reset());
+            if game_state.read().step == Step::Day && applied_cr {
+                return;
+            }
+            console_log(format!("Applied cr: {}", applied_cr).as_str());
             game_state.update(|gs| gs.next_step());
             if matches!(game_state.read().step, Step::Day) {
                 return;

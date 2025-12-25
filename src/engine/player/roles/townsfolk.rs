@@ -771,7 +771,6 @@ impl Role for Virgin {
             },
         );
 
-        console_log("I was called");
         state.nomination_listeners.push(virgin_listener);
     }
 }
@@ -892,37 +891,43 @@ impl Role for Mayor {
         let mayor_listener = EventListener::new(
             player_index,
             move |event_listener_state, state, attempted_kill_event: AttemptedKill| {
+                console_log("I was called");
                 if attempted_kill_event.target_player_index
                     != event_listener_state.source_player_index
                 {
                     return state;
                 }
 
-                ChangeRequest::new_builder(
-                    ChangeType::ChoosePlayers(1),
-                    "Choose a player to die (the mayor may bounce a kill)".into(),
-                )
-                .state_change_func(StateChangeFuncPtr::new(move |state, args| {
-                    let target_player_indices = args.extract_player_indicies()?;
-                    check_len(&target_player_indices, 1)?;
+                state.prevent_kill_default = true;
 
-                    let target_player_index = target_player_indices[0];
+                state.change_request_queue.push_back(
+                    ChangeRequest::new_builder(
+                        ChangeType::ChoosePlayers(1),
+                        "Choose a player to die (the mayor may bounce a kill)".into(),
+                    )
+                    .state_change_func(StateChangeFuncPtr::new(
+                        move |state, args| {
+                            let target_player_indices = args.extract_player_indicies()?;
+                            check_len(&target_player_indices, 1)?;
 
-                    // Stop infinite loop of mayor bouncing kills
-                    if target_player_index == player_index {
-                        state.get_player_mut(player_index).dead = true;
-                        state.handle_death(player_index);
-                        return Ok(());
-                    }
+                            let target_player_index = target_player_indices[0];
 
-                    state.kill(
-                        attempted_kill_event.attacking_player_index,
-                        target_player_index,
-                    );
+                            // Stop infinite loop of mayor bouncing kills
+                            if target_player_index == player_index {
+                                state.get_player_mut(player_index).dead = true;
+                                state.handle_death(player_index);
+                                return Ok(());
+                            }
 
-                    Ok(())
-                }));
+                            state.kill(
+                                attempted_kill_event.attacking_player_index,
+                                target_player_index,
+                            );
 
+                            Ok(())
+                        },
+                    )),
+                );
                 state
             },
         );

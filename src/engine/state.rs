@@ -3,12 +3,7 @@ pub(crate) mod log;
 
 use leptos::leptos_dom::logging::console_log;
 use log::Log;
-use std::{
-    collections::{HashMap, VecDeque},
-    fmt::Debug,
-    ops::{Add, Deref, Index},
-    sync::{Arc, Mutex, RwLock},
-};
+use std::{collections::VecDeque, fmt::Debug, sync::Arc};
 pub(crate) mod status_effects;
 
 use rand::{self, seq::SliceRandom};
@@ -16,7 +11,7 @@ use reactive_stores::*;
 
 use crate::{
     engine::{
-        change_request::{ChangeArgs, ChangeRequest, ChangeRequestBuilder, ChangeResult},
+        change_request::ChangeRequestBuilder,
         player::{
             Player,
             roles::{Role, RoleNames},
@@ -137,6 +132,7 @@ pub(crate) struct State {
 
     pub(crate) nomination_listeners: Vec<EventListener<log::Nomination>>,
     pub(crate) attempted_kill_listeners: Vec<EventListener<log::AttemptedKill>>,
+    pub(crate) prevent_kill_default: bool,
     pub(crate) death_listeners: Vec<EventListener<log::Death>>,
 }
 
@@ -218,6 +214,7 @@ impl State {
 
             nomination_listeners: vec![],
             attempted_kill_listeners: vec![],
+            prevent_kill_default: false,
             // TODO: Maybe add a listener for demon death?
             death_listeners: vec![],
         };
@@ -362,6 +359,7 @@ impl State {
         target_player_index: PlayerIndex,
     ) {
         // Go through all kill listeners (can maybe set a change request up to go)
+        self.prevent_kill_default = false;
         let mut state = self;
         state.log.log_event(Event::AttemptedKill {
             attacking_player_index,
@@ -377,7 +375,20 @@ impl State {
                 },
             );
         }
-        // Go through all status effects (also can maybe do a change request?)
+        // Go through all status effects
+        for status_effect in state.players[target_player_index].status_effects.iter() {
+            if status_effect.status_type == status_effects::StatusType::DemonProtected {
+                state.prevent_kill_default = true;
+            }
+        }
+
+        state.attempted_kill_listeners = attempted_kill_listeners;
+        if state.prevent_kill_default {
+            return;
+        }
+
+        // TODO: Return early if a listener needs us to (need to get this information from the
+        // listener)
 
         // let cr = self.get_player_mut(target_player_index).kill(
         //     attacking_player_index,
