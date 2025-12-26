@@ -1,10 +1,14 @@
 #![allow(dead_code, clippy::needless_return)]
 pub(crate) mod log;
 
-use crate::console_error;
+use crate::{console_error, engine::state::log::EventType};
 use leptos::leptos_dom::logging::console_log;
 use log::Log;
-use std::{collections::VecDeque, fmt::Debug, sync::Arc};
+use std::{
+    collections::{HashMap, VecDeque},
+    fmt::Debug,
+    sync::Arc,
+};
 pub(crate) mod status_effects;
 
 use rand::{self, seq::SliceRandom};
@@ -133,6 +137,7 @@ pub(crate) struct State {
     // pub(crate) curr_args: Option<ChangeArgs>,
     // pub(crate) curr_description: Option<String>,
     pub(crate) change_request_queue: VecDeque<ChangeRequestBuilder>,
+    pub(crate) listener_map: HashMap<EventType>,
 
     pub(crate) nomination_listeners: Vec<EventListener<log::Nomination>>,
     pub(crate) attempted_kill_listeners: Vec<EventListener<log::AttemptedKill>>,
