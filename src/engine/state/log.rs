@@ -165,7 +165,16 @@ impl DayPhaseLog {
 //     ($event:ty) => {{ EventType(PhantomData::from($event::default())) }};
 // }
 
-//
+pub enum EventType {
+    Nomination,
+    Voting,
+    Execution,
+    AttemptedKill,
+    Death,
+    StatusApplied,
+    InfoLearned,
+}
+
 // TODO: Implement all events
 #[derive(Clone, Debug, PartialEq)]
 pub enum Event {
@@ -196,6 +205,20 @@ pub enum Event {
     InfoLearned(String),
 }
 
+impl Event {
+    pub fn get_type(&self) -> EventType {
+        match self {
+            Event::Nomination { .. } => EventType::Nomination,
+            Event::Voting { .. } => EventType::Voting,
+            Event::Execution(_) => EventType::Execution,
+            Event::AttemptedKill { .. } => EventType::AttemptedKill,
+            Event::Death(_) => EventType::Death,
+            Event::StatusApplied { .. } => EventType::StatusApplied,
+            Event::InfoLearned(_) => EventType::InfoLearned,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Nomination {
     pub nominator_player_index: PlayerIndex,
@@ -207,7 +230,7 @@ pub struct Voting {
     pub target_player_index: PlayerIndex,
 }
 #[derive(Clone, Debug, PartialEq)]
-pub struct Execution(PlayerIndex);
+pub struct Execution(pub PlayerIndex);
 #[derive(Clone, Debug, PartialEq)]
 pub struct AttemptedKill {
     pub attacking_player_index: PlayerIndex,
@@ -217,6 +240,7 @@ pub struct AttemptedKill {
 pub struct Death {
     pub player_index: PlayerIndex,
 }
+//
 // Ability Specific Events
 #[derive(Clone, Debug, PartialEq)]
 pub struct StatusApplied {

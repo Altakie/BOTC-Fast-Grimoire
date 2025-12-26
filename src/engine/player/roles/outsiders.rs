@@ -2,6 +2,8 @@ use std::fmt::Display;
 
 use crate::engine::change_request::{ChangeArgs, ChangeError, ChangeRequest, StateChangeFuncPtr};
 use crate::engine::player::roles::Roles;
+use crate::engine::state::EventListener;
+use crate::engine::state::log::Execution;
 use crate::engine::state::status_effects::CleanupPhase;
 use crate::engine::{
     change_request::{ChangeRequestBuilder, ChangeType, check_len},
@@ -244,6 +246,31 @@ impl Role for Saint {
 
     fn get_true_character_type(&self) -> CharacterType {
         CharacterType::Outsider
+    }
+
+    fn initialize(&self, player_index: PlayerIndex, state: &mut State) {
+        let saint_listener = EventListener::new(
+            player_index,
+            |event_listener_state, state, execution_event: Execution| {
+                // If the executed player is the saint, trigger a display request that the game is over (if the
+                // saint is dead after the execution
+                if execution_event.0 != event_listener_state.source_player_index {
+                    return state;
+                }
+                state.change_request_queue.push_back(
+                    // WARN: Make this make sure the player is dead after execution
+                    ChangeRequest::new_builder(
+                        ChangeType::Display,
+                        "Game Over (Saint was executed)".to_string(),
+                    ),
+                );
+
+                state
+            },
+        );
+
+        // TODO: Make our listener queue a hashmap or smth
+        state.execution_listeners
     }
 }
 
