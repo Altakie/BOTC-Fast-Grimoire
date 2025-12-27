@@ -54,7 +54,7 @@ fn App() -> impl IntoView {
     // NOTE: Debug only
     if DEBUG {
         roles.set(vec![
-            RoleNames::Ravenkeeper,
+            RoleNames::Soldier,
             RoleNames::Virgin,
             RoleNames::Monk,
             RoleNames::Slayer,

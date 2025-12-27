@@ -852,6 +852,16 @@ impl Role for Soldier {
         CharacterType::Townsfolk
     }
 
+    fn initialize(&self, player_index: PlayerIndex, state: &mut State) {
+        state
+            .get_player_mut(player_index)
+            .add_status(StatusEffect::new(
+                StatusType::DemonProtected,
+                player_index,
+                None,
+            ));
+    }
+
     // Overwrite kill method for Soldier so they can't be killed by a demon
     // fn kill(
     //     &self,
