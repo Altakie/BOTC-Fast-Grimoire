@@ -12,6 +12,7 @@ use crate::engine::{
 #[derive(Default, Debug, Clone)]
 pub(crate) struct Imp {
     pub(crate) last_killed: Option<usize>,
+    pub(crate) last_swapped: Option<usize>,
 }
 
 impl Role for Imp {
@@ -58,24 +59,28 @@ impl Role for Imp {
             check_len(&target_players, 1)?;
             let target_player_index = target_players[0];
             state.kill(player_index, target_player_index);
+            if let Roles::Imp(imp_data) = &mut state.get_player_mut(player_index).role {
+                imp_data.last_killed = Some(day_num);
+            }
             state.change_request_queue.push_back(
                 // WARN: Unused description
                 ChangeRequest::new_builder(ChangeType::NoStoryteller, String::new())
                     .state_change_func(StateChangeFuncPtr::new(move |state, _| {
                         if let Roles::Imp(Imp {
-                            last_killed: Some(day_num),
+                            last_swapped: Some(day_num),
                             ..
                         }) = &state.get_player(player_index).role
+                            && *day_num == state.day_num
                         {
-                            if *day_num == state.day_num {
-                                return Ok(());
-                            }
+                            return Ok(());
                         }
 
                         if target_player_index == player_index
                             && state.get_player(player_index).dead
                         {
-                            state.change_request_queue.push_back(Imp::new_imp());
+                            state
+                                .change_request_queue
+                                .push_back(Imp::new_imp(player_index));
                         }
 
                         Ok(())
@@ -89,7 +94,7 @@ impl Role for Imp {
 }
 
 impl Imp {
-    fn new_imp() -> ChangeRequestBuilder {
+    fn new_imp(player_index: PlayerIndex) -> ChangeRequestBuilder {
         return ChangeRequest::new_builder(ChangeType::ChoosePlayers(1), "Choose a new Imp".into())
             .state_change_func(StateChangeFuncPtr::new(move |state, args| {
                 let target_players = args.extract_player_indicies()?;
@@ -104,19 +109,18 @@ impl Imp {
                 }
                 let target_player_index = target_players[0];
                 let day_num = state.day_num;
+                let mut new_role = state.get_player(player_index).role.clone();
+                if let Roles::Imp(imp_data) = &mut new_role {
+                    imp_data.last_swapped = Some(day_num);
+                }
                 let target_player = state.get_player_mut(target_player_index);
-
-                let new_role = Roles::Imp(Imp {
-                    last_killed: Some(day_num),
-                });
 
                 target_player.role = new_role;
                 Ok(())
             }))
             .filter_func(FilterFuncPtr::new(move |_, player| {
                 player.role.get_true_character_type() == CharacterType::Minion
-            }))
-            .into();
+            }));
     }
 }
 

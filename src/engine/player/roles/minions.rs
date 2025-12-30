@@ -219,7 +219,7 @@ impl Role for ScarletWoman {
                             let day_num = state.day_num;
                             let dead_player = &mut state.get_player_mut(death_event.player_index);
                             if let Roles::Imp(imp_data) = &mut dead_player.role {
-                                imp_data.last_killed = Some(day_num);
+                                imp_data.last_swapped = Some(day_num);
                             }
 
                             let dead_role = dead_player.role.clone();
