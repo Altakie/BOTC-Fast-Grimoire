@@ -25,10 +25,16 @@
 ├── tailwind.config.js          # Tailwind styling definitions (if any)
 ├── requirements.md             # Developer roadmap & design requirements
 ├── src/
-│   ├── main.rs                 # Web application entry, routing, stage management, and Leptos views
+│   ├── main.rs                 # Web application entry point
 │   ├── initialization.rs       # Custom script deserializer & CharacterType count tables
-│   ├── scripts.rs              # Hardcoded script templates (e.g., Trouble Brewing)
+│   ├── scripts.rs              # Hardcoded script templates
 │   ├── template.rs             # Legacy/placeholder architecture examples
+│   ├── ui/                     # Frontend UI components
+│   │   ├── mod.rs              # UI module exports
+│   │   ├── components/         # Reusable UI elements
+│   │   ├── game/               # Game loop interface components
+│   │   ├── setup/              # Setup phase components
+│   │   └── utils/              # UI utilities (e.g., layout math)
 │   └── engine/                 # Core BOTC State and Rules Engine
 │       ├── change_request.rs   # Storyteller interaction request and callback system
 │       ├── engine.rs           # Core module export definitions
