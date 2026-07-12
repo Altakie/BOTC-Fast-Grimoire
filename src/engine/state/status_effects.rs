@@ -2,8 +2,6 @@ use std::fmt::{Debug, Display};
 use std::ops::Deref;
 use std::sync::Arc;
 
-use leptos::leptos_dom::logging::{console_error, console_log};
-
 use crate::engine::player::Player;
 use crate::engine::{
     player::PlayerBehaviors,

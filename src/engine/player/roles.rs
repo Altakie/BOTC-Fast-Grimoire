@@ -49,7 +49,7 @@ pub(crate) enum RoleNames {
 }
 
 #[enum_dispatch(Role)]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(crate) enum Roles {
     // Normal Roles
     Investigator,

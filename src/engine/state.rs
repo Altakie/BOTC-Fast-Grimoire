@@ -1,8 +1,7 @@
 #![allow(dead_code, clippy::needless_return)]
 pub(crate) mod log;
 
-use crate::console_error;
-use leptos::leptos_dom::logging::console_log;
+use tracing::{error, info, warn};
 use log::Log;
 use std::{collections::VecDeque, fmt::Debug, sync::Arc};
 pub(crate) mod status_effects;
@@ -152,7 +151,7 @@ impl State {
         roles.shuffle(&mut rng);
 
         if roles.len() != player_names.len() {
-            eprintln!("Number of players does not match number of roles");
+            error!(num_roles = roles.len(), num_players = player_names.len(), "Number of players does not match number of roles");
             // TODO: Figure out to do errors here
             return Err(());
         }
@@ -227,7 +226,7 @@ impl State {
             player.role.initialize(player_index, &mut state);
         }
 
-        console_log(format!("Listeners: {:#?}", state.nomination_listeners).as_str());
+        info!(?state.nomination_listeners, "Listeners");
         return Ok(state);
     }
 
@@ -395,13 +394,7 @@ impl State {
         }
 
         state.attempted_kill_listeners = attempted_kill_listeners;
-        console_error(
-            format!(
-                "Kill attempted and prevent_default {:?}",
-                state.prevent_kill_default
-            )
-            .as_str(),
-        );
+        error!(prevent_default = state.prevent_kill_default, "Kill attempted");
         if state.prevent_kill_default {
             return;
         }
@@ -801,8 +794,8 @@ impl State {
     }
 
     pub(crate) fn cleanup_event_listeners(&mut self, player_index: PlayerIndex) {
-        console_log(format!("Cleanup for the {}", self.get_player_mut(player_index).role).as_str());
-        console_log(format!("Event Listeners are: {:#?}", self.death_listeners).as_str());
+        info!(role = ?self.get_player(player_index).role, "Cleanup for the player");
+        info!(?self.death_listeners, "Event Listeners");
         self.nomination_listeners
             .retain(|listener| listener.state.source_player_index != player_index);
         self.attempted_kill_listeners

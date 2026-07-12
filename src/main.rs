@@ -26,6 +26,13 @@ use scripts::*;
 fn main() {
     // Stack Traces
     console_error_panic_hook::set_once();
+    
+    // Tracing initialization
+    use tracing_wasm::WASMLayerConfigBuilder;
+    tracing_wasm::set_as_global_default_with_config(
+        WASMLayerConfigBuilder::default()
+            .build(),
+    );
 
     mount_to_body(App);
 }

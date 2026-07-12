@@ -30,8 +30,10 @@ impl Character for Role {
     }
 }
 
+use tracing::info;
+
 fn main() {
-    println!("Hello, world!");
+    info!("Hello, world!");
 }
 
 #[cfg(test)]

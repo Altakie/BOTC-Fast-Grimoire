@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use leptos::leptos_dom::logging::{console_error, console_log};
+use tracing::error;
 
 use crate::engine::{
     change_request::{
@@ -901,7 +901,7 @@ impl Role for Mayor {
         let mayor_listener = EventListener::new(
             player_index,
             move |event_listener_state, state, attempted_kill_event: AttemptedKill| {
-                console_error("I was called");
+                error!("I was called");
                 if attempted_kill_event.target_player_index
                     != event_listener_state.source_player_index
                 {
@@ -967,31 +967,64 @@ mod test {
     }
 
     #[test]
-    fn test_undertaker_ability() {
+    fn test_monk_protection() {
         let roles = vec![
-            RoleNames::Undertaker,
-            RoleNames::Virgin,
+            RoleNames::Monk,
             RoleNames::Soldier,
-            RoleNames::Spy,
             RoleNames::Imp,
         ];
         let mut state = setup_test_state(roles);
-        let undertaker_role = Roles::new(&RoleNames::Undertaker);
-        let undertaker_index = state
-            .get_players()
-            .iter()
-            .position(|player| player.role.to_string() == "Undertaker")
-            .expect("Undertaker not found");
+        
+        let monk_index = state.get_players().iter().position(|p| p.role.to_string() == "Monk").unwrap();
+        let imp_index = state.get_players().iter().position(|p| p.role.to_string() == "Imp").unwrap();
+        let target_index = state.get_players().iter().position(|p| p.role.to_string() == "Soldier").unwrap();
 
-        let cr = undertaker_role.night_ability(undertaker_index, &state);
+        // Monk protects Soldier
+        let monk_role = Roles::new(&RoleNames::Monk);
+        let cr = monk_role.night_ability(monk_index, &state).unwrap();
+        
+        // Execute the change request
+        let mut args = crate::engine::change_request::ChangeArgs::Players(vec![target_index]);
+        cr.state_change_func.unwrap().call(&mut state, &mut args).unwrap();
 
-        // FIX: This unit test sucks, probably need to refactor code, or use dependency injection
-        // to have a dummy state
-        assert!(cr.is_none());
-        state.next_step();
-        state.next_step();
-        state.next_step();
+        assert!(state.get_player(target_index).get_statuses().iter().any(|s| s.status_type == StatusType::DemonProtected));
 
-        todo!()
+        // Imp kills Soldier
+        state.kill(imp_index, target_index);
+        
+        assert!(!state.get_player(target_index).dead, "Soldier should be protected");
+    }
+
+    #[test]
+    fn test_monk_poisoned_protection_blocked() {
+        let roles = vec![
+            RoleNames::Monk,
+            RoleNames::Soldier,
+            RoleNames::Imp,
+        ];
+        let mut state = setup_test_state(roles);
+        
+        let monk_index = state.get_players().iter().position(|p| p.role.to_string() == "Monk").unwrap();
+        let imp_index = state.get_players().iter().position(|p| p.role.to_string() == "Imp").unwrap();
+        let target_index = state.get_players().iter().position(|p| p.role.to_string() == "Soldier").unwrap();
+
+        // Poison the Monk
+        state.get_player_mut(monk_index).add_status(StatusEffect::new(StatusType::Poisoned, imp_index, None));
+
+        // Monk attempts to protect Soldier
+        let monk_role = Roles::new(&RoleNames::Monk);
+        let cr = monk_role.night_ability(monk_index, &state).unwrap();
+        
+        // Execute the change request - should fail or not apply protection because they are poisoned
+        let mut args = crate::engine::change_request::ChangeArgs::Players(vec![target_index]);
+        cr.state_change_func.unwrap().call(&mut state, &mut args).unwrap();
+
+        // Protection status should NOT be applied because Monk is poisoned
+        assert!(!state.get_player(target_index).get_statuses().iter().any(|s| s.status_type == StatusType::DemonProtected));
+
+        // Imp kills Soldier
+        state.kill(imp_index, target_index);
+        
+        assert!(state.get_player(target_index).dead, "Soldier should die because protection was blocked by poison");
     }
 }

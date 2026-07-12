@@ -1,8 +1,6 @@
 #![allow(unused_variables)]
 use std::fmt::Display;
 
-use leptos::leptos_dom::logging::console_log;
-
 use crate::{
     engine::{
         change_request::{

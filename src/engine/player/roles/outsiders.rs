@@ -91,7 +91,7 @@ impl Display for Butler {
     }
 }
 
-#[derive(Default, Clone)]
+#[derive(Default, Debug, Clone)]
 pub(crate) struct Drunk {
     // WARN: Why can we use boxes here. Isn't this not thread safe?
     role: Option<Box<Roles>>,

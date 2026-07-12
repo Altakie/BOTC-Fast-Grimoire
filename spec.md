@@ -11,7 +11,7 @@
 - **Build/Dev Server:** Trunk (Trunk.toml)
 - **Frontend Framework:** Leptos (v0.8.2) in client-side rendering (csr) mode, utilizing reactive_stores for global state synchronization.
 - **Styling:** Tailwind CSS (v4) built via Trunk hooks calling @tailwindcss/cli.
-- **Dependencies:** serde & serde_json for custom script inputs, rand for seating & role distributions, enum_dispatch for high-performance dynamic dispatch.
+- **Dependencies:** serde & serde_json for custom script inputs, rand for seating & role distributions, enum_dispatch for high-performance dynamic dispatch, tracing for structured logging.
 
 ---
 

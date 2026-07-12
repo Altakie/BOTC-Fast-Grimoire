@@ -1,5 +1,5 @@
 use leptos::prelude::*;
-use leptos::{leptos_dom::logging::{console_error, console_log}};
+use tracing::{error, info};
 use reactive_stores::Store;
 
 use crate::engine::{
@@ -214,9 +214,9 @@ fn Game() -> impl IntoView {
                         .try_update(|gs| state_func.call(gs, args))
                         .unwrap();
                     if let Err(err) = err {
-                        console_log(format!("ChangeType {:?}", change_type).as_str());
-                        console_log(format!("cr: {:#?}", cr).as_str());
-                        console_error(format!("Error: {:?}", err).as_str());
+                        info!(?change_type, "ChangeType");
+                        info!(?cr, "cr");
+                        error!(?err, "Error");
                         return (true, applied_cr);
                     }
                     applied_cr = true;
@@ -238,7 +238,7 @@ fn Game() -> impl IntoView {
                 break;
             }
 
-            console_log(format!("Temp State: {:#?}", temp_state.get()).as_str());
+            info!(?temp_state, "Temp State");
             break;
         }
 
@@ -288,7 +288,7 @@ fn Game() -> impl IntoView {
                     .read()
                     .get_next_active_player(Some(acting_player));
 
-                console_log(format!("Next Player is {:?}", next_player).as_str());
+                info!(?next_player, "Next Player is");
 
                 if let Some(next_player) = next_player {
                     game_state.update(|gs| gs.resolve(next_player));
@@ -319,7 +319,7 @@ fn Game() -> impl IntoView {
             if game_state.read().step == Step::Day && applied_cr {
                 return;
             }
-            console_log(format!("Applied cr: {}", applied_cr).as_str());
+            info!(?applied_cr, "Applied cr");
             game_state.update(|gs| gs.next_step());
             if matches!(game_state.read().step, Step::Day) {
                 return;
@@ -334,7 +334,7 @@ fn Game() -> impl IntoView {
             class="relative w-3/5 flex justify-center items-center focus:outline-none"
             on:keydown=move |ev| {
                 if ev.key() == "Enter" {
-                    console_log("Next Button Pressed");
+                    info!("Next Button Pressed");
                     next_button()
                 }
             }
@@ -377,7 +377,7 @@ fn Player_Display() -> impl IntoView {
                 children=move |(i, _)| {
                     let pos = player_positions[i];
                     let player = Memo::new(move |_| players.get()[i].clone());
-                    console_log("New Signal Created");
+                    info!("New Signal Created");
                     let selected = move || temp_state.selected_players().get().contains(&i);
 
                     view! {
