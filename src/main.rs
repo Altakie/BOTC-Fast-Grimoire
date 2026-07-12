@@ -7,24 +7,21 @@ use leptos::{
 };
 use reactive_stores::Store;
 
-mod initialization;
 mod engine;
-mod ui;
+mod initialization;
 mod scripts;
+mod ui;
 
-use crate::ui::{InitializationStage, setup::*, game::GameInterface};
-use initialization::{CharacterTypeCounts, Script, ScriptJson};
+use crate::engine::change_request::{ChangeRequestBuilder, StateChangeFuncPtr, check_len};
+use crate::engine::state::{self, log};
+use crate::ui::{InitializationStage, game::GameInterface, setup::*};
 use engine::{
     change_request::{ChangeArgs, ChangeRequest, ChangeType},
     player::{CharacterType, Player, roles::RoleNames},
     state::{PlayerIndex, State, StateStoreFields, Step},
 };
+use initialization::{CharacterTypeCounts, Script, ScriptJson};
 use scripts::*;
-use crate::engine::change_request::{ChangeRequestBuilder, StateChangeFuncPtr, check_len};
-use crate::engine::state::{self, log};
-
-
-const DEBUG: bool = false;
 
 fn main() {
     // Stack Traces
@@ -42,7 +39,10 @@ fn App() -> impl IntoView {
     provide_context(script);
 
     // NOTE: Debug only
-    if DEBUG {
+    //
+    let debug: bool = std::env::var("DEBUG")
+        .is_ok_and(|val| matches!(&*val.trim().to_lowercase(), "1" | "true" | "t"));
+    if debug {
         roles.set(vec![
             RoleNames::Soldier,
             RoleNames::Virgin,
