@@ -1,6 +1,8 @@
 use crate::ChangeRequest;
 use crate::engine::change_request::{FilterFuncPtr, StateChangeFuncPtr, check_len};
 use crate::engine::player::roles::Roles;
+use crate::engine::state::Step;
+use crate::engine::state::log::DayPhaseLog;
 use std::fmt::Display;
 
 use crate::engine::{
@@ -11,8 +13,8 @@ use crate::engine::{
 
 #[derive(Default, Debug, Clone)]
 pub(crate) struct Imp {
-    pub(crate) last_killed: Option<usize>,
-    pub(crate) last_swapped: Option<usize>,
+    pub(crate) last_killed: Option<(Step, usize)>,
+    pub(crate) last_swapped: Option<(Step, usize)>,
 }
 
 impl Role for Imp {
@@ -42,10 +44,9 @@ impl Role for Imp {
             return None;
         }
 
-        let day_num = state.day_num;
-
-        if let Some(prev_day_num) = self.last_killed
-            && prev_day_num == day_num
+        if let Some((step, prev_day_num)) = self.last_killed
+            && prev_day_num == state.day_num
+            && step == state.step
         {
             return None;
         }
@@ -59,18 +60,20 @@ impl Role for Imp {
             check_len(&target_players, 1)?;
             let target_player_index = target_players[0];
             state.kill(player_index, target_player_index);
+
+            let kill_data = (state.step, state.day_num);
             if let Roles::Imp(imp_data) = &mut state.get_player_mut(player_index).role {
-                imp_data.last_killed = Some(day_num);
+                imp_data.last_killed = Some(kill_data);
             }
             state.change_request_queue.push_back(
-                // WARN: Unused description
                 ChangeRequest::new_builder(ChangeType::NoStoryteller, String::new())
                     .state_change_func(StateChangeFuncPtr::new(move |state, _| {
                         if let Roles::Imp(Imp {
-                            last_swapped: Some(day_num),
+                            last_swapped: Some((step, day_num)),
                             ..
                         }) = &state.get_player(player_index).role
                             && *day_num == state.day_num
+                            && *step == state.step
                         {
                             return Ok(());
                         }
@@ -111,7 +114,7 @@ impl Imp {
                 let day_num = state.day_num;
                 let mut new_role = state.get_player(player_index).role.clone();
                 if let Roles::Imp(imp_data) = &mut new_role {
-                    imp_data.last_swapped = Some(day_num);
+                    imp_data.last_swapped = Some((state.step, state.day_num));
                 }
                 let target_player = state.get_player_mut(target_player_index);
 
@@ -127,5 +130,247 @@ impl Imp {
 impl Display for Imp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("Imp")
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::engine::change_request::ChangeArgs;
+    use crate::engine::player::roles::RoleNames;
+    use crate::engine::player::roles::test_utils::{find_role, setup_test_state};
+
+    #[test]
+    fn test_imp_night_kill() {
+        let roles = vec![
+            RoleNames::Imp,
+            RoleNames::Poisoner,
+            RoleNames::Washerwoman,
+        ];
+        let mut state = setup_test_state(roles);
+
+        let imp_index = find_role(&state, RoleNames::Imp);
+        let target_index = find_role(&state, RoleNames::Washerwoman);
+
+        // Imp acts "each night*" -- i.e. not night one.
+        state.step = Step::Night;
+
+        let cr = state
+            .get_player(imp_index)
+            .night_ability(imp_index, &state)
+            .expect("Imp should have a night ability");
+
+        let args = ChangeArgs::PlayerIndices(vec![target_index]);
+        cr.state_change_func.unwrap().call(&mut state, args).unwrap();
+
+        assert!(
+            state.get_player(target_index).dead,
+            "Imp's chosen target should die"
+        );
+    }
+
+    #[test]
+    fn test_imp_has_no_night_one_ability() {
+        // Wiki: "Each night*, choose a player: they die." The `*` means the Imp does not
+        // act on night one.
+        let roles = vec![
+            RoleNames::Imp,
+            RoleNames::Poisoner,
+            RoleNames::Washerwoman,
+        ];
+        let state = setup_test_state(roles);
+
+        let imp_index = find_role(&state, RoleNames::Imp);
+
+        assert!(
+            state
+                .get_player(imp_index)
+                .night_one_ability(imp_index, &state)
+                .is_none(),
+            "Imp should not have a night one ability"
+        );
+    }
+
+    #[test]
+    fn test_imp_death_ends_game_for_good() {
+        // Wiki rule 3: "If the Imp dies (by any means), good wins."
+        let roles = vec![
+            RoleNames::Imp,
+            RoleNames::Poisoner,
+            RoleNames::Washerwoman,
+        ];
+        let mut state = setup_test_state(roles);
+
+        let imp_index = find_role(&state, RoleNames::Imp);
+
+        assert!(
+            !state.game_over(),
+            "Game should not be over while the Imp is alive"
+        );
+
+        // Imp dies by a means other than its own kill ability (e.g. execution).
+        state.execute_player(imp_index);
+
+        assert!(state.get_player(imp_index).dead);
+        assert!(
+            state.game_over(),
+            "Good should win once the (non-star-passed) Imp is dead"
+        );
+    }
+
+    #[test]
+    fn test_imp_star_pass_creates_new_imp() {
+        // Wiki rule 4: "If you kill yourself this way, a Minion becomes the Imp."
+        let roles = vec![
+            RoleNames::Imp,
+            RoleNames::Poisoner,
+            RoleNames::Washerwoman,
+        ];
+        let mut state = setup_test_state(roles);
+
+        let imp_index = find_role(&state, RoleNames::Imp);
+        let minion_index = find_role(&state, RoleNames::Poisoner);
+
+        state.step = Step::Night;
+
+        let cr = state
+            .get_player(imp_index)
+            .night_ability(imp_index, &state)
+            .expect("Imp should have a night ability");
+
+        // Imp targets itself.
+        cr.state_change_func
+            .unwrap()
+            .call(&mut state, ChangeArgs::PlayerIndices(vec![imp_index]))
+            .unwrap();
+
+        assert!(
+            state.get_player(imp_index).dead,
+            "Imp should die from targeting itself"
+        );
+
+        // The kill's state_change_func queues a NoStoryteller follow-up that detects the
+        // star-pass and, if it occurred, queues a "choose a new Imp" request.
+        let follow_up = state
+            .change_request_queue
+            .pop_front()
+            .expect("expected a queued follow-up change request after Imp self-kill");
+        follow_up
+            .state_change_func
+            .unwrap()
+            .call(&mut state, ChangeArgs::Blank)
+            .unwrap();
+
+        let new_imp_request = state
+            .change_request_queue
+            .pop_front()
+            .expect("expected a queued 'choose new Imp' request after star-pass");
+
+        new_imp_request
+            .state_change_func
+            .unwrap()
+            .call(
+                &mut state,
+                ChangeArgs::PlayerIndices(vec![minion_index]),
+            )
+            .unwrap();
+
+        assert_eq!(
+            state.get_player(minion_index).role.to_role_name(),
+            RoleNames::Imp,
+            "The alive Minion should become the new Imp after a star-pass"
+        );
+        assert_eq!(
+            state.get_player(minion_index).role.get_true_character_type(),
+            CharacterType::Demon
+        );
+    }
+
+    #[test]
+    fn test_imp_star_pass_game_should_not_be_over() {
+        // Wiki rule 4: star-passing keeps the game going via a new Imp instead of ending
+        // it. This checks the win-condition bookkeeping actually reflects that instead of
+        // just the role transfer.
+        let roles = vec![
+            RoleNames::Imp,
+            RoleNames::Poisoner,
+            RoleNames::Washerwoman,
+        ];
+        let mut state = setup_test_state(roles);
+
+        let imp_index = find_role(&state, RoleNames::Imp);
+        let minion_index = find_role(&state, RoleNames::Poisoner);
+
+        state.step = Step::Night;
+
+        let cr = state
+            .get_player(imp_index)
+            .night_ability(imp_index, &state)
+            .expect("Imp should have a night ability");
+        cr.state_change_func
+            .unwrap()
+            .call(&mut state, ChangeArgs::PlayerIndices(vec![imp_index]))
+            .unwrap();
+
+        let follow_up = state.change_request_queue.pop_front().unwrap();
+        follow_up
+            .state_change_func
+            .unwrap()
+            .call(&mut state, ChangeArgs::Blank)
+            .unwrap();
+
+        let new_imp_request = state.change_request_queue.pop_front().unwrap();
+        new_imp_request
+            .state_change_func
+            .unwrap()
+            .call(
+                &mut state,
+                ChangeArgs::PlayerIndices(vec![minion_index]),
+            )
+            .unwrap();
+
+        assert!(
+            !state.game_over(),
+            "Game should not be over after a star-pass, since a new Imp is alive"
+        );
+    }
+
+    #[test]
+    fn test_imp_cannot_act_twice_in_same_night() {
+        // There's no explicit wiki rule against this (the Storyteller simply wouldn't wake
+        // the Imp twice), but the engine tracks `last_killed` to enforce a once-per-night
+        // constraint. This test documents/pins that behavior as currently implemented.
+        let roles = vec![
+            RoleNames::Imp,
+            RoleNames::Poisoner,
+            RoleNames::Washerwoman,
+            RoleNames::Chef,
+        ];
+        let mut state = setup_test_state(roles);
+
+        let imp_index = find_role(&state, RoleNames::Imp);
+        let target_index = find_role(&state, RoleNames::Washerwoman);
+
+        state.step = Step::Night;
+
+        let cr = state
+            .get_player(imp_index)
+            .night_ability(imp_index, &state)
+            .expect("Imp should have a night ability the first time");
+        cr.state_change_func
+            .unwrap()
+            .call(&mut state, ChangeArgs::PlayerIndices(vec![target_index]))
+            .unwrap();
+
+        assert!(state.get_player(target_index).dead);
+
+        // Same night/step -- the Imp should not be able to act again.
+        let second_ability = state
+            .get_player(imp_index)
+            .night_ability(imp_index, &state);
+        assert!(
+            second_ability.is_none(),
+            "Imp should not be able to act twice in the same night/step"
+        );
     }
 }
