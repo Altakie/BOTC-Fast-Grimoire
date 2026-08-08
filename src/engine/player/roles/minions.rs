@@ -210,14 +210,15 @@ impl Role for ScarletWoman {
                 }
 
                 let source_player_index = event_listener_state.source_player_index;
+                // state.set_win_condition(state.get_player(source_player_index));
 
                 state.change_request_queue.push_back(
                     ChangeRequest::new_builder(ChangeType::NoStoryteller, String::new())
                         .state_change_func(StateChangeFuncPtr::new(move |state, _| {
-                            let day_num = state.day_num;
+                            let swap_data = (state.step, state.day_num);
                             let dead_player = &mut state.get_player_mut(death_event.player_index);
                             if let Roles::Imp(imp_data) = &mut dead_player.role {
-                                imp_data.last_swapped = Some(day_num);
+                                imp_data.last_swapped = Some(swap_data);
                             }
 
                             let dead_role = dead_player.role.clone();
@@ -244,75 +245,348 @@ impl Role for ScarletWoman {
 
         state.death_listeners.push(scarlet_listener);
     }
-
-    // fn night_order(&self) -> Option<usize> {
-    //     Some(28)
-    // }
-
-    // fn night_ability(&self, _player_index: PlayerIndex, state: &State) -> ChangeResult {
-    //     // TODO: This might be a little tricky because the scarlet woman should immediately become
-    //     // demon when the demon dies. Potentially could have role abilities trigger on events that
-    //     // are added to the log as well. This could be useful for scarlet woman. Then have a method
-    //     // called on event that needs to be overwritten. This "subscribes" that role to that event
-    //     // type in the log. Essentially, whenever that event fires, it will call a function to
-    //     // notify all subscribers. Subscribers should be stored in a hash map and initialized at
-    //     // the start of the game. Something like that
-    //     // Needs to be done for imp as well
-    //     // Check player count and if demon is dead. The change type is dynamic here
-    //     // WARN: Update this method when travelers are added
-    //     let living_player_count = state
-    //         .get_players()
-    //         .iter()
-    //         .filter(|player| !player.dead)
-    //         .count();
-    //
-    //     let demon_alive = state.get_players();
-    //
-    //     if living_player_count < 5 {
-    //         let change_type = ChangeType::NoStoryteller;
-    //     }
-    //
-    //     todo!()
-    // }
-
-    // FIX: Very temporary so that scarlet woman can work somehow
-    // fn has_day_ability(&self) -> bool {
-    //     true
-    // }
-    //
-    // fn day_ability(
-    //     &self,
-    //     player_index: PlayerIndex,
-    //     state: &State,
-    // ) -> Option<ChangeRequestBuilder> {
-    //     let demon_alive = state.get_players().iter().any(|player| {
-    //         player.role.get_true_character_type() == CharacterType::Demon && !player.dead
-    //     });
-    //     let living_player_count = state
-    //         .get_players()
-    //         .iter()
-    //         .filter(|player| !player.dead)
-    //         .count();
-    //
-    //     if living_player_count < 4 || demon_alive {
-    //         return None;
-    //     }
-    //
-    //     ChangeRequest::new_builder(
-    //         ChangeType::NoStoryteller,
-    //         "The Scarletwoman becomes the imp".into(),
-    //     )
-    //     .state_change_func(StateChangeFuncPtr::new(move |state, args| {
-    //         let scarlet_woman = state.get_player_mut(player_index);
-    //         scarlet_woman.role = Roles::new(&RoleNames::Imp);
-    //         Ok(None)
-    //     }))
-    //     .into()
-    // }
 }
 
 impl Display for ScarletWoman {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("Scarlet Woman")
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::engine::change_request::ChangeArgs;
+    use crate::engine::player::roles::RoleNames;
+    use crate::engine::player::roles::test_utils::{find_role, setup_test_state};
+
+    use super::*;
+
+    // -------------------- Poisoner --------------------
+
+    #[test]
+    fn test_poisoner_applies_poisoned_status() {
+        let roles = vec![
+            RoleNames::Poisoner,
+            RoleNames::Soldier,
+            RoleNames::Monk,
+            RoleNames::Imp,
+        ];
+        let mut state = setup_test_state(roles);
+
+        let poisoner_index = find_role(&state, RoleNames::Poisoner);
+        let target_index = find_role(&state, RoleNames::Soldier);
+
+        let poisoner_role = Roles::new(&RoleNames::Poisoner);
+        let cr = poisoner_role.night_ability(poisoner_index, &state).unwrap();
+
+        let args = ChangeArgs::PlayerIndices(vec![target_index]);
+        cr.state_change_func.unwrap().call(&mut state, args).unwrap();
+
+        let statuses = state.get_player(target_index).get_statuses();
+        let poison_status = statuses
+            .iter()
+            .find(|s| s.status_type == StatusType::Poisoned)
+            .expect("Target should be poisoned");
+        assert_eq!(poison_status.source_player_index, poisoner_index);
+    }
+
+    #[test]
+    fn test_poisoner_suppresses_monk_protection() {
+        let roles = vec![
+            RoleNames::Poisoner,
+            RoleNames::Monk,
+            RoleNames::Soldier,
+            RoleNames::Imp,
+        ];
+        let mut state = setup_test_state(roles);
+
+        let poisoner_index = find_role(&state, RoleNames::Poisoner);
+        let monk_index = find_role(&state, RoleNames::Monk);
+        let imp_index = find_role(&state, RoleNames::Imp);
+        let target_index = find_role(&state, RoleNames::Soldier);
+
+        // Poisoner poisons the Monk
+        let poisoner_role = Roles::new(&RoleNames::Poisoner);
+        let cr = poisoner_role.night_ability(poisoner_index, &state).unwrap();
+        cr.state_change_func
+            .unwrap()
+            .call(&mut state, ChangeArgs::PlayerIndices(vec![monk_index]))
+            .unwrap();
+
+        assert!(
+            state
+                .get_player(monk_index)
+                .get_statuses()
+                .iter()
+                .any(|s| s.status_type == StatusType::Poisoned)
+        );
+
+        // Poisoned Monk attempts to protect the Soldier
+        let monk_role = Roles::new(&RoleNames::Monk);
+        let cr = monk_role.night_ability(monk_index, &state).unwrap();
+        cr.state_change_func
+            .unwrap()
+            .call(&mut state, ChangeArgs::PlayerIndices(vec![target_index]))
+            .unwrap();
+
+        // Per wiki rule 2, a poisoned player's ability does not function, so the
+        // protection should not actually be applied.
+        assert!(
+            !state
+                .get_player(target_index)
+                .get_statuses()
+                .iter()
+                .any(|s| s.status_type == StatusType::DemonProtected),
+            "Poisoned Monk's protection should not apply"
+        );
+
+        state.kill(imp_index, target_index);
+        assert!(
+            state.get_player(target_index).dead,
+            "Soldier should die because the poisoned Monk's protection had no real effect"
+        );
+    }
+
+    #[test]
+    fn test_poisoner_suppresses_slayer_kill_effect() {
+        let roles = vec![
+            RoleNames::Poisoner,
+            RoleNames::Slayer,
+            RoleNames::Soldier,
+            RoleNames::Imp,
+        ];
+        let mut state = setup_test_state(roles);
+
+        let poisoner_index = find_role(&state, RoleNames::Poisoner);
+        let slayer_index = find_role(&state, RoleNames::Slayer);
+        let imp_index = find_role(&state, RoleNames::Imp);
+
+        // Poisoner poisons the Slayer
+        let poisoner_role = Roles::new(&RoleNames::Poisoner);
+        let cr = poisoner_role.night_ability(poisoner_index, &state).unwrap();
+        cr.state_change_func
+            .unwrap()
+            .call(&mut state, ChangeArgs::PlayerIndices(vec![slayer_index]))
+            .unwrap();
+
+        // Poisoned Slayer points at the Imp
+        let slayer_role = Roles::new(&RoleNames::Slayer);
+        let cr = slayer_role.day_ability(slayer_index, &state).unwrap();
+        cr.state_change_func
+            .unwrap()
+            .call(&mut state, ChangeArgs::PlayerIndices(vec![imp_index]))
+            .unwrap();
+
+        // Per wiki rule 2, the poisoned Slayer's shot should have no real effect.
+        assert!(
+            !state.get_player(imp_index).dead,
+            "Imp should survive a poisoned Slayer's shot"
+        );
+    }
+
+    #[test]
+    fn test_poisoner_poisoned_once_per_game_ability_still_consumed() {
+        let roles = vec![
+            RoleNames::Poisoner,
+            RoleNames::Slayer,
+            RoleNames::Soldier,
+            RoleNames::Imp,
+        ];
+        let mut state = setup_test_state(roles);
+
+        let poisoner_index = find_role(&state, RoleNames::Poisoner);
+        let slayer_index = find_role(&state, RoleNames::Slayer);
+        let imp_index = find_role(&state, RoleNames::Imp);
+
+        // Poisoner poisons the Slayer
+        let poisoner_role = Roles::new(&RoleNames::Poisoner);
+        let cr = poisoner_role.night_ability(poisoner_index, &state).unwrap();
+        cr.state_change_func
+            .unwrap()
+            .call(&mut state, ChangeArgs::PlayerIndices(vec![slayer_index]))
+            .unwrap();
+
+        assert!(
+            state.get_player(slayer_index).role.has_day_ability(),
+            "Slayer's once-per-game ability should not be marked used yet"
+        );
+
+        // Poisoned Slayer uses their once-per-game ability anyway
+        let slayer_role = Roles::new(&RoleNames::Slayer);
+        let cr = slayer_role.day_ability(slayer_index, &state).unwrap();
+        cr.state_change_func
+            .unwrap()
+            .call(&mut state, ChangeArgs::PlayerIndices(vec![imp_index]))
+            .unwrap();
+
+        // Per wiki rule 3, a poisoned once-per-game ability use is still consumed,
+        // even though it had no real effect.
+        assert!(
+            !state.get_player(slayer_index).role.has_day_ability(),
+            "Slayer's once-per-game ability should be consumed even though it was poisoned"
+        );
+    }
+
+    // -------------------- Spy --------------------
+
+    #[test]
+    fn test_spy_sees_grimoire_night_one() {
+        let roles = vec![RoleNames::Spy, RoleNames::Soldier, RoleNames::Imp];
+        let state = setup_test_state(roles);
+
+        let spy_index = find_role(&state, RoleNames::Spy);
+
+        let spy_role = Roles::new(&RoleNames::Spy);
+        let cr = spy_role
+            .night_one_ability(spy_index, &state)
+            .expect("Spy should see the Grimoire on night one");
+
+        assert_eq!(cr.change_type, ChangeType::Display);
+    }
+
+    #[test]
+    fn test_spy_sees_grimoire_each_night() {
+        let roles = vec![RoleNames::Spy, RoleNames::Soldier, RoleNames::Imp];
+        let state = setup_test_state(roles);
+
+        let spy_index = find_role(&state, RoleNames::Spy);
+
+        let spy_role = Roles::new(&RoleNames::Spy);
+        let cr = spy_role
+            .night_ability(spy_index, &state)
+            .expect("Spy should see the Grimoire each night");
+
+        assert_eq!(cr.change_type, ChangeType::Display);
+    }
+
+    #[test]
+    fn test_spy_ability_continues_after_death() {
+        let roles = vec![RoleNames::Spy, RoleNames::Soldier, RoleNames::Imp];
+        let mut state = setup_test_state(roles);
+
+        let spy_index = find_role(&state, RoleNames::Spy);
+        state.get_player_mut(spy_index).dead = true;
+
+        let spy_role = Roles::new(&RoleNames::Spy);
+        // Per wiki rule 5, the Spy's ability continues to function even after death.
+        assert!(
+            spy_role.night_ability(spy_index, &state).is_some(),
+            "Dead Spy should still see the Grimoire"
+        );
+    }
+
+    #[test]
+    fn test_spy_registers_as_storyteller_choice() {
+        let roles = vec![RoleNames::Spy, RoleNames::Soldier, RoleNames::Imp];
+        let state = setup_test_state(roles);
+
+        let spy_index = find_role(&state, RoleNames::Spy);
+        let spy_role = &state.get_player(spy_index).role;
+
+        // True nature: an evil Minion.
+        assert_eq!(spy_role.get_default_alignment(), Alignment::Evil);
+        assert_eq!(spy_role.get_true_character_type(), CharacterType::Minion);
+
+        // What detection abilities see is left open (Storyteller's choice), modeled
+        // here as `Any` rather than a fixed good alignment / Townsfolk-or-Outsider type.
+        assert_eq!(spy_role.get_alignment(), Alignment::Any);
+        assert_eq!(spy_role.get_character_type(), CharacterType::Any);
+    }
+
+    // -------------------- Scarlet Woman --------------------
+
+    #[test]
+    fn test_scarlet_woman_promotes_to_demon_when_imp_dies_with_enough_players() {
+        // 5 players alive when the Imp dies -> Scarlet Woman should become the Demon.
+        let roles = vec![
+            RoleNames::ScarletWoman,
+            RoleNames::Imp,
+            RoleNames::Soldier,
+            RoleNames::Monk,
+            RoleNames::Virgin,
+        ];
+        let mut state = setup_test_state(roles);
+
+        let scarlet_index = find_role(&state, RoleNames::ScarletWoman);
+        let imp_index = find_role(&state, RoleNames::Imp);
+
+        state.execute_player(imp_index);
+
+        assert_eq!(
+            state.change_request_queue.len(),
+            2,
+            "Scarlet Woman's promotion and display change requests should be queued"
+        );
+
+        let swap_cr = state.change_request_queue.pop_front().unwrap();
+        swap_cr
+            .state_change_func
+            .unwrap()
+            .call(&mut state, ChangeArgs::Blank)
+            .unwrap();
+
+        assert_eq!(
+            state.get_player(scarlet_index).role.to_role_name(),
+            RoleNames::Imp,
+            "Scarlet Woman should become the Imp"
+        );
+        assert_eq!(
+            state.get_player(scarlet_index).role.get_true_character_type(),
+            CharacterType::Demon
+        );
+    }
+
+    #[test]
+    fn test_scarlet_woman_no_promotion_below_five_players() {
+        // Only 4 players total -> fewer than 5 alive when the Imp dies, so no promotion.
+        let roles = vec![
+            RoleNames::ScarletWoman,
+            RoleNames::Imp,
+            RoleNames::Soldier,
+            RoleNames::Monk,
+        ];
+        let mut state = setup_test_state(roles);
+
+        let scarlet_index = find_role(&state, RoleNames::ScarletWoman);
+        let imp_index = find_role(&state, RoleNames::Imp);
+
+        state.execute_player(imp_index);
+
+        assert!(
+            state.change_request_queue.is_empty(),
+            "Scarlet Woman should not be promoted with fewer than 5 players alive"
+        );
+        assert_eq!(
+            state.get_player(scarlet_index).role.to_role_name(),
+            RoleNames::ScarletWoman
+        );
+    }
+
+    // -------------------- Baron --------------------
+
+    #[test]
+    fn test_baron_initialization_effect_adds_two_outsiders() {
+        let baron_role = Roles::new(&RoleNames::Baron);
+        let effect = baron_role
+            .initialization_effect()
+            .expect("Baron should have a setup character-count effect");
+
+        assert_eq!(effect.townsfolk, -2);
+        assert_eq!(effect.outsiders, 2);
+        assert_eq!(effect.minions, 0);
+        assert_eq!(effect.demons, 0);
+    }
+
+    #[test]
+    fn test_baron_shifts_character_type_counts_on_choose() {
+        // 7 players: 5 townsfolk, 0 outsiders, 1 minion, 1 demon by default.
+        let mut counts = CharacterTypeCounts::new(7).unwrap();
+        assert_eq!(counts.townsfolk, 5);
+        assert_eq!(counts.outsiders, 0);
+
+        counts.on_choose(RoleNames::Baron);
+
+        assert_eq!(counts.townsfolk, 3);
+        assert_eq!(counts.outsiders, 2);
     }
 }
