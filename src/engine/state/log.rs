@@ -6,9 +6,15 @@ use super::{PlayerIndex, status_effects::StatusEffect};
 // -- Logging --
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct LoggedEvent {
+    pub event: Event,
+    pub actor: Option<PlayerIndex>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct DayPhaseLog {
     pub(crate) day_phase: Step,
-    pub(crate) log: Vec<Event>,
+    pub(crate) log: Vec<LoggedEvent>,
     pub(crate) day_num: usize,
 }
 
@@ -59,7 +65,10 @@ impl Log {
     where
         F: Fn(&Event) -> Option<&Event>,
     {
-        let day_phase = self.get_latest_phase().unwrap();
+        let day_phase = match self.get_latest_phase() {
+            Some(day_phase) => day_phase,
+            None => return Err(SearchError::InvalidDayNum),
+        };
         if let Some(event) = day_phase.search(&search_func) {
             return Ok(event);
         }
@@ -118,29 +127,35 @@ impl Log {
     }
 
     fn get_previous_phase(&self) -> Option<&DayPhaseLog> {
-        let len = self.day_phases.len();
-        self.day_phases.get(len - 2)
+        let index = self.day_phases.len().checked_sub(2)?;
+        self.day_phases.get(index)
     }
 
     fn get_mut_previous_phase(&mut self) -> Option<&mut DayPhaseLog> {
-        let len = self.day_phases.len();
-        self.day_phases.get_mut(len - 2)
+        let index = self.day_phases.len().checked_sub(2)?;
+        self.day_phases.get_mut(index)
     }
 
     fn get_latest_phase(&self) -> Option<&DayPhaseLog> {
         self.day_phases.last()
     }
 
+    // A Manual-mode storyteller can set `State.step` directly, bypassing `next_step()`/`next_phase()`,
+    // so `day_phases` can be empty here even mid-game. Lazily start a phase rather than panicking.
     fn get_mut_latest_phase(&mut self) -> &mut DayPhaseLog {
-        // WARN: This should never be empty anyway, but do fix this implementation to not panic if
-        // it is
-        assert!(!self.day_phases.is_empty());
+        if self.day_phases.is_empty() {
+            self.day_phases.push(DayPhaseLog {
+                day_phase: Step::Setup,
+                log: vec![],
+                day_num: self.day_num,
+            });
+        }
         self.day_phases.last_mut().unwrap()
     }
 
-    pub fn log_event(&mut self, event: Event) {
+    pub fn log_event(&mut self, event: Event, actor: Option<PlayerIndex>) {
         let latest_phase = self.get_mut_latest_phase();
-        latest_phase.log(event);
+        latest_phase.log(event, actor);
     }
 
     // fn search(&self, day_num: usize, event_type: EventType) -> Result<Event, SearchError> {
@@ -149,15 +164,15 @@ impl Log {
 }
 
 impl DayPhaseLog {
-    fn log(&mut self, event: Event) {
-        self.log.push(event);
+    fn log(&mut self, event: Event, actor: Option<PlayerIndex>) {
+        self.log.push(LoggedEvent { event, actor });
     }
 
-    fn search<F>(&self, func: F) -> Option<&Event>
+    fn search<F>(&self, mut func: F) -> Option<&Event>
     where
         F: FnMut(&Event) -> Option<&Event>,
     {
-        self.log.iter().rev().find_map(func)
+        self.log.iter().rev().find_map(|le| func(&le.event))
     }
 }
 
@@ -250,7 +265,7 @@ impl Display for DayPhaseLog {
         let log_str = self
             .log
             .iter()
-            .map(|event| format!("\t{}", event))
+            .map(|logged_event| format!("\t{}", logged_event.event))
             .collect::<Vec<String>>()
             .join("\n");
         write!(f, "{:?} {}\n{}", self.day_phase, self.day_num, log_str)
@@ -274,7 +289,7 @@ mod tests {
         log.next_phase();
         log.next_phase();
         let execution_event = Event::Execution(2);
-        log.log_event(execution_event.clone());
+        log.log_event(execution_event.clone(), None);
         log.next_phase();
 
         let event = log.search_previous_phase(|ev| match *ev {

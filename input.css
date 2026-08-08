@@ -1,3 +1,36 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@theme {
+  /* Chassis surfaces */
+  --color-chassis: var(--color-neutral-900);
+  --color-stage: var(--color-neutral-950);
+  --color-panel: var(--color-neutral-800);
+  --color-panel-hover: var(--color-neutral-700);
+  --color-divider: var(--color-neutral-700);
+  --color-input: var(--color-neutral-600);
+  --color-seat: var(--color-neutral-500);
+
+  /* Text */
+  --color-ink: var(--color-neutral-100);
+  --color-muted: var(--color-neutral-400);
+  --color-faint: var(--color-neutral-500);
+
+  /* Primary action */
+  --color-accent: var(--color-blue-600);
+  --color-accent-hover: var(--color-blue-500);
+  --color-selected-bg: oklch(30% 0.08 250);
+
+  /* Alignment colors (also reused for destructive UI, per TODO.md's blue-for-good/red-for-evil convention) */
+  --color-good: var(--color-blue-400);
+  --color-evil: var(--color-red-400);
+  --color-evil-solid: var(--color-red-700);
+  --color-evil-solid-hover: var(--color-red-600);
+  --color-any: var(--color-purple-400);
+
+  /* Special-case light surfaces */
+  --color-nameplate: var(--color-white);
+  --color-status-badge: var(--color-yellow-300);
+
+  /* Active-turn seat highlight */
+  --color-active-turn: var(--color-emerald-300);
+}

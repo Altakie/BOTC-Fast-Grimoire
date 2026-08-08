@@ -93,7 +93,7 @@ struct RoleData {
 }
 
 impl Roles {
-    fn new(role_name: &RoleNames) -> Self {
+    pub fn new(role_name: &RoleNames) -> Self {
         match role_name {
             RoleNames::Investigator => Self::Investigator(Investigator::default()),
             RoleNames::Empath => Self::Empath(Empath::default()),
@@ -123,7 +123,7 @@ impl Roles {
         }
     }
 
-    fn to_role_name(&self) -> RoleNames {
+    pub fn to_role_name(&self) -> RoleNames {
         match self {
             Roles::Investigator(_) => RoleNames::Investigator,
             Roles::Empath(_) => RoleNames::Empath,
@@ -343,6 +343,10 @@ pub(crate) mod demons;
 pub(crate) mod minions;
 pub(crate) mod outsiders;
 pub(crate) mod townsfolk;
+#[cfg(test)]
+pub(crate) mod test_utils;
+#[cfg(test)]
+mod interactions;
 // pub(crate) mod empath;
 // pub(crate) mod fortuneteller;
 // pub(crate) mod undertaker;

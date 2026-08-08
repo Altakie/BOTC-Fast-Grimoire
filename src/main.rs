@@ -26,13 +26,10 @@ use scripts::*;
 fn main() {
     // Stack Traces
     console_error_panic_hook::set_once();
-    
+
     // Tracing initialization
     use tracing_wasm::WASMLayerConfigBuilder;
-    tracing_wasm::set_as_global_default_with_config(
-        WASMLayerConfigBuilder::default()
-            .build(),
-    );
+    tracing_wasm::set_as_global_default_with_config(WASMLayerConfigBuilder::default().build());
 
     mount_to_body(App);
 }
@@ -47,9 +44,14 @@ fn App() -> impl IntoView {
 
     // NOTE: Debug only
     //
-    let debug: bool = std::env::var("DEBUG")
-        .is_ok_and(|val| matches!(&*val.trim().to_lowercase(), "1" | "true" | "t"));
-    if debug {
+    // `std::env::var` reads the OS process environment, which doesn't exist once this
+    // code is running as WASM in the browser. `option_env!` reads the environment at
+    // *compile* time instead, so the value must be set when the crate is built
+    // (e.g. `DEBUG=1 trunk serve`), and it gets baked into the binary.
+    let debug_mode: bool =
+        matches!(option_env!("DEBUG"), Some(val) if matches!(val.trim().to_lowercase().as_str(), "1" | "true" | "t"));
+    tracing::debug!("debug is {debug_mode}");
+    if debug_mode {
         roles.set(vec![
             RoleNames::Soldier,
             RoleNames::Virgin,

@@ -1,9 +1,9 @@
 #![allow(dead_code, clippy::needless_return)]
 pub(crate) mod log;
 
-use tracing::{error, info, warn};
 use log::Log;
 use std::{collections::VecDeque, fmt::Debug, sync::Arc};
+use tracing::{error, info, warn};
 pub(crate) mod status_effects;
 
 use rand::{self, seq::SliceRandom};
@@ -128,6 +128,7 @@ pub(crate) struct State {
     pub(crate) log: Log,
     script: Script,
     pub(crate) step: Step,
+    pub(crate) current_step_actor: Option<PlayerIndex>,
 
     // pub(crate) curr_args: Option<ChangeArgs>,
     // pub(crate) curr_description: Option<String>,
@@ -151,7 +152,11 @@ impl State {
         roles.shuffle(&mut rng);
 
         if roles.len() != player_names.len() {
-            error!(num_roles = roles.len(), num_players = player_names.len(), "Number of players does not match number of roles");
+            error!(
+                num_roles = roles.len(),
+                num_players = player_names.len(),
+                "Number of players does not match number of roles"
+            );
             // TODO: Figure out to do errors here
             return Err(());
         }
@@ -210,6 +215,7 @@ impl State {
             log,
             script,
             step: Step::default(),
+            current_step_actor: None,
 
             // curr_args: None,
             // curr_description: None,
@@ -341,6 +347,7 @@ impl State {
     /// * Option<ChangeRequest> : A change request if the role does something, or none if it
     ///   doesn't
     pub(crate) fn resolve(&mut self, player_index: PlayerIndex) {
+        self.current_step_actor = Some(player_index);
         let player = self.get_player(player_index);
 
         let res = match self.step {
@@ -356,6 +363,11 @@ impl State {
         // TODO: Log events that happen in the setup
     }
 
+    fn log_event(&mut self, event: Event) {
+        let actor = self.current_step_actor;
+        self.log.log_event(event, actor);
+    }
+
     pub(crate) fn kill(
         &mut self,
         attacking_player_index: PlayerIndex,
@@ -364,7 +376,7 @@ impl State {
         // Go through all kill listeners (can maybe set a change request up to go)
         self.prevent_kill_default = false;
         let mut state = self;
-        state.log.log_event(Event::AttemptedKill {
+        state.log_event(Event::AttemptedKill {
             attacking_player_index,
             target_player_index,
         });
@@ -394,7 +406,10 @@ impl State {
         }
 
         state.attempted_kill_listeners = attempted_kill_listeners;
-        error!(prevent_default = state.prevent_kill_default, "Kill attempted");
+        error!(
+            prevent_default = state.prevent_kill_default,
+            "Kill attempted"
+        );
         if state.prevent_kill_default {
             return;
         }
@@ -418,7 +433,7 @@ impl State {
 
     pub(crate) fn handle_death(&mut self, player_index: PlayerIndex) {
         let mut state = self;
-        state.log.log_event(Event::Death(player_index));
+        state.log_event(Event::Death(player_index));
         let mut death_listeners = std::mem::take(&mut state.death_listeners);
         for listener in death_listeners.iter_mut() {
             if state.players[listener.state.source_player_index]
@@ -515,6 +530,7 @@ impl State {
         target_player_index: PlayerIndex,
     ) {
         // target_player.nominate(source_player_index, target_player_index, self);
+        self.current_step_actor = Some(source_player_index);
         let mut state = self;
         let mut nomination_listeners = std::mem::take(&mut state.nomination_listeners);
         for listener in nomination_listeners.iter_mut() {
@@ -535,13 +551,14 @@ impl State {
         }
         state.nomination_listeners = nomination_listeners;
 
-        state.log.log_event(Event::Nomination {
+        state.log_event(Event::Nomination {
             nominator_player_index: source_player_index,
             target_player_index,
         });
     }
 
     pub(crate) fn execute_player(&mut self, target_player_index: PlayerIndex) {
+        self.current_step_actor = Some(target_player_index);
         let target_player = self.get_player_mut(target_player_index);
 
         // FIX: Make this work properly again and prevent defaults
@@ -550,7 +567,7 @@ impl State {
         // TODO: Call execute listeners
         // Resolve their change requests (right away if possible)
         self.handle_death(target_player_index);
-        self.log.log_event(Event::Execution(target_player_index));
+        self.log_event(Event::Execution(target_player_index));
 
         // After a player is executed, immediately go to night
         self.next_step();
@@ -573,6 +590,14 @@ impl State {
     pub(crate) fn day_ability(&self, player_index: PlayerIndex) -> Option<ChangeRequestBuilder> {
         self.get_player(player_index)
             .day_ability(player_index, self)
+    }
+
+    pub(crate) fn resolve_day_ability(
+        &mut self,
+        player_index: PlayerIndex,
+    ) -> Option<ChangeRequestBuilder> {
+        self.current_step_actor = Some(player_index);
+        self.day_ability(player_index)
     }
 
     pub(crate) fn get_next_active_night_one(

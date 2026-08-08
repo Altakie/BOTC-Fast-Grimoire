@@ -51,7 +51,11 @@
 - Implementation of all roles
 - Game overview after
   - Should be able to replay the log
+- Real vote tallying during nominations
+  - `ChangeType::Voting` and `Event::Voting` already exist in the engine (`change_request.rs`, `log.rs`) but are never constructed anywhere — nominations are logged, but there's no mechanism to record how many players voted or to require a majority before a player can be executed
+  - Currently the storyteller can execute any player directly at will (via the UI's execute confirm gate), regardless of nomination/vote outcome
 
 ## Minor Features
 
 - Display errors as a tooltip
+- Explain setup-time role/bag conflicts (e.g. dealing the Baron when there aren't enough Outsiders left to satisfy the +2 Outsider/-2 Townsfolk swap) instead of silently blocking the role selection
