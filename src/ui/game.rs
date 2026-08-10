@@ -89,11 +89,11 @@ pub(crate) fn GameInterface(
                             </GrimoireStage>
                             <DecisionCard>
                                 {move || {
-                                    // if state.read().game_over() {
-                                    //     view! { <EndOfGameSummary /> }.into_any()
-                                    // } else {
+                                    if state.read().game_over().is_some() {
+                                        view! { <EndOfGameSummary /> }.into_any()
+                                    } else {
                                         view! { <AutoResolveDecisionCard /> }.into_any()
-                                    // }
+                                    }
                                 }}
                             </DecisionCard>
                         }

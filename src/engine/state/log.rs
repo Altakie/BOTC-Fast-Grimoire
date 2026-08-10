@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::engine::state::Step;
+use crate::engine::state::{Step, status_effects::StatusType};
 
 use super::{PlayerIndex, status_effects::StatusEffect};
 // -- Logging --
@@ -206,7 +206,7 @@ pub enum Event {
     StatusApplied {
         source_player_index: PlayerIndex,
         target_player_index: PlayerIndex,
-        status_effect: StatusEffect,
+        status_effect: StatusType,
     },
     InfoLearned(String),
 }
@@ -222,7 +222,7 @@ pub struct Voting {
     pub target_player_index: PlayerIndex,
 }
 #[derive(Clone, Debug, PartialEq)]
-pub struct Execution(PlayerIndex);
+pub struct Execution(pub PlayerIndex);
 #[derive(Clone, Debug, PartialEq)]
 pub struct AttemptedKill {
     pub attacking_player_index: PlayerIndex,
@@ -237,7 +237,7 @@ pub struct Death {
 pub struct StatusApplied {
     pub source_player_index: PlayerIndex,
     pub target_player_index: PlayerIndex,
-    pub status_effect: StatusEffect,
+    pub status_effect: StatusType,
 }
 #[derive(Clone, Debug, PartialEq)]
 pub struct InfoLearned(String);

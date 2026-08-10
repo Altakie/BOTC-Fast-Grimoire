@@ -13,7 +13,7 @@ use crate::engine::{
     },
     state::{
         EventListener, PlayerIndex, State,
-        log::{AttemptedKill, Event, Nomination},
+        log::{self, AttemptedKill, Event, Nomination},
         status_effects::{CleanupPhase, StatusEffect, StatusType},
     },
 };
@@ -36,8 +36,7 @@ fn washerwoman_librarian_investigator(
         let target_player_indices = args.extract_player_indicies()?;
         check_len(&target_player_indices, 1)?;
 
-        let target_player = state.get_player_mut(target_player_indices[0]);
-        target_player.add_status(right_status());
+        state.add_status(right_status(), target_player_indices[0]);
 
         state
             .change_request_queue
@@ -85,8 +84,7 @@ fn washerwoman_librarian_investigator_wrong(
         }
 
         // Assign the chosen player the wrong status effect
-        let target_player = state.get_player_mut(target_player_indices[0]);
-        target_player.add_status(wrong_status());
+        state.add_status(wrong_status(), target_player_indices[0]);
 
         Ok(())
     }));
@@ -493,9 +491,8 @@ impl Role for Fortuneteller {
             }
 
             let target_player_index = target_player_indices[0];
-            let target_player = state.get_player_mut(target_player_index);
             let status = StatusEffect::new(StatusType::FortuneTellerRedHerring, player_index, None);
-            target_player.add_status(status);
+            state.add_status(status, target_player_index);
 
             Ok(())
         }))
@@ -632,13 +629,12 @@ impl Role for Monk {
                 });
             }
 
-            let target_player = state.get_player_mut(target_player_indices[0]);
             let status = StatusEffect::new(
                 StatusType::DemonProtected,
                 player_index,
                 CleanupPhase::Dawn.into(),
             );
-            target_player.add_status(status);
+            state.add_status(status, target_player_indices[0]);
 
             Ok(())
         }))
@@ -853,13 +849,20 @@ impl Role for Soldier {
     }
 
     fn initialize(&self, player_index: PlayerIndex, state: &mut State) {
-        state
-            .get_player_mut(player_index)
-            .add_status(StatusEffect::new(
-                StatusType::DemonProtected,
-                player_index,
-                None,
-            ));
+        // WARN: No indicator that the soldier is demon protected
+        // state.add_status(
+        //     StatusEffect::new(StatusType::DemonProtected, player_index, None),
+        //     player_index,
+        // );
+        state.attempted_kill_listeners.push(EventListener::new(
+            player_index,
+            |ev_state, state, event: log::AttemptedKill| {
+                if event.target_player_index == ev_state.source_player_index {
+                    state.prevent_kill_default = true
+                }
+                state
+            },
+        ));
     }
 
     // Overwrite kill method for Soldier so they can't be killed by a demon
@@ -962,64 +965,94 @@ mod test {
 
     #[test]
     fn test_monk_protection() {
-        let roles = vec![
-            RoleNames::Monk,
-            RoleNames::Soldier,
-            RoleNames::Imp,
-        ];
+        // Deliberately NOT using Soldier as the protected target: Soldier's own ability
+        // applies a permanent DemonProtected status in `initialize()` (see townsfolk.rs),
+        // which would make this assertion pass even if Monk's ability were a no-op.
+        let roles = vec![RoleNames::Monk, RoleNames::Investigator, RoleNames::Imp];
         let mut state = setup_test_state(roles);
 
         let monk_index = find_role(&state, RoleNames::Monk);
         let imp_index = find_role(&state, RoleNames::Imp);
-        let target_index = find_role(&state, RoleNames::Soldier);
+        let target_index = find_role(&state, RoleNames::Investigator);
 
-        // Monk protects Soldier
+        // Monk protects the Investigator
         let monk_role = Roles::new(&RoleNames::Monk);
         let cr = monk_role.night_ability(monk_index, &state).unwrap();
-        
+
         // Execute the change request
         let args = crate::engine::change_request::ChangeArgs::PlayerIndices(vec![target_index]);
-        cr.state_change_func.unwrap().call(&mut state, args).unwrap();
+        cr.state_change_func
+            .unwrap()
+            .call(&mut state, args)
+            .unwrap();
 
-        assert!(state.get_player(target_index).get_statuses().iter().any(|s| s.status_type == StatusType::DemonProtected));
+        assert!(
+            state
+                .get_player(target_index)
+                .get_statuses()
+                .iter()
+                .any(|s| s.status_type == StatusType::DemonProtected)
+        );
 
-        // Imp kills Soldier
+        // Imp kills the Investigator
         state.kill(imp_index, target_index);
-        
-        assert!(!state.get_player(target_index).dead, "Soldier should be protected");
+
+        assert!(
+            !state.get_player(target_index).dead,
+            "the protected player should survive"
+        );
     }
 
     #[test]
     fn test_monk_poisoned_protection_blocked() {
-        let roles = vec![
-            RoleNames::Monk,
-            RoleNames::Soldier,
-            RoleNames::Imp,
-        ];
+        // Deliberately NOT using Soldier as the protected target: Soldier's own ability
+        // applies a permanent DemonProtected status in `initialize()`, which would make the
+        // "no protection applied" assertion below meaningless (it'd already be present
+        // regardless of Monk).
+        let roles = vec![RoleNames::Monk, RoleNames::Investigator, RoleNames::Imp];
         let mut state = setup_test_state(roles);
 
         let monk_index = find_role(&state, RoleNames::Monk);
         let imp_index = find_role(&state, RoleNames::Imp);
-        let target_index = find_role(&state, RoleNames::Soldier);
+        let target_index = find_role(&state, RoleNames::Investigator);
 
         // Poison the Monk
-        state.get_player_mut(monk_index).add_status(StatusEffect::new(StatusType::Poisoned, imp_index, None));
+        state.add_status(
+            StatusEffect::new(StatusType::Poisoned, imp_index, None),
+            monk_index,
+        );
 
-        // Monk attempts to protect Soldier
-        let monk_role = Roles::new(&RoleNames::Monk);
-        let cr = monk_role.night_ability(monk_index, &state).unwrap();
-        
+        // Monk attempts to protect the Investigator. Go through the Player wrapper (not the
+        // raw Roles::night_ability), since poison suppression is applied centrally there via
+        // `drunkify` -- calling the raw role method bypasses it entirely.
+        let cr = state
+            .get_player(monk_index)
+            .night_ability(monk_index, &state)
+            .unwrap();
+
         // Execute the change request - should fail or not apply protection because they are poisoned
         let args = crate::engine::change_request::ChangeArgs::PlayerIndices(vec![target_index]);
-        cr.state_change_func.unwrap().call(&mut state, args).unwrap();
+        cr.state_change_func
+            .unwrap()
+            .call(&mut state, args)
+            .unwrap();
 
         // Protection status should NOT be applied because Monk is poisoned
-        assert!(!state.get_player(target_index).get_statuses().iter().any(|s| s.status_type == StatusType::DemonProtected));
+        assert!(
+            !state
+                .get_player(target_index)
+                .get_statuses()
+                .iter()
+                .any(|s| s.status_type == StatusType::DemonProtected)
+        );
 
-        // Imp kills Soldier
+        // Imp kills the Investigator
         state.kill(imp_index, target_index);
 
-        assert!(state.get_player(target_index).dead, "Soldier should die because protection was blocked by poison");
+        assert!(
+            state.get_player(target_index).dead,
+            "the target should die because protection was blocked by poison"
+        );
     }
 
     // -- Washerwoman --
@@ -1998,9 +2031,10 @@ mod test {
 
         // Poison the Virgin, then nominate them - the wiki says the ability is consumed even
         // when it is blocked (e.g. by poisoning)
-        state
-            .get_player_mut(virgin_index)
-            .add_status(StatusEffect::new(StatusType::Poisoned, poisoner_index, None));
+        state.add_status(
+            StatusEffect::new(StatusType::Poisoned, poisoner_index, None),
+            virgin_index,
+        );
         state.nominate_player(poisoner_index, virgin_index);
         assert!(
             state.change_request_queue.is_empty(),
@@ -2066,6 +2100,64 @@ mod test {
         );
     }
 
+    #[test]
+    fn test_poisoned_soldier_dies_to_demon_kill() {
+        // Poison negates the Soldier's ability, so a poisoned Soldier should NOT be immune
+        // to a demon kill. Soldier's protection is implemented as an attempted_kill_listener
+        // sourced from the Soldier, which `State::kill` already skips when its source is
+        // poisoned -- so this is checked live at kill time, not just at grant time.
+        let roles = vec![RoleNames::Poisoner, RoleNames::Soldier, RoleNames::Imp];
+        let mut state = setup_test_state(roles);
+
+        let poisoner_index = find_role(&state, RoleNames::Poisoner);
+        let soldier_index = find_role(&state, RoleNames::Soldier);
+        let imp_index = find_role(&state, RoleNames::Imp);
+
+        let poisoner_role = Roles::new(&RoleNames::Poisoner);
+        let cr = poisoner_role
+            .night_ability(poisoner_index, &state)
+            .expect("Poisoner should have a night ability");
+        cr.state_change_func
+            .unwrap()
+            .call(&mut state, ChangeArgs::PlayerIndices(vec![soldier_index]))
+            .unwrap();
+
+        state.kill(imp_index, soldier_index);
+
+        assert!(
+            state.get_player(soldier_index).dead,
+            "a poisoned Soldier should not be immune to a demon kill"
+        );
+    }
+
+    #[test]
+    fn test_soldier_immune_again_after_poison_wears_off() {
+        let roles = vec![RoleNames::Poisoner, RoleNames::Soldier, RoleNames::Imp];
+        let mut state = setup_test_state(roles);
+
+        let poisoner_index = find_role(&state, RoleNames::Poisoner);
+        let soldier_index = find_role(&state, RoleNames::Soldier);
+        let imp_index = find_role(&state, RoleNames::Imp);
+
+        let poisoner_role = Roles::new(&RoleNames::Poisoner);
+        let cr = poisoner_role
+            .night_ability(poisoner_index, &state)
+            .expect("Poisoner should have a night ability");
+        cr.state_change_func
+            .unwrap()
+            .call(&mut state, ChangeArgs::PlayerIndices(vec![soldier_index]))
+            .unwrap();
+
+        state.cleanup_statuses(CleanupPhase::Dusk);
+
+        state.kill(imp_index, soldier_index);
+
+        assert!(
+            !state.get_player(soldier_index).dead,
+            "the Soldier should be immune again once the Poisoner's poison has worn off"
+        );
+    }
+
     // -- Slayer --
 
     #[test]
@@ -2124,9 +2216,10 @@ mod test {
         let slayer_index = find_role(&state, RoleNames::Slayer);
         let imp_index = find_role(&state, RoleNames::Imp);
 
-        state
-            .get_player_mut(slayer_index)
-            .add_status(StatusEffect::new(StatusType::Poisoned, imp_index, None));
+        state.add_status(
+            StatusEffect::new(StatusType::Poisoned, imp_index, None),
+            slayer_index,
+        );
 
         let cr = state
             .get_player(slayer_index)
@@ -2208,9 +2301,10 @@ mod test {
         let mayor_index = find_role(&state, RoleNames::Mayor);
         let imp_index = find_role(&state, RoleNames::Imp);
 
-        state
-            .get_player_mut(mayor_index)
-            .add_status(StatusEffect::new(StatusType::Poisoned, imp_index, None));
+        state.add_status(
+            StatusEffect::new(StatusType::Poisoned, imp_index, None),
+            mayor_index,
+        );
 
         state.kill(imp_index, mayor_index);
 

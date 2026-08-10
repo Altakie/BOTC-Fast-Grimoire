@@ -123,13 +123,12 @@ impl Poisoner {
             let target_players = args.extract_player_indicies()?;
             check_len(&target_players, 1)?;
 
-            let target_player = state.get_player_mut(target_players[0]);
             let status = StatusEffect::new(
                 StatusType::Poisoned,
                 player_index,
                 CleanupPhase::Dusk.into(),
             );
-            target_player.add_status(status);
+            state.add_status(status, target_players[0]);
 
             Ok(())
         }))
@@ -292,10 +291,13 @@ mod test {
 
     #[test]
     fn test_poisoner_suppresses_monk_protection() {
+        // Deliberately NOT using Soldier as the protected target: Soldier's own ability
+        // applies a permanent DemonProtected status in `initialize()` (townsfolk.rs), which
+        // would make the "no protection applied" assertion below pass regardless of Monk.
         let roles = vec![
             RoleNames::Poisoner,
             RoleNames::Monk,
-            RoleNames::Soldier,
+            RoleNames::Investigator,
             RoleNames::Imp,
         ];
         let mut state = setup_test_state(roles);
@@ -303,7 +305,7 @@ mod test {
         let poisoner_index = find_role(&state, RoleNames::Poisoner);
         let monk_index = find_role(&state, RoleNames::Monk);
         let imp_index = find_role(&state, RoleNames::Imp);
-        let target_index = find_role(&state, RoleNames::Soldier);
+        let target_index = find_role(&state, RoleNames::Investigator);
 
         // Poisoner poisons the Monk
         let poisoner_role = Roles::new(&RoleNames::Poisoner);
@@ -321,9 +323,13 @@ mod test {
                 .any(|s| s.status_type == StatusType::Poisoned)
         );
 
-        // Poisoned Monk attempts to protect the Soldier
-        let monk_role = Roles::new(&RoleNames::Monk);
-        let cr = monk_role.night_ability(monk_index, &state).unwrap();
+        // Poisoned Monk attempts to protect the Investigator. Go through the Player wrapper
+        // (not the raw Roles::night_ability), since poison suppression is applied centrally
+        // there via `drunkify` -- calling the raw role method bypasses it entirely.
+        let cr = state
+            .get_player(monk_index)
+            .night_ability(monk_index, &state)
+            .unwrap();
         cr.state_change_func
             .unwrap()
             .call(&mut state, ChangeArgs::PlayerIndices(vec![target_index]))
@@ -343,7 +349,7 @@ mod test {
         state.kill(imp_index, target_index);
         assert!(
             state.get_player(target_index).dead,
-            "Soldier should die because the poisoned Monk's protection had no real effect"
+            "the target should die because the poisoned Monk's protection had no real effect"
         );
     }
 
@@ -369,9 +375,12 @@ mod test {
             .call(&mut state, ChangeArgs::PlayerIndices(vec![slayer_index]))
             .unwrap();
 
-        // Poisoned Slayer points at the Imp
-        let slayer_role = Roles::new(&RoleNames::Slayer);
-        let cr = slayer_role.day_ability(slayer_index, &state).unwrap();
+        // Poisoned Slayer points at the Imp. Go through the Player wrapper so poison
+        // suppression (`drunkify`) actually applies.
+        let cr = state
+            .get_player(slayer_index)
+            .day_ability(slayer_index, &state)
+            .unwrap();
         cr.state_change_func
             .unwrap()
             .call(&mut state, ChangeArgs::PlayerIndices(vec![imp_index]))
@@ -411,9 +420,12 @@ mod test {
             "Slayer's once-per-game ability should not be marked used yet"
         );
 
-        // Poisoned Slayer uses their once-per-game ability anyway
-        let slayer_role = Roles::new(&RoleNames::Slayer);
-        let cr = slayer_role.day_ability(slayer_index, &state).unwrap();
+        // Poisoned Slayer uses their once-per-game ability anyway. Go through the Player
+        // wrapper so poison suppression (`drunkify`) actually applies.
+        let cr = state
+            .get_player(slayer_index)
+            .day_ability(slayer_index, &state)
+            .unwrap();
         cr.state_change_func
             .unwrap()
             .call(&mut state, ChangeArgs::PlayerIndices(vec![imp_index]))
@@ -424,6 +436,10 @@ mod test {
         assert!(
             !state.get_player(slayer_index).role.has_day_ability(),
             "Slayer's once-per-game ability should be consumed even though it was poisoned"
+        );
+        assert!(
+            !state.get_player(imp_index).dead,
+            "the poisoned Slayer's shot should have had no real effect"
         );
     }
 

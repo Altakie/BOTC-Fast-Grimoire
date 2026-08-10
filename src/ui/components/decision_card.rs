@@ -204,7 +204,11 @@ pub(crate) fn EndOfGameSummary() -> impl IntoView {
     view! {
         <div class="flex flex-col gap-4 h-full">
             <DecisionCardHeader title=Signal::derive(|| "Game Over".to_string())>
-                <p class="text-lg text-good font-medium">"Good Wins"</p>
+                <p class={move || format!("text-lg font-medium text-{}", game_state.winner().get().map(|winner| match winner {
+                    crate::engine::player::Alignment::Good => "good",
+                    crate::engine::player::Alignment::Evil => "evil",
+                    crate::engine::player::Alignment::Any => "any",
+                }).unwrap_or("white")) }>{move || format!("{} Wins", game_state.winner().get().map(|alignment| alignment.to_string()).unwrap_or("No One".to_string()))}</p>
             </DecisionCardHeader>
             <div class="border border-solid border-divider rounded p-3 flex flex-col gap-2">
                 <h3 class="font-mono uppercase tracking-widest text-xs text-muted">"Final Roster"</h3>

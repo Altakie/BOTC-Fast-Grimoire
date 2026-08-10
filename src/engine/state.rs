@@ -13,7 +13,7 @@ use crate::{
     engine::{
         change_request::ChangeRequestBuilder,
         player::{
-            Player,
+            Alignment, CharacterType, Player,
             roles::{Role, RoleNames},
         },
         state::{
@@ -123,7 +123,6 @@ impl<EventType> EventListener<EventType> {
 #[derive(Store, Debug, Clone)]
 pub(crate) struct State {
     players: Vec<Player>,
-    win_cond_i: Option<PlayerIndex>,
     pub(crate) day_num: usize,
     pub(crate) log: Log,
     script: Script,
@@ -135,9 +134,13 @@ pub(crate) struct State {
     pub(crate) change_request_queue: VecDeque<ChangeRequestBuilder>,
 
     pub(crate) nomination_listeners: Vec<EventListener<log::Nomination>>,
+    pub(crate) execution_listeners: Vec<EventListener<log::Execution>>,
     pub(crate) attempted_kill_listeners: Vec<EventListener<log::AttemptedKill>>,
     pub(crate) prevent_kill_default: bool,
     pub(crate) death_listeners: Vec<EventListener<log::Death>>,
+    pub(crate) add_status_listeners: Vec<EventListener<log::StatusApplied>>,
+
+    pub(crate) winner: Option<Alignment>,
 }
 
 impl State {
@@ -161,56 +164,20 @@ impl State {
             return Err(());
         }
 
-        // TODO: Figure out how to store roles properly so we can create a game. Do we even need
-        // the roles enum?
-        // Idea: For now, just have a method to translate a member of the enum to a role trait
         for i in 0..roles.len() {
             let player = Player::new(player_names[i].clone(), roles[i].convert());
             players.push(player);
         }
 
-        let win_cond_index = players
+        let demon_index = players
             .iter()
-            .position(|player| player.role.is_win_condition())
+            .position(|player| player.role.get_true_character_type() == CharacterType::Demon)
             .unwrap();
-
-        let _demon_listener = EventListener::new(
-            win_cond_index,
-            |listener, state, death_event: log::Death| {
-                if death_event.player_index == listener.source_player_index {
-                    let win_cond_index = state
-                        .players
-                        .iter()
-                        .position(|player| player.role.is_win_condition() && !player.dead);
-                    match win_cond_index {
-                        Some(win_cond_index) => listener.source_player_index = win_cond_index,
-                        None => {
-                            // FIX: For now just setting all players to dead to indicate the game
-                            // is over
-                            state
-                                .players
-                                .iter_mut()
-                                .for_each(|player| player.dead = true);
-                        }
-                    }
-                }
-
-                state
-            },
-        );
-
-        // assert!(
-        //     players.iter().filter(|p| p.role.is_win_condition()).count() <= 1,
-        //     "Shouldn't have more than one win condition when game starts"
-        // );
-
-        let win_cond_i = players.iter().position(|p| p.role.is_win_condition());
 
         let log = Log::new();
 
         let mut state = Self {
             players,
-            win_cond_i,
             day_num: 1,
             log,
             script,
@@ -222,10 +189,14 @@ impl State {
             change_request_queue: VecDeque::new(),
 
             nomination_listeners: vec![],
+            execution_listeners: vec![],
             attempted_kill_listeners: vec![],
             prevent_kill_default: false,
             // TODO: Maybe add a listener for demon death?
             death_listeners: vec![],
+            add_status_listeners: vec![],
+
+            winner: None,
         };
 
         for (player_index, player) in state.players.clone().iter().enumerate() {
@@ -278,22 +249,40 @@ impl State {
         return index;
     }
 
-    pub(crate) fn set_win_condition(&mut self, player: &Player) {
-        self.win_cond_i = Some(self.get_player_index(player));
+    /// Returns None if the game is still going, or which team won the game (Good or Evil)
+    pub(crate) fn game_over(&self) -> Option<Alignment> {
+        return self.winner;
     }
 
-    pub(crate) fn game_over(&self) -> bool {
-        let index = match self.win_cond_i {
-            Some(i) => i,
-            None =>
-            // TODO: Need to implement this for athiest games, but this should be manually
-            // resolved by story teller most likely
-            {
-                todo!()
-            }
-        };
-        // Game ends if win condition player is dead
-        self.players[index].dead
+    fn update_winner(&mut self) {
+        if self.winner.is_some() {
+            return;
+        }
+        // Check if there are any living demons
+        let demon_index = self.get_players().iter().position(|player| {
+            player.role.get_true_character_type() == CharacterType::Demon && !player.dead
+        });
+
+        if demon_index.is_none() {
+            self.winner = Some(Alignment::Good);
+            return;
+        }
+        let living_players: Vec<&Player> = self.players.iter().filter(|p| !p.dead).collect();
+
+        if living_players.len() <= 2 {
+            self.winner = Some(Alignment::Evil);
+            return;
+        }
+
+        if living_players
+            .iter()
+            .filter(|p| p.alignment != Alignment::Evil)
+            .count()
+            == 0
+        {
+            self.winner = Some(Alignment::Evil);
+            return;
+        }
     }
 
     pub(crate) fn next_step(&mut self) {
@@ -308,11 +297,13 @@ impl State {
             // }
             Step::Day => {
                 self.cleanup_statuses(CleanupPhase::Dusk);
+                // self.update_winner();
                 self.day_num += 1;
                 Step::Night
             }
             Step::NightOne | Step::Night => {
                 self.cleanup_statuses(CleanupPhase::Dawn);
+                self.update_winner();
                 Step::Day
             }
         };
@@ -406,10 +397,6 @@ impl State {
         }
 
         state.attempted_kill_listeners = attempted_kill_listeners;
-        error!(
-            prevent_default = state.prevent_kill_default,
-            "Kill attempted"
-        );
         if state.prevent_kill_default {
             return;
         }
@@ -422,7 +409,6 @@ impl State {
         //     target_player_index,
         //     &state_snapshot,
         // );
-        // FIX: Shouldn't always successfully kill
         state.get_player_mut(target_player_index).dead = true;
 
         let dead = state.get_player(target_player_index).dead;
@@ -559,18 +545,29 @@ impl State {
 
     pub(crate) fn execute_player(&mut self, target_player_index: PlayerIndex) {
         self.current_step_actor = Some(target_player_index);
-        let target_player = self.get_player_mut(target_player_index);
 
-        // FIX: Make this work properly again and prevent defaults
-        // target_player.execute();
+        let mut state = self;
+
+        let mut execution_listeners = std::mem::take(&mut state.execution_listeners);
+        for listener in execution_listeners.iter_mut() {
+            if state.players[listener.state.source_player_index]
+                .status_effects
+                .iter_mut()
+                .any(|se| matches!(se.status_type, StatusType::Poisoned | StatusType::Drunk))
+            {
+                continue;
+            }
+            state = listener.call(state, log::Execution(target_player_index));
+        }
+        state.execution_listeners = execution_listeners;
+
+        let target_player = state.get_player_mut(target_player_index);
         target_player.dead = true;
-        // TODO: Call execute listeners
-        // Resolve their change requests (right away if possible)
-        self.handle_death(target_player_index);
-        self.log_event(Event::Execution(target_player_index));
+        state.handle_death(target_player_index);
+        state.log_event(Event::Execution(target_player_index));
 
         // After a player is executed, immediately go to night
-        self.next_step();
+        state.next_step();
     }
 
     pub(crate) fn get_day_active(&self) -> Vec<PlayerIndex> {
@@ -802,803 +799,3 @@ impl State {
         }
     }
 }
-
-/// Status Effects can either be visual (just for the storyteller) and do nothing or they can
-/// overwrite player behaviors
-impl State {
-    pub(crate) fn cleanup_player_statuses(&mut self, source_player_index: PlayerIndex) {
-        for player in self.players.iter_mut() {
-            player.remove_players_statuses(source_player_index);
-        }
-    }
-
-    pub(crate) fn cleanup_statuses(&mut self, cleanup_phase: CleanupPhase) {
-        for player in self.players.iter_mut() {
-            player.cleanup_statuses(cleanup_phase);
-        }
-    }
-
-    pub(crate) fn cleanup_event_listeners(&mut self, player_index: PlayerIndex) {
-        info!(role = ?self.get_player(player_index).role, "Cleanup for the player");
-        info!(?self.death_listeners, "Event Listeners");
-        self.nomination_listeners
-            .retain(|listener| listener.state.source_player_index != player_index);
-        self.attempted_kill_listeners
-            .retain(|listener| listener.state.source_player_index != player_index);
-        self.death_listeners
-            .retain(|listener| listener.state.source_player_index != player_index);
-    }
-}
-
-// #[cfg(test)]
-// pub mod tests {
-//     use super::*;
-//
-//     // NOTE: Testing Utils
-//
-//     pub(crate) fn setup_test_game() -> (State, Vec<Roles>) {
-//         let roles = vec![
-//             Roles::Investigator,
-//             Roles::Innkeeper,
-//             Roles::Imp,
-//             Roles::Chef,
-//             Roles::Poisoner,
-//         ];
-//         let player_names = vec![
-//             String::from("P1"),
-//             String::from("P2"),
-//             String::from("P3"),
-//             String::from("P4"),
-//             String::from("P5"),
-//         ];
-//
-//         return (
-//             State::new(roles.clone(), player_names, EMPTY_SCRIPT).unwrap(),
-//             roles,
-//         );
-//     }
-//     pub(crate) const EMPTY_SCRIPT: Script = Script { roles: vec![] };
-//     //
-//     // // NOTE: Tests
-//     // #[test]
-//     // fn test_player_constructor() {
-//     //     let good_player_name = String::from("Good");
-//     //     // Add in all good players here
-//     //     let good_player_roles = vec![
-//     //         Role::Investigator,
-//     //         Role::Empath,
-//     //         Role::Gossip,
-//     //         Role::Innkeeper,
-//     //     ];
-//     //
-//     //     for role in good_player_roles {
-//     //         // Create a new player
-//     //         let player = Player::new(good_player_name.clone(), role);
-//     //         // Test that the player is alive, has a ghost vote, has the proper name, has no status
-//     //         // effects on them, has the right role, and is good
-//     //         assert_eq!(player.name, String::from("Good"));
-//     //         assert_eq!(player.role, role);
-//     //         assert!(!player.dead);
-//     //         assert!(player.ghost_vote);
-//     //         assert_eq!(player.alignment, Alignment::Good);
-//     //     }
-//     //
-//     //     let evil_player_name = String::from("Evil");
-//     //     let evil_player_roles = vec![Role::Imp];
-//     //
-//     //     for role in evil_player_roles {
-//     //         // Create a new player
-//     //         let player = Player::new(evil_player_name.clone(), role);
-//     //         // Test that the player is alive, has a ghost vote, has the proper name, has no status
-//     //         // effects on them, has the right role, and is good
-//     //         assert_eq!(player.name, String::from("Evil"));
-//     //         assert_eq!(player.role, role);
-//     //         assert!(!player.dead);
-//     //         assert!(player.ghost_vote);
-//     //         assert_eq!(player.alignment, Alignment::Evil);
-//     //     }
-//     // }
-//     //
-//     #[test]
-//     fn test_new_game() {
-//         let (game, roles) = setup_test_game();
-//
-//         assert_eq!(game.players.len(), 5);
-//         assert_eq!(game.players[0].name, "P1");
-//         assert_eq!(game.players[1].name, "P2");
-//         assert_eq!(game.players[2].name, "P3");
-//         assert_eq!(game.players[3].name, "P4");
-//         assert_eq!(game.players[4].name, "P5");
-//
-//         assert_eq!(game.status_effects.len(), 0);
-//
-//         {
-//             let mut roles = roles.clone();
-//             for player in game.players {
-//                 let role_i = match roles.iter().position(|&r| r == player.role) {
-//                     Some(x) => x,
-//                     None => {
-//                         eprintln!("Role not assigned to player");
-//                         panic!();
-//                     }
-//                 };
-//
-//                 roles.remove(role_i);
-//             }
-//
-//             assert_eq!(roles.len(), 0);
-//         }
-//
-//         // TODO: Maybe add a check here that all the assigment events were logged
-//     }
-//
-//     // #[test]
-//     // fn game_setup() {
-//     //     // TODO: Do this after implementing setup method
-//     //     // Only way to really test this right now is through baron and drunk
-//     //     todo!()
-//     // }
-//     //
-//     #[test]
-//     fn kill_player() {
-//         let mut game = setup_test_game().0;
-//
-//         game.kill_player(0, 0);
-//         assert!(game.players[0].dead);
-//         game.kill_player(1, 1);
-//         assert!(game.players[1].dead);
-//         game.kill_player(2, 2);
-//         assert!(game.players[2].dead);
-//     }
-//
-//     #[test]
-//     fn kill_death_protected_player() {
-//         let mut game = setup_test_game().0;
-//
-//         game.add_status(StatusType::DeathProtected, 1, 1);
-//
-//         game.kill_player(0, 0);
-//         assert!(game.players[0].dead);
-//         game.kill_player(1, 1);
-//         assert!(!game.players[1].dead);
-//         game.kill_player(2, 2);
-//         assert!(game.players[2].dead);
-//
-//         game.remove_status(StatusType::DeathProtected, 1, 1);
-//         game.kill_player(1, 1);
-//         assert!(game.players[1].dead);
-//     }
-//
-//     #[test]
-//     fn kill_night_protected_player() {
-//         let mut game = setup_test_game().0;
-//
-//         game.day_phase = DayPhase::Night;
-//         game.add_status(StatusType::NightProtected, 1, 1);
-//
-//         game.kill_player(0, 0);
-//         assert!(game.players[0].dead);
-//         game.kill_player(1, 1);
-//         assert!(!game.players[1].dead);
-//         game.kill_player(2, 2);
-//         assert!(game.players[2].dead);
-//
-//         game.day_phase = DayPhase::DayDiscussion;
-//         game.kill_player(1, 1);
-//         assert!(game.players[1].dead);
-//     }
-//
-//     #[test]
-//     fn kill_demon_protected_player() {
-//         let mut game = setup_test_game().0;
-//
-//         game.add_status(StatusType::DemonProtected, 1, 1);
-//
-//         let demon_index = game.win_cond_i.unwrap();
-//
-//         game.kill_player(demon_index, 0);
-//         assert!(game.players[0].dead);
-//         game.kill_player(demon_index, 1);
-//         assert!(!game.players[1].dead);
-//         game.kill_player(demon_index, 2);
-//         assert!(game.players[2].dead);
-//
-//         game.kill_player(demon_index, 1);
-//         assert!(!game.players[1].dead);
-//
-//         game.remove_status(StatusType::DemonProtected, 1, 1);
-//         game.kill_player(demon_index, 1);
-//         assert!(game.players[1].dead);
-//     }
-//     //
-//     // #[test]
-//     // fn test_left() {
-//     //     let mut game = setup_test_game().0;
-//     //
-//     //     assert_eq!(game.players[game.left_player(1)], game.players[0]);
-//     //
-//     //     // Kill set the left player to dead and see that the left player is updated accordingly
-//     //     game.kill_player(0, 0);
-//     //     assert_eq!(game.players[game.left_player(1)], game.players[2]);
-//     // }
-//     //
-//     // #[test]
-//     // fn test_right() {
-//     //     let mut game = setup_test_game().0;
-//     //
-//     //     assert_eq!(game.players[game.right_player(1)], game.players[2]);
-//     //
-//     //     // Kill the right player and make sure the right player is updated accordingly
-//     //     game.kill_player(0, 2);
-//     //     assert_eq!(game.players[game.right_player(1)], game.players[0]);
-//     // }
-//     //
-//     // #[test]
-//     // fn test_game_over() {
-//     //     todo!();
-//     // }
-//     //
-//     // #[test]
-//     // fn test_get_night_1_order() {
-//     //     let game = setup_test_game().0;
-//     //
-//     //     let player_indices = vec![0, 1, 2, 3, 4];
-//     //     let order = game.get_night_1_order(player_indices);
-//     //     assert_eq!(game.players[order[0]].role, Role::Poisoner);
-//     //     assert_eq!(game.players[order[1]].role, Role::Investigator);
-//     //     assert_eq!(game.players[order[2]].role, Role::Chef);
-//     //     assert_eq!(order.len(), 3);
-//     // }
-//     //
-//     // fn test_resolve_night_1() {
-//     //     todo!();
-//     // }
-//     //
-//     // // TODO: Test that all night one abilities work as expected
-//     //
-//     // fn test_night_order() {
-//     //     let game = setup_test_game().0;
-//     //
-//     //     let player_indices = vec![0, 1, 2, 3, 4];
-//     //     let order = game.get_night_order(player_indices);
-//     //     assert_eq!(game.players[order[0]].role, Role::Poisoner);
-//     //     assert_eq!(game.players[order[1]].role, Role::Innkeeper);
-//     //     assert_eq!(order.len(), 2);
-//     // }
-//     //
-//     // // TODO: Test that all night abilities work as expected
-//     // fn tsest_resolve_night() {
-//     //     todo!();
-//     // }
-//     //
-//     // #[test]
-//     // fn add_status_effect() {
-//     //     let mut game = setup_test_game().0;
-//     //
-//     //     game.add_status(StatusEffects::Poisoned, 2, 0);
-//     //
-//     //     assert_eq!(game.status_effects[0].status_type, StatusEffects::Poisoned);
-//     //     assert_eq!(game.status_effects[0].source_player_index, 2);
-//     //     assert_eq!(game.status_effects[0].affected_player_index, 0);
-//     // }
-//     //
-//     // #[test]
-//     // fn add_multiple_status_effects() {
-//     //     let mut game = setup_test_game().0;
-//     //
-//     //     game.add_status(StatusEffects::Poisoned, 2, 0);
-//     //     game.add_status(StatusEffects::MayorBounceKill, 1, 3);
-//     //     game.add_status(StatusEffects::Drunk, 4, 2);
-//     //
-//     //     assert_eq!(
-//     //         game.status_effects
-//     //             .iter()
-//     //             .filter(|s| {
-//     //                 s.status_type == StatusEffects::Poisoned
-//     //                     && s.source_player_index == 2
-//     //                     && s.source_role == game.players[2].role
-//     //                     && s.affected_player_index == 0
-//     //             })
-//     //             .count(),
-//     //         1
-//     //     );
-//     //
-//     //     assert_eq!(
-//     //         game.status_effects
-//     //             .iter()
-//     //             .filter(|s| {
-//     //                 s.status_type == StatusEffects::MayorBounceKill
-//     //                     && s.source_player_index == 1
-//     //                     && s.source_role == game.players[1].role
-//     //                     && s.affected_player_index == 3
-//     //             })
-//     //             .count(),
-//     //         1
-//     //     );
-//     //
-//     //     assert_eq!(
-//     //         game.status_effects
-//     //             .iter()
-//     //             .filter(|s| {
-//     //                 s.status_type == StatusEffects::Drunk
-//     //                     && s.source_player_index == 4
-//     //                     && s.source_role == game.players[4].role
-//     //                     && s.affected_player_index == 2
-//     //             })
-//     //             .count(),
-//     //         1
-//     //     );
-//     //
-//     //     // Checks that same player can have multiple status effects applied to them
-//     //     // Checks that the same player can have multiple of the same status effect from differnet
-//     //     // sources applied to them
-//     //     //
-//     //     game.add_status(StatusEffects::Drunk, 3, 2);
-//     //     game.add_status(StatusEffects::Drunk, 1, 2);
-//     //     game.add_status(StatusEffects::Poisoned, 4, 2);
-//     //     game.add_status(StatusEffects::Drunk, 1, 0);
-//     //
-//     //     assert_eq!(
-//     //         game.status_effects
-//     //             .iter()
-//     //             .filter(|s| { s.status_type == StatusEffects::Drunk })
-//     //             .count(),
-//     //         4
-//     //     );
-//     //
-//     //     assert_eq!(
-//     //         game.status_effects
-//     //             .iter()
-//     //             .filter(|s| {
-//     //                 s.status_type == StatusEffects::Drunk && s.affected_player_index == 2
-//     //             })
-//     //             .count(),
-//     //         3
-//     //     );
-//     //
-//     //     assert_eq!(
-//     //         game.status_effects
-//     //             .iter()
-//     //             .filter(|s| {
-//     //                 s.status_type == StatusEffects::Drunk
-//     //                     && s.source_player_index == 4
-//     //                     && s.source_role == game.players[4].role
-//     //                     && s.affected_player_index == 2
-//     //             })
-//     //             .count(),
-//     //         1
-//     //     );
-//     //
-//     //     assert_eq!(
-//     //         game.status_effects
-//     //             .iter()
-//     //             .filter(|s| {
-//     //                 s.status_type == StatusEffects::Poisoned && s.affected_player_index == 2
-//     //             })
-//     //             .count(),
-//     //         1
-//     //     );
-//     //
-//     //     assert_eq!(
-//     //         game.status_effects
-//     //             .iter()
-//     //             .filter(|s| {
-//     //                 s.source_player_index == 4
-//     //                     && s.source_role == game.players[4].role
-//     //                     && s.affected_player_index == 2
-//     //             })
-//     //             .count(),
-//     //         2
-//     //     );
-//     //
-//     //     assert_eq!(
-//     //         game.status_effects
-//     //             .iter()
-//     //             .filter(|s| { s.affected_player_index == 2 })
-//     //             .count(),
-//     //         4
-//     //     );
-//     // }
-//     //
-//     // #[test]
-//     // fn find_status_effects_inflicted_by_player() {
-//     //     let mut game = setup_test_game().0;
-//     //
-//     //     game.add_status(StatusEffects::Poisoned, 2, 0);
-//     //     game.add_status(StatusEffects::MayorBounceKill, 1, 3);
-//     //     game.add_status(StatusEffects::Drunk, 4, 2);
-//     //
-//     //     game.add_status(StatusEffects::Drunk, 2, 2);
-//     //     game.add_status(StatusEffects::Drunk, 2, 1);
-//     //     game.add_status(StatusEffects::Drunk, 2, 0);
-//     //
-//     //     let statuses = game.get_inflicted_statuses(2);
-//     //     assert_eq!(statuses.len(), 4);
-//     //     assert_eq!(
-//     //         statuses
-//     //             .iter()
-//     //             .filter(|s| s.status_type == StatusEffects::Drunk)
-//     //             .count(),
-//     //         3
-//     //     );
-//     //     assert_eq!(
-//     //         statuses
-//     //             .iter()
-//     //             .filter(|s| s.status_type == StatusEffects::Poisoned)
-//     //             .count(),
-//     //         1
-//     //     );
-//     //     assert!(statuses.iter().all(|s| s.source_player_index == 2));
-//     //     assert!(
-//     //         statuses
-//     //             .iter()
-//     //             .all(|s| s.source_role == game.players[2].role)
-//     //     );
-//     //
-//     //     let no_statuses = game.get_inflicted_statuses(0);
-//     //     assert_eq!(no_statuses.len(), 0);
-//     // }
-//     //
-//     // #[test]
-//     // fn find_status_effects_inlicted_by_player() {
-//     //     let mut game = setup_test_game().0;
-//     //
-//     //     game.add_status(StatusEffects::Poisoned, 2, 0);
-//     //     game.add_status(StatusEffects::MayorBounceKill, 1, 3);
-//     //     game.add_status(StatusEffects::Poisoned, 4, 2);
-//     //
-//     //     game.add_status(StatusEffects::Drunk, 3, 2);
-//     //     game.add_status(StatusEffects::Drunk, 1, 2);
-//     //     game.add_status(StatusEffects::Drunk, 0, 2);
-//     //
-//     //     let statuses = game.get_afflicted_statuses(2);
-//     //     assert_eq!(statuses.len(), 4);
-//     //     assert_eq!(
-//     //         statuses
-//     //             .iter()
-//     //             .filter(|s| s.status_type == StatusEffects::Drunk)
-//     //             .count(),
-//     //         3
-//     //     );
-//     //     assert_eq!(
-//     //         statuses
-//     //             .iter()
-//     //             .filter(|s| s.status_type == StatusEffects::Poisoned)
-//     //             .count(),
-//     //         1
-//     //     );
-//     //     assert!(statuses.iter().all(|s| s.affected_player_index == 2));
-//     //
-//     //     let no_statuses = game.get_afflicted_statuses(4);
-//     //     assert_eq!(no_statuses.len(), 0);
-//     // }
-//     //
-//     // #[test]
-//     // fn remove_status_effect() {
-//     //     todo!();
-//     // }
-//     //
-//     // #[test]
-//     // fn remove_multiple_status_effects() {
-//     //     todo!();
-//     // }
-// }
-//
-
-// NOTE: Role Specific Abilities
-
-// TODO: Make these tests work with the new roles
-// #[cfg(test)]
-// mod tests {
-//     use crate::{
-//         Roles,
-//         engine::{
-//             night::{chef_ability, empath_ability},
-//             state::{PlayerIndex, tests::setup_test_game},
-//         },
-//     };
-//     #[test]
-//     fn test_get_order() {
-//         let game = setup_test_game().0;
-//
-//         let mut next_player_index = None;
-//
-//         let mut assert_next_role = |role: Roles| {
-//             next_player_index = game.get_next_active_night1(next_player_index);
-//             let role_pos = game.players.iter().position(|p| p.role == role).unwrap();
-//             assert_eq!(
-//                 next_player_index.unwrap(),
-//                 role_pos,
-//                 "Next Player Role: {}\n {}'s Position is {}",
-//                 game.players[next_player_index.unwrap()].role,
-//                 role,
-//                 role_pos
-//             );
-//         };
-//
-//         assert_next_role(Roles::Poisoner);
-//         assert_next_role(Roles::Investigator);
-//         assert_next_role(Roles::Chef);
-//
-//         next_player_index = game.get_next_active_player(next_player_index);
-//         assert!(next_player_index.is_none());
-//     }
-//
-//     #[test]
-//     fn test_empath_ability() {
-//         let test_cases = [
-//             (
-//                 "Empath 0 evil neighbors",
-//                 vec![Roles::Investigator, Roles::Empath, Roles::Saint],
-//                 vec![],
-//                 0,
-//             ),
-//             (
-//                 "Empath dead right neighbor",
-//                 vec![
-//                     Roles::Investigator,
-//                     Roles::Empath,
-//                     Roles::Saint,
-//                     Roles::Poisoner,
-//                 ],
-//                 vec![2],
-//                 1,
-//             ),
-//             (
-//                 "Empath dead left neighbor",
-//                 vec![
-//                     Roles::Investigator,
-//                     Roles::Empath,
-//                     Roles::Saint,
-//                     Roles::Chef,
-//                     Roles::Scarletwoman,
-//                 ],
-//                 vec![0],
-//                 1,
-//             ),
-//             (
-//                 "Empath right evil neighbor",
-//                 vec![Roles::Investigator, Roles::Empath, Roles::Baron],
-//                 vec![],
-//                 1,
-//             ),
-//             (
-//                 "Empath dead right neighbor initially evil",
-//                 vec![
-//                     Roles::Investigator,
-//                     Roles::Empath,
-//                     Roles::Baron,
-//                     Roles::Saint,
-//                     Roles::Washerwoman,
-//                 ],
-//                 vec![2],
-//                 0,
-//             ),
-//             (
-//                 "Empath dead right neighbor initially evil, new neighbor also evil",
-//                 vec![
-//                     Roles::Investigator,
-//                     Roles::Empath,
-//                     Roles::Baron,
-//                     Roles::Saint,
-//                     Roles::Washerwoman,
-//                 ],
-//                 vec![2],
-//                 0,
-//             ),
-//             (
-//                 "Empath left evil neighbor",
-//                 vec![Roles::Scarletwoman, Roles::Empath, Roles::Saint],
-//                 vec![],
-//                 1,
-//             ),
-//             (
-//                 "Empath dead left evil neighbor initially evil",
-//                 vec![
-//                     Roles::Scarletwoman,
-//                     Roles::Empath,
-//                     Roles::Saint,
-//                     Roles::Chef,
-//                     Roles::Investigator,
-//                 ],
-//                 vec![0],
-//                 0,
-//             ),
-//             (
-//                 "Empath dead left evil neighbor initially evil, new neighbor also evil",
-//                 vec![
-//                     Roles::Scarletwoman,
-//                     Roles::Empath,
-//                     Roles::Saint,
-//                     Roles::Chef,
-//                     Roles::Poisoner,
-//                 ],
-//                 vec![0],
-//                 1,
-//             ),
-//             (
-//                 "Empath both evil neighbors",
-//                 vec![Roles::Poisoner, Roles::Empath, Roles::Imp],
-//                 vec![],
-//                 2,
-//             ),
-//             (
-//                 "Empath initallly both evil neighbors, right dead",
-//                 vec![
-//                     Roles::Poisoner,
-//                     Roles::Empath,
-//                     Roles::Imp,
-//                     Roles::Chef,
-//                     Roles::Investigator,
-//                 ],
-//                 vec![0],
-//                 1,
-//             ),
-//             (
-//                 "Empath initallly both evil neighbors, left dead",
-//                 vec![
-//                     Roles::Poisoner,
-//                     Roles::Empath,
-//                     Roles::Imp,
-//                     Roles::Chef,
-//                     Roles::Investigator,
-//                 ],
-//                 vec![2],
-//                 1,
-//             ),
-//             (
-//                 "Empath initallly both evil neighbors, both dead",
-//                 vec![
-//                     Roles::Poisoner,
-//                     Roles::Empath,
-//                     Roles::Imp,
-//                     Roles::Chef,
-//                     Roles::Investigator,
-//                 ],
-//                 vec![0, 2],
-//                 0,
-//             ),
-//             (
-//                 "Empath recluse evil neighbor",
-//                 vec![Roles::Investigator, Roles::Empath, Roles::Recluse],
-//                 vec![],
-//                 0,
-//             ),
-//             (
-//                 "Empath spy evil neighbor",
-//                 vec![Roles::Spy, Roles::Empath, Roles::Investigator],
-//                 vec![],
-//                 1,
-//             ),
-//         ];
-//
-//         for test_case in test_cases {
-//             // Create clean environment for each test
-//             let mut game = setup_test_game().0;
-//             let mut convert_player = |player_index: PlayerIndex| {
-//                 game.players[player_index].role = test_case.1[player_index];
-//                 game.players[player_index].alignment =
-//                     test_case.1[player_index].get_default_alignment();
-//             };
-//
-//             for (i, _) in test_case.1.iter().enumerate() {
-//                 convert_player(i);
-//             }
-//
-//             for i in test_case.2 {
-//                 game.players[i].dead = true;
-//             }
-//
-//             let desired_num = test_case.3;
-//
-//             let empath_message = empath_ability(&game, 1)[0].description.clone();
-//             let desired_message = format!("Empath has {} evil neighbors", desired_num);
-//             assert!(
-//                 empath_message == desired_message,
-//                 "{} failed. Expected {} evil neighbors, got {}",
-//                 test_case.0,
-//                 desired_num,
-//                 empath_message
-//             )
-//         }
-//     }
-//
-//     #[test]
-//     fn test_chef_ability() {
-//         let mut game = setup_test_game().0;
-//
-//         let test_cases = [
-//             (
-//                 "0 Chef Pairs",
-//                 [
-//                     Roles::Imp,
-//                     Roles::Chef,
-//                     Roles::Spy,
-//                     Roles::Washerwoman,
-//                     Roles::Empath,
-//                 ],
-//                 0,
-//             ),
-//             (
-//                 "1 Chef Pair",
-//                 [
-//                     Roles::Chef,
-//                     Roles::Imp,
-//                     Roles::Spy,
-//                     Roles::Washerwoman,
-//                     Roles::Empath,
-//                 ],
-//                 1,
-//             ),
-//             (
-//                 "1 Chef Pair with Wrap",
-//                 [
-//                     Roles::Imp,
-//                     Roles::Chef,
-//                     Roles::Washerwoman,
-//                     Roles::Empath,
-//                     Roles::Spy,
-//                 ],
-//                 1,
-//             ),
-//             (
-//                 "3 Evil Players, two sitting together other separate",
-//                 [
-//                     Roles::Chef,
-//                     Roles::Imp,
-//                     Roles::Spy,
-//                     Roles::Washerwoman,
-//                     Roles::Poisoner,
-//                 ],
-//                 1,
-//             ),
-//             (
-//                 "3 Evil in a row",
-//                 [
-//                     Roles::Imp,
-//                     Roles::Chef,
-//                     Roles::Washerwoman,
-//                     Roles::Baron,
-//                     Roles::Spy,
-//                 ],
-//                 2,
-//             ),
-//         ];
-//
-//         for test_case in test_cases {
-//             let mut convert_player = |player_index: PlayerIndex| {
-//                 game.players[player_index].role = test_case.1[player_index];
-//                 game.players[player_index].alignment =
-//                     test_case.1[player_index].get_default_alignment();
-//             };
-//
-//             for i in 0..5 {
-//                 convert_player(i);
-//             }
-//
-//             let chef_message = chef_ability(&game)[0].description.clone();
-//             let desired_message = format!(
-//                 "Show the chef that there are {} pairs of evil players",
-//                 test_case.2
-//             );
-//             assert!(
-//                 chef_message == desired_message,
-//                 "{} failed. Expected {} pairs of evil players, got {}",
-//                 test_case.0,
-//                 test_case.2,
-//                 chef_message
-//             )
-//         }
-//     }
-//
-//     // TODO: Test all night abilities (both check funcs and state application funcs)
-//     // Imp
-//     // Empath
-//     // Monk
-//     // Poisoner
-//     // Butler
-//     // Scarletwoman
-//     // FortuneTeller
-//     // Ravenkeeper
-//     // Undertaker
-// }

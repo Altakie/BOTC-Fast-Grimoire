@@ -2,7 +2,10 @@ use std::fmt::{Debug, Display};
 use std::ops::Deref;
 use std::sync::Arc;
 
+use tracing::info;
+
 use crate::engine::player::Player;
+use crate::engine::state::log;
 use crate::engine::{
     player::PlayerBehaviors,
     state::{PlayerIndex, State},
@@ -120,59 +123,66 @@ impl PartialEq for StatusEffect {
     }
 }
 
-// impl State {
-//     pub(crate) fn add_status(
-//         &mut self,
-//         status_type: StatusType,
-//         source_player_index: PlayerIndex,
-//         affected_player_index: PlayerIndex,
-//     ) {
-//         let new_status = StatusEffect::new(
-//             status_type,
-//             source_player_index,
-//             self.players[source_player_index].role,
-//             affected_player_index,
-//         );
-//         self.status_effects.push(new_status);
-//     }
-//
-//     pub(crate) fn remove_status(
-//         &mut self,
-//         status_type: StatusType,
-//         source_player_index: PlayerIndex,
-//         affected_player_index: PlayerIndex,
-//     ) {
-//         let index = self
-//             .status_effects
-//             .iter()
-//             .position(|s| {
-//                 s.status_type == status_type
-//                     && s.source_player_index == source_player_index
-//                     && s.affected_player_index == affected_player_index
-//             })
-//             .expect("Tried to remove status effect not in game");
-//         self.status_effects.remove(index);
-//     }
-//
-//     pub(crate) fn get_inflicted_statuses(
-//         &self,
-//         source_player_index: PlayerIndex,
-//     ) -> Vec<StatusEffect> {
-//         self.status_effects
-//             .iter()
-//             .filter(|s| s.source_player_index == source_player_index)
-//             .cloned()
-//             .collect()
-//     }
-//
-//     pub(crate) fn get_afflicted_statuses(
-//         &self,
-//         affected_player_index: PlayerIndex,
-//     ) -> Vec<StatusEffect> {
-//         self.status_effects
-//             .iter()
-//             .filter(|s| s.affected_player_index == affected_player_index)
-//             .cloned()
-//             .collect()
-//     }
-// }
+/// Status Effects can either be visual (just for the storyteller) and do nothing or they can
+/// overwrite player behaviors
+impl State {
+    pub(crate) fn add_status(&mut self, status: StatusEffect, target_player_index: PlayerIndex) {
+        self.handle_status_added(&status, target_player_index);
+        self.get_player_mut(target_player_index).add_status(status);
+    }
+
+    fn handle_status_added(&mut self, status: &StatusEffect, target_player_index: PlayerIndex) {
+        let mut state = self;
+        state.log.log_event(
+            log::Event::StatusApplied {
+                source_player_index: status.source_player_index,
+                target_player_index,
+                status_effect: status.status_type,
+            },
+            Some(status.source_player_index),
+        );
+        let mut status_listeners = std::mem::take(&mut state.add_status_listeners);
+        for listener in status_listeners.iter_mut() {
+            if state.players[listener.state.source_player_index]
+                .status_effects
+                .iter_mut()
+                .any(|se| matches!(se.status_type, StatusType::Poisoned | StatusType::Drunk))
+            {
+                continue;
+            }
+            state = listener.call(
+                state,
+                log::StatusApplied {
+                    source_player_index: status.source_player_index,
+                    target_player_index,
+                    status_effect: status.status_type,
+                },
+            );
+        }
+
+        state.add_status_listeners = status_listeners;
+    }
+
+    pub(crate) fn cleanup_player_statuses(&mut self, source_player_index: PlayerIndex) {
+        for player in self.players.iter_mut() {
+            player.remove_players_statuses(source_player_index);
+        }
+    }
+
+    pub(crate) fn cleanup_statuses(&mut self, cleanup_phase: CleanupPhase) {
+        for player in self.players.iter_mut() {
+            player.cleanup_statuses(cleanup_phase);
+        }
+    }
+
+    pub(crate) fn cleanup_event_listeners(&mut self, player_index: PlayerIndex) {
+        info!(role = ?self.get_player(player_index).role, "Cleanup for the player");
+        info!(?self.death_listeners, "Event Listeners");
+        self.nomination_listeners
+            .retain(|listener| listener.state.source_player_index != player_index);
+        self.attempted_kill_listeners
+            .retain(|listener| listener.state.source_player_index != player_index);
+        self.death_listeners
+            .retain(|listener| listener.state.source_player_index != player_index);
+    }
+}

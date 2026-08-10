@@ -2,7 +2,6 @@ use crate::ChangeRequest;
 use crate::engine::change_request::{FilterFuncPtr, StateChangeFuncPtr, check_len};
 use crate::engine::player::roles::Roles;
 use crate::engine::state::Step;
-use crate::engine::state::log::DayPhaseLog;
 use std::fmt::Display;
 
 use crate::engine::{
@@ -80,6 +79,15 @@ impl Role for Imp {
 
                         if target_player_index == player_index
                             && state.get_player(player_index).dead
+                            && state
+                                .get_players()
+                                .iter()
+                                .filter(|p| {
+                                    p.role.get_true_character_type() == CharacterType::Minion
+                                        && !p.dead
+                                })
+                                .count()
+                                > 0
                         {
                             state
                                 .change_request_queue
@@ -142,11 +150,7 @@ mod test {
 
     #[test]
     fn test_imp_night_kill() {
-        let roles = vec![
-            RoleNames::Imp,
-            RoleNames::Poisoner,
-            RoleNames::Washerwoman,
-        ];
+        let roles = vec![RoleNames::Imp, RoleNames::Poisoner, RoleNames::Washerwoman];
         let mut state = setup_test_state(roles);
 
         let imp_index = find_role(&state, RoleNames::Imp);
@@ -161,7 +165,10 @@ mod test {
             .expect("Imp should have a night ability");
 
         let args = ChangeArgs::PlayerIndices(vec![target_index]);
-        cr.state_change_func.unwrap().call(&mut state, args).unwrap();
+        cr.state_change_func
+            .unwrap()
+            .call(&mut state, args)
+            .unwrap();
 
         assert!(
             state.get_player(target_index).dead,
@@ -173,11 +180,7 @@ mod test {
     fn test_imp_has_no_night_one_ability() {
         // Wiki: "Each night*, choose a player: they die." The `*` means the Imp does not
         // act on night one.
-        let roles = vec![
-            RoleNames::Imp,
-            RoleNames::Poisoner,
-            RoleNames::Washerwoman,
-        ];
+        let roles = vec![RoleNames::Imp, RoleNames::Poisoner, RoleNames::Washerwoman];
         let state = setup_test_state(roles);
 
         let imp_index = find_role(&state, RoleNames::Imp);
@@ -194,26 +197,27 @@ mod test {
     #[test]
     fn test_imp_death_ends_game_for_good() {
         // Wiki rule 3: "If the Imp dies (by any means), good wins."
-        let roles = vec![
-            RoleNames::Imp,
-            RoleNames::Poisoner,
-            RoleNames::Washerwoman,
-        ];
+        let roles = vec![RoleNames::Imp, RoleNames::Poisoner, RoleNames::Washerwoman];
         let mut state = setup_test_state(roles);
 
         let imp_index = find_role(&state, RoleNames::Imp);
 
         assert!(
-            !state.game_over(),
+            state.game_over().is_none(),
             "Game should not be over while the Imp is alive"
         );
 
         // Imp dies by a means other than its own kill ability (e.g. execution).
         state.execute_player(imp_index);
+        let demon_index = state.get_players().iter().position(|player| {
+            player.role.get_true_character_type() == CharacterType::Demon && !player.dead
+        });
 
         assert!(state.get_player(imp_index).dead);
         assert!(
-            state.game_over(),
+            state
+                .game_over()
+                .is_some_and(|winner| winner == Alignment::Good),
             "Good should win once the (non-star-passed) Imp is dead"
         );
     }
@@ -221,11 +225,7 @@ mod test {
     #[test]
     fn test_imp_star_pass_creates_new_imp() {
         // Wiki rule 4: "If you kill yourself this way, a Minion becomes the Imp."
-        let roles = vec![
-            RoleNames::Imp,
-            RoleNames::Poisoner,
-            RoleNames::Washerwoman,
-        ];
+        let roles = vec![RoleNames::Imp, RoleNames::Poisoner, RoleNames::Washerwoman];
         let mut state = setup_test_state(roles);
 
         let imp_index = find_role(&state, RoleNames::Imp);
@@ -269,10 +269,7 @@ mod test {
         new_imp_request
             .state_change_func
             .unwrap()
-            .call(
-                &mut state,
-                ChangeArgs::PlayerIndices(vec![minion_index]),
-            )
+            .call(&mut state, ChangeArgs::PlayerIndices(vec![minion_index]))
             .unwrap();
 
         assert_eq!(
@@ -281,8 +278,99 @@ mod test {
             "The alive Minion should become the new Imp after a star-pass"
         );
         assert_eq!(
-            state.get_player(minion_index).role.get_true_character_type(),
+            state
+                .get_player(minion_index)
+                .role
+                .get_true_character_type(),
             CharacterType::Demon
+        );
+    }
+
+    #[test]
+    fn test_imp_star_pass_no_swap_when_no_minions_in_game() {
+        // If there are no Minions in the game at all, self-killing should not queue a
+        // "choose a new Imp" request.
+        let roles = vec![RoleNames::Imp, RoleNames::Washerwoman, RoleNames::Chef];
+        let mut state = setup_test_state(roles);
+
+        let imp_index = find_role(&state, RoleNames::Imp);
+
+        state.step = Step::Night;
+
+        let cr = state
+            .get_player(imp_index)
+            .night_ability(imp_index, &state)
+            .expect("Imp should have a night ability");
+
+        cr.state_change_func
+            .unwrap()
+            .call(&mut state, ChangeArgs::PlayerIndices(vec![imp_index]))
+            .unwrap();
+
+        assert!(
+            state.get_player(imp_index).dead,
+            "Imp should die from targeting itself"
+        );
+
+        let follow_up = state
+            .change_request_queue
+            .pop_front()
+            .expect("expected a queued follow-up change request after Imp self-kill");
+        follow_up
+            .state_change_func
+            .unwrap()
+            .call(&mut state, ChangeArgs::Blank)
+            .unwrap();
+
+        assert!(
+            state.change_request_queue.is_empty(),
+            "No 'choose new Imp' request should be queued when there are no Minions in the game"
+        );
+    }
+
+    #[test]
+    fn test_imp_star_pass_no_swap_when_all_minions_dead() {
+        // If the only Minion(s) in the game are already dead, self-killing should not queue
+        // a "choose a new Imp" request either.
+        let roles = vec![RoleNames::Imp, RoleNames::Poisoner, RoleNames::Washerwoman];
+        let mut state = setup_test_state(roles);
+
+        let imp_index = find_role(&state, RoleNames::Imp);
+        let minion_index = find_role(&state, RoleNames::Poisoner);
+
+        state.execute_player(minion_index);
+        assert!(state.get_player(minion_index).dead);
+
+        state.step = Step::Night;
+
+        let cr = state
+            .get_player(imp_index)
+            .night_ability(imp_index, &state)
+            .expect("Imp should have a night ability");
+
+        cr.state_change_func
+            .unwrap()
+            .call(&mut state, ChangeArgs::PlayerIndices(vec![imp_index]))
+            .unwrap();
+
+        assert!(
+            state.get_player(imp_index).dead,
+            "Imp should die from targeting itself"
+        );
+
+        let follow_up = state
+            .change_request_queue
+            .pop_front()
+            .expect("expected a queued follow-up change request after Imp self-kill");
+        follow_up
+            .state_change_func
+            .unwrap()
+            .call(&mut state, ChangeArgs::Blank)
+            .unwrap();
+
+        assert!(
+            state.change_request_queue.is_empty(),
+            "No 'choose new Imp' request should be queued when all Minions are already dead"
         );
     }
 
@@ -291,11 +379,7 @@ mod test {
         // Wiki rule 4: star-passing keeps the game going via a new Imp instead of ending
         // it. This checks the win-condition bookkeeping actually reflects that instead of
         // just the role transfer.
-        let roles = vec![
-            RoleNames::Imp,
-            RoleNames::Poisoner,
-            RoleNames::Washerwoman,
-        ];
+        let roles = vec![RoleNames::Imp, RoleNames::Poisoner, RoleNames::Washerwoman];
         let mut state = setup_test_state(roles);
 
         let imp_index = find_role(&state, RoleNames::Imp);
@@ -323,14 +407,11 @@ mod test {
         new_imp_request
             .state_change_func
             .unwrap()
-            .call(
-                &mut state,
-                ChangeArgs::PlayerIndices(vec![minion_index]),
-            )
+            .call(&mut state, ChangeArgs::PlayerIndices(vec![minion_index]))
             .unwrap();
 
         assert!(
-            !state.game_over(),
+            state.game_over().is_none(),
             "Game should not be over after a star-pass, since a new Imp is alive"
         );
     }
@@ -365,9 +446,7 @@ mod test {
         assert!(state.get_player(target_index).dead);
 
         // Same night/step -- the Imp should not be able to act again.
-        let second_ability = state
-            .get_player(imp_index)
-            .night_ability(imp_index, &state);
+        let second_ability = state.get_player(imp_index).night_ability(imp_index, &state);
         assert!(
             second_ability.is_none(),
             "Imp should not be able to act twice in the same night/step"

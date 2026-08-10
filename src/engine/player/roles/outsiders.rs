@@ -3,6 +3,7 @@ use std::fmt::Display;
 use crate::engine::change_request::{ChangeArgs, ChangeError, ChangeRequest, StateChangeFuncPtr};
 use crate::engine::player::roles::Roles;
 use crate::engine::state::status_effects::CleanupPhase;
+use crate::engine::state::{EventListener, log};
 use crate::engine::{
     change_request::{ChangeRequestBuilder, ChangeType, check_len},
     player::{Alignment, CharacterType, roles::Role},
@@ -34,13 +35,12 @@ impl Butler {
                 });
             }
 
-            let target_player = state.get_player_mut(target_players[0]);
             let status = StatusEffect::new(
                 StatusType::ButlerMaster,
                 player_index,
                 CleanupPhase::Dusk.into(),
             );
-            target_player.add_status(status);
+            state.add_status(status, target_players[0]);
             Ok(())
         }))
         .into()
@@ -245,6 +245,26 @@ impl Role for Saint {
     fn get_true_character_type(&self) -> CharacterType {
         CharacterType::Outsider
     }
+
+    fn initialize(&self, player_index: PlayerIndex, state: &mut State) {
+        state.execution_listeners.push(EventListener::new(
+            player_index,
+            |ev_state, state, event: log::Execution| {
+                if event.0 == ev_state.source_player_index {
+                    state.winner = Some(
+                        match state.get_player(ev_state.source_player_index).alignment {
+                            Alignment::Good => Alignment::Evil,
+                            Alignment::Evil => Alignment::Good,
+                            Alignment::Any => {
+                                unreachable!("Saint's true alignment should never be Any");
+                            }
+                        },
+                    )
+                }
+                state
+            },
+        ));
+    }
 }
 
 impl Display for Saint {
@@ -276,7 +296,10 @@ mod test {
         let cr = butler_role.night_one_ability(butler_index, &state).unwrap();
 
         let args = ChangeArgs::PlayerIndices(vec![target_index]);
-        cr.state_change_func.unwrap().call(&mut state, args).unwrap();
+        cr.state_change_func
+            .unwrap()
+            .call(&mut state, args)
+            .unwrap();
 
         assert!(
             state
@@ -327,7 +350,10 @@ mod test {
         let cr = butler_role.night_one_ability(butler_index, &state).unwrap();
 
         let args = ChangeArgs::PlayerIndices(vec![target_index]);
-        cr.state_change_func.unwrap().call(&mut state, args).unwrap();
+        cr.state_change_func
+            .unwrap()
+            .call(&mut state, args)
+            .unwrap();
 
         assert!(
             state
@@ -353,7 +379,10 @@ mod test {
         let butler_role = Roles::new(&RoleNames::Butler);
         let cr = butler_role.night_one_ability(butler_index, &state).unwrap();
         let args = ChangeArgs::PlayerIndices(vec![target_index]);
-        cr.state_change_func.unwrap().call(&mut state, args).unwrap();
+        cr.state_change_func
+            .unwrap()
+            .call(&mut state, args)
+            .unwrap();
 
         assert!(
             state
@@ -437,7 +466,10 @@ mod test {
         // Washerwoman's setup ability has a real (functional) state_change_func that applies
         // WasherwomanTownsfolk/WasherwomanWrong statuses.
         let args = ChangeArgs::Roles(vec![RoleNames::Washerwoman]);
-        cr.state_change_func.unwrap().call(&mut state, args).unwrap();
+        cr.state_change_func
+            .unwrap()
+            .call(&mut state, args)
+            .unwrap();
 
         let assigned_role = match &state.get_player(drunk_index).role {
             Roles::Drunk(drunk) => drunk.role.clone(),
@@ -493,7 +525,10 @@ mod test {
     fn test_recluse_true_nature_is_good_outsider() {
         let recluse_role = Roles::new(&RoleNames::Recluse);
         assert_eq!(recluse_role.get_default_alignment(), Alignment::Good);
-        assert_eq!(recluse_role.get_true_character_type(), CharacterType::Outsider);
+        assert_eq!(
+            recluse_role.get_true_character_type(),
+            CharacterType::Outsider
+        );
     }
 
     #[test]
@@ -531,7 +566,11 @@ mod test {
         let recluse_index = find_role(&state, RoleNames::Recluse);
 
         let recluse_role = Roles::new(&RoleNames::Recluse);
-        assert!(recluse_role.night_one_ability(recluse_index, &state).is_none());
+        assert!(
+            recluse_role
+                .night_one_ability(recluse_index, &state)
+                .is_none()
+        );
         assert!(recluse_role.night_ability(recluse_index, &state).is_none());
     }
 
@@ -547,7 +586,10 @@ mod test {
         let recluse_role = &state.get_player(recluse_index).role;
         // Whatever the disguised alignment/character-type resolve to, they should be unaffected
         // by the Recluse being dead.
-        assert_eq!(recluse_role.get_alignment(), Roles::new(&RoleNames::Recluse).get_alignment());
+        assert_eq!(
+            recluse_role.get_alignment(),
+            Roles::new(&RoleNames::Recluse).get_alignment()
+        );
         assert_eq!(
             recluse_role.get_character_type(),
             Roles::new(&RoleNames::Recluse).get_character_type()
@@ -562,7 +604,10 @@ mod test {
     fn test_saint_true_nature_is_good_outsider() {
         let saint_role = Roles::new(&RoleNames::Saint);
         assert_eq!(saint_role.get_default_alignment(), Alignment::Good);
-        assert_eq!(saint_role.get_true_character_type(), CharacterType::Outsider);
+        assert_eq!(
+            saint_role.get_true_character_type(),
+            CharacterType::Outsider
+        );
     }
 
     #[test]
@@ -580,7 +625,9 @@ mod test {
             "the Saint should be dead after execution"
         );
         assert!(
-            state.game_over(),
+            state
+                .game_over()
+                .is_some_and(|winner| winner == Alignment::Evil),
             "executing the Saint should immediately end the game (evil wins)"
         );
     }
@@ -599,7 +646,7 @@ mod test {
 
         assert!(state.get_player(saint_index).dead);
         assert!(
-            !state.game_over(),
+            state.game_over().is_none(),
             "the Saint dying to a non-execution kill should not end the game"
         );
     }
