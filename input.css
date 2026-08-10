@@ -32,5 +32,5 @@
   --color-status-badge: var(--color-yellow-300);
 
   /* Active-turn seat highlight */
-  --color-active-turn: var(--color-emerald-300);
+  --color-active-turn: var(--color-orange-400);
 }

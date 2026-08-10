@@ -79,11 +79,11 @@ pub(crate) fn Grimoire() -> impl IntoView {
                                         "1px"
                                     }
                                 }
-                                style:background=move || {
+                                style:box-shadow=move || {
                                     if let Some(selected_player) = temp_state
                                         .currently_acting_player()
                                         .get() && selected_player == i {
-                                            return "var(--color-active-turn)";
+                                            return "0 0 16px 4px var(--color-active-turn)";
                                         }
 
                                     ""
