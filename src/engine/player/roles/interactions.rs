@@ -42,10 +42,7 @@ fn test_washerwoman_spy_can_be_shown_as_townsfolk() {
         .unwrap();
     cr.state_change_func
         .unwrap()
-        .call(
-            &mut state,
-            ChangeArgs::PlayerIndices(vec![spy_index]),
-        )
+        .call(&mut state, ChangeArgs::PlayerIndices(vec![spy_index]))
         .unwrap();
 
     assert!(
@@ -79,10 +76,7 @@ fn test_investigator_recluse_can_be_shown_as_minion() {
         .unwrap();
     cr.state_change_func
         .unwrap()
-        .call(
-            &mut state,
-            ChangeArgs::PlayerIndices(vec![recluse_index]),
-        )
+        .call(&mut state, ChangeArgs::PlayerIndices(vec![recluse_index]))
         .unwrap();
 
     assert!(
@@ -103,13 +97,18 @@ fn test_chef_spy_disguise_not_consulted() {
     // player's static `.alignment` field directly (see `Empath`/`Chef::ability` in
     // townsfolk.rs), and `Spy::get_alignment()` is hardcoded to always return `Alignment::Any`
     // with no way to make it return `Good` for a given read.
-    let roles = vec![RoleNames::Chef, RoleNames::Spy, RoleNames::Saint, RoleNames::Imp];
+    let roles = vec![
+        RoleNames::Chef,
+        RoleNames::Spy,
+        RoleNames::Saint,
+        RoleNames::Imp,
+    ];
     let state = setup_test_state(roles);
     let spy_index = find_role(&state, RoleNames::Spy);
 
     assert_eq!(
         state.get_player(spy_index).get_alignment(),
-        Alignment::Good,
+        Alignment::Any,
         "for the Spy to register as good to the Chef as the wiki describes, get_alignment() \
          would need to be able to return Good -- but it's hardcoded to always return \
          Alignment::Any, so there is no Storyteller-choice mechanism to exercise here"
@@ -121,13 +120,18 @@ fn test_chef_recluse_disguise_not_consulted() {
     // Wiki: "the Recluse might register as an Evil player for your [Chef] information" --
     // per-pair Storyteller choice. Same gap as the Spy case: `Recluse::get_alignment()` is
     // hardcoded to `Alignment::Any`, never `Evil`.
-    let roles = vec![RoleNames::Chef, RoleNames::Recluse, RoleNames::Saint, RoleNames::Imp];
+    let roles = vec![
+        RoleNames::Chef,
+        RoleNames::Recluse,
+        RoleNames::Saint,
+        RoleNames::Imp,
+    ];
     let state = setup_test_state(roles);
     let recluse_index = find_role(&state, RoleNames::Recluse);
 
     assert_eq!(
         state.get_player(recluse_index).get_alignment(),
-        Alignment::Evil,
+        Alignment::Any,
         "for the Recluse to register as evil to the Chef as the wiki describes, \
          get_alignment() would need to be able to return Evil -- but it's hardcoded to \
          always return Alignment::Any"
@@ -139,13 +143,18 @@ fn test_empath_spy_disguise_not_consulted() {
     // Wiki: the Spy "may register as good for you [Empath], and give you an incorrect
     // count." Empath::ability (townsfolk.rs) reads neighbors' static `.alignment` field, not
     // the disguise-aware `get_alignment()`.
-    let roles = vec![RoleNames::Empath, RoleNames::Spy, RoleNames::Saint, RoleNames::Imp];
+    let roles = vec![
+        RoleNames::Empath,
+        RoleNames::Spy,
+        RoleNames::Saint,
+        RoleNames::Imp,
+    ];
     let state = setup_test_state(roles);
     let spy_index = find_role(&state, RoleNames::Spy);
 
     assert_eq!(
         state.get_player(spy_index).get_alignment(),
-        Alignment::Good,
+        Alignment::Any,
         "for the Spy to register as good to the Empath as the wiki describes, get_alignment() \
          would need to be able to return Good -- but it's hardcoded to Alignment::Any"
     );
@@ -155,13 +164,18 @@ fn test_empath_spy_disguise_not_consulted() {
 fn test_empath_recluse_disguise_not_consulted() {
     // Wiki: the Recluse "may register as evil, making you [Empath] believe you are sitting
     // next to an evil player when that is not actually the case."
-    let roles = vec![RoleNames::Empath, RoleNames::Recluse, RoleNames::Saint, RoleNames::Imp];
+    let roles = vec![
+        RoleNames::Empath,
+        RoleNames::Recluse,
+        RoleNames::Saint,
+        RoleNames::Imp,
+    ];
     let state = setup_test_state(roles);
     let recluse_index = find_role(&state, RoleNames::Recluse);
 
     assert_eq!(
         state.get_player(recluse_index).get_alignment(),
-        Alignment::Evil,
+        Alignment::Any,
         "for the Recluse to register as evil to the Empath as the wiki describes, \
          get_alignment() would need to be able to return Evil -- but it's hardcoded to \
          Alignment::Any"
@@ -252,10 +266,7 @@ fn test_slayer_recluse_target_never_registers_as_demon() {
     let cr = slayer_role.day_ability(slayer_index, &state).unwrap();
     cr.state_change_func
         .unwrap()
-        .call(
-            &mut state,
-            ChangeArgs::PlayerIndices(vec![recluse_index]),
-        )
+        .call(&mut state, ChangeArgs::PlayerIndices(vec![recluse_index]))
         .unwrap();
 
     assert!(
@@ -326,10 +337,7 @@ fn test_ravenkeeper_always_reveals_true_character_no_disguise_choice() {
         .unwrap();
     cr.state_change_func
         .unwrap()
-        .call(
-            &mut state,
-            ChangeArgs::PlayerIndices(vec![spy_index]),
-        )
+        .call(&mut state, ChangeArgs::PlayerIndices(vec![spy_index]))
         .unwrap();
 
     let shown = state

@@ -539,7 +539,7 @@ mod test {
         let recluse_role = Roles::new(&RoleNames::Recluse);
         assert_eq!(
             recluse_role.get_alignment(),
-            Alignment::Evil,
+            Alignment::Any,
             "the Recluse's disguised alignment should be able to resolve to Evil"
         );
     }

@@ -20,10 +20,6 @@
         - Selection should be color coded by alignment
           - Blue for good
           - Red for evil
-- Test suite
-  - Need to figure out a better way to test roles
-  - Write detailed test cases for each role
-  - Test cases should also be partially derived from the role descriptions on the official dominion wiki
 - Better styling
   - I want the log to look better
 - Undo functionality
@@ -59,3 +55,8 @@
 
 - Display errors as a tooltip
 - Explain setup-time role/bag conflicts (e.g. dealing the Baron when there aren't enough Outsiders left to satisfy the +2 Outsider/-2 Townsfolk swap) instead of silently blocking the role selection
+- Implement Partial borrows
+  - Much of the state is non-overlapping, but a single mutable borrow of the state will invalidate accesses to the rest of the state
+  - This leads to a lot of behavior that is prohibited by the borrow checked but is completely valid
+  - Instead of passing around a state object, perhaps pass around a state reference distributer?
+    - This distributer will handle giving out references, and will literally return pointers to the state as references

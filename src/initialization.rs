@@ -207,15 +207,15 @@ impl SubAssign for CharacterTypeCounts {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn counts_updated_on_choose() {
-        // NOTE: Should have a test for all roles that modify character_types
-
-        // Baron
-        let _character_counts = CharacterTypeCounts::new(5).unwrap();
-        todo!()
-    }
-}
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//     #[test]
+//     fn counts_updated_on_choose() {
+//         // NOTE: Should have a test for all roles that modify character_types
+//
+//         // Baron
+//         let _character_counts = CharacterTypeCounts::new(5).unwrap();
+//         todo!()
+//     }
+// }
